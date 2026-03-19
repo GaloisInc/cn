@@ -1,0 +1,9 @@
+return code: 1
+[1/1]: f -- fail
+tests/cn/comma_operator_struct_field.error.c:4:16: error: Missing resource for reading
+void f() { (0, b).a; }
+               ^ 
+Resource needed: RW<struct __cerbty_unnamed_tag_518>(&b)
+  which requires: RW<signed int>(&&b->a)
+      other location (File "lib/resourceInference.ml", line 247, characters 33-40)  (arg a)
+State file: file:///tmp/state__comma_operator_struct_field.error.c__f.html
