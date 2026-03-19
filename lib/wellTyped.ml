@@ -781,6 +781,7 @@ module WIT = struct
                   [@alert "-deprecated"]
               }
           | Loc (), Alloc_id -> return ()
+          | Loc (), Loc () -> return ()
           | Integer, Real -> return ()
           | Real, Integer -> return ()
           | Bits (_sign, _n), Bits (_sign', _n')
