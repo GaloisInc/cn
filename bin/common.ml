@@ -280,6 +280,31 @@ let handle_error_with_user_guidance ~(label : string) (e : exn) : unit =
   exit 1
 
 
+(** Update prog5.logical_predicates with definitions from Global.t state.
+    This syncs the stale logical_predicates list with the authoritative
+    definitions in Global.t, which were updated during type checking. *)
+let update_prog5_logical_predicates (prog5 : unit Mucore.file) (paused : 'a Typing.pause)
+  : (unit Mucore.file, TypeErrors.t) Result.t
+  =
+  (* Extract the updated logical functions from Global state *)
+  let update_all_defs =
+    let open Typing in
+    let@ global = get_global () in
+    (* For each logical predicate, look up its updated definition in Global *)
+    let updated_pairs =
+      List.map
+        (fun (sym, old_def) ->
+           match Sym.Map.find_opt sym global.logical_functions with
+           | Some new_def -> (sym, new_def) (* Use updated definition *)
+           | None -> (sym, old_def)) (* Keep original if not found *)
+        prog5.logical_predicates
+    in
+    return { prog5 with logical_predicates = updated_pairs }
+  in
+  (* Run the update operation using the paused typing state *)
+  Typing.run_from_pause (fun _ -> update_all_defs) paused
+
+
 type subcommand =
   | Verify
   | Instrument

@@ -207,6 +207,12 @@ let run_tests
         print_endline "No testable functions, trivially passing";
         exit 0);
       Cerb_colour.do_colour := false;
+      (* Update prog5 with definitions from Global state *)
+      let prog5_updated =
+        match Common.update_prog5_logical_predicates prog5 paused with
+        | Ok prog5' -> prog5'
+        | Error err -> Common.handle_type_error ~json:false err
+      in
       (try
          Fulminate.main
            ~without_ownership_checking
@@ -227,7 +233,7 @@ let run_tests
            output_dir
            cabs_tunit
            ail_prog
-           prog5
+           prog5_updated
        with
        | e -> Common.handle_error_with_user_guidance ~label:"CN-Exec" e);
       (try
@@ -238,7 +244,7 @@ let run_tests
            build_tool
            cabs_tunit
            sigma
-           prog5
+           prog5_updated
            paused
        with
        | e -> Common.handle_error_with_user_guidance ~label:"CN-Test-Gen" e);

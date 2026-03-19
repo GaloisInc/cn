@@ -149,7 +149,7 @@ let generate_executable_specs
       (* If output locations requested, disable linemarkers in preproc step *)
     ~skip_label_inlining:true
     ~handle_error
-    ~f:(fun ~cabs_tunit ~prog5 ~ail_prog ~statement_locs:_ ~paused:_ ->
+    ~f:(fun ~cabs_tunit ~prog5 ~ail_prog ~statement_locs:_ ~paused ->
       if run && Option.is_none prog5.main then (
         print_endline "Tried running instrumented file (`--run`) without `main` function.";
         exit 1);
@@ -161,6 +161,12 @@ let generate_executable_specs
       in
       Cerb_colour.without_colour
         (fun () ->
+           (* Update prog5 with definitions from Global state *)
+           let prog5_updated =
+             match Common.update_prog5_logical_predicates prog5 paused with
+             | Ok prog5' -> prog5'
+             | Error err -> Common.handle_type_error ~json:false err
+           in
            (try
               Fulminate.main
                 ~without_ownership_checking
@@ -181,7 +187,7 @@ let generate_executable_specs
                 output_dir
                 cabs_tunit
                 ail_prog
-                prog5
+                prog5_updated
             with
             | e -> Common.handle_error_with_user_guidance ~label:"CN-Exec" e);
            ())
