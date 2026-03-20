@@ -391,6 +391,19 @@ module Make (AD : Domain.T) = struct
         (tests : Test.t list)
     : GenContext.Make(Term.Make(AD)).t
     =
+    (* Check for uninterpreted predicates *)
+    List.iter
+      (fun (name, (pred : Definition.Predicate.t)) ->
+         match pred.clauses with
+         | None ->
+           CF.Pp_errors.fatal
+             ("Cannot generate tests for uninterpreted predicate "
+              ^ Sym.pp_string name
+              ^ ".\nPredicate '"
+              ^ Sym.pp_string name
+              ^ "' has no definition.")
+         | Some _ -> ())
+      preds;
     (* Necessary to avoid triggering special-cased logic in [CtA] w.r.t globals *)
     let globals_subst =
       globals
