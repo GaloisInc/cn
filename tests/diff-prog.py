@@ -42,7 +42,12 @@ class Prog:
     def get_diff(self, test_rel_path):
         expect_path = test_rel_path + '.' + self.name
         if not os.path.isfile(expect_path):
-            open(expect_path, 'w')
+            try:
+                output = self.output(test_rel_path)
+                with open(expect_path, 'w') as expect:
+                    expect.writelines(output['lines'])
+            finally:
+                return { 'diff': False, 'time': .0 }
         with open(expect_path, 'r') as expect:
             try:
                 output = self.output(test_rel_path)
