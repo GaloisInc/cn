@@ -9,3 +9,4 @@ return code: 1
   474 |   cn_assert(cn_bool_or(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), ptr_eq(f, f3)), spec_mode);
       |                                                                            ^
 3 errors generated.
+Failed to compile 'fun_ptr_three_opts.test.c' in /tmp.

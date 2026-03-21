@@ -6,3 +6,4 @@ return code: 1
    97 |   memcpy((&s), ptr, sizeof(signed int));
       |            ^
 2 errors generated.
+Failed to compile 'previously_inconsistent_assumptions2.exec.c' in /tmp.

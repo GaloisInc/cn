@@ -28,3 +28,4 @@ In file included from ./append.test.c:241:
    78 | void bennet_split(size_t n, size_t* arr[], size_t len);
       |      ^            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning and 3 errors generated.
+Failed to compile 'append.test.c' in /tmp.

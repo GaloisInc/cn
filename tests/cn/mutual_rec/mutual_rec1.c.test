@@ -242,3 +242,4 @@ In file included from ./mutual_rec1.test.c:289:
       |                                                  ^
 fatal error: too many errors emitted, stopping now [-ferror-limit=]
 36 warnings and 20 errors generated.
+Failed to compile 'mutual_rec1.test.c' in /tmp.

@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-import os, sys, re, subprocess, json, difflib, argparse, concurrent.futures, math, multiprocessing
+import os, sys, re, subprocess, json, difflib, argparse, concurrent.futures, math, multiprocessing, time
 from multiprocessing import freeze_support
 
 def eprint(*args, then_exit=True, **kwargs):
     print('Error:', *args, file=sys.stderr, **kwargs)
     if then_exit:
         exit(1)
-
-def time_cmd(cmd):
-    return ["/usr/bin/time", "-p"] + cmd
 
 class Prog:
 
@@ -23,24 +20,22 @@ class Prog:
         self.accept_baselines = opts.accept
 
     def run(self, test_rel_path):
-        cmd = time_cmd([self.prog] + self.args + [test_rel_path])
+        cmd = [self.prog] + self.args + [test_rel_path]
         if self.print_cmd:
             print(' '.join(cmd))
         if self.run_cmd:
-            return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=self.timeout)
+            start_time = time.time()
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=self.timeout)
+            elapsed_time = time.time() - start_time
+            return (result, elapsed_time)
         else:
             return None
 
     def output(self, test_rel_path):
         try:
-            completed = self.run(test_rel_path);
+            completed, elapsed_time = self.run(test_rel_path);
             lines = completed.stdout.splitlines(True)
-            try:
-                time = float(lines[-3].split()[1])
-            except (ValueError, IndexError):
-                # If timing parse fails, use 0.0 as fallback
-                time = 0.0
-            return { 'time': time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines[:-3] }
+            return { 'time': elapsed_time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines }
         except subprocess.TimeoutExpired:
             return { 'time': float(self.timeout), 'lines': ["TIMEOUT\n"] }
 

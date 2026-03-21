@@ -12,3 +12,4 @@ return code: 1
   175 |   memcpy((&y), ptr, sizeof(signed int));
       |            ^
 4 errors generated.
+Failed to compile 'disj_nonnull.exec.c' in /tmp.

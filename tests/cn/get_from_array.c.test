@@ -92,3 +92,4 @@ In file included from ./get_from_array.test.c:168:
    97 |   });
       |   ~~
 10 errors generated.
+Failed to compile 'get_from_array.test.c' in /tmp.
