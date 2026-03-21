@@ -1,6 +1,7 @@
 module CF = Cerb_frontend
 module Cn_to_ail = Cn_to_ail
 module A = CF.AilSyntax
+module C = CF.Ctype
 module Extract = Extract
 module Globals = Globals
 module Internal = Internal
@@ -8,162 +9,21 @@ module Records = Records
 module Ownership = Ownership
 module Utils = Utils
 
-let rec group_toplevel_defs new_list = function
-  | [] -> new_list
-  | loc :: ls ->
-    let matching_elems = List.filter (fun toplevel_loc -> loc == toplevel_loc) new_list in
-    if List.is_empty matching_elems then
-      group_toplevel_defs (loc :: new_list) ls
-    else (
-      (* Unsafe *)
-      let non_matching_elems =
-        List.filter (fun toplevel_loc -> loc != toplevel_loc) new_list
-      in
-      group_toplevel_defs (loc :: non_matching_elems) ls)
+(* ===== AST Rewriting: Memory Accesses ===== *)
 
-
-type 'a memory_access =
-  | Load of
-      { loc : Cerb_location.t;
-        lvalue : 'a CF.AilSyntax.expression
-      }
-  | Store of
-      { loc : Cerb_location.t;
-        lvalue : 'a CF.AilSyntax.expression;
-        expr : 'a CF.AilSyntax.expression
-      }
-  | StoreOp of
-      { loc : Cerb_location.t;
-        aop : CF.AilSyntax.arithmeticOperator;
-        lvalue : 'a CF.AilSyntax.expression;
-        expr : 'a CF.AilSyntax.expression
-      }
-  | Postfix of
-      { loc : Cerb_location.t;
-        op : [ `Incr | `Decr ];
-        lvalue : 'a CF.AilSyntax.expression
-      }
-
-let collect_memory_accesses (_, sigm) =
-  let open CF.AilSyntax in
-  let acc = ref [] in
-  (* list of scoped variables *)
-  let scan_for_decls_and_update_env (bs, ss) env f_expr f_stmt =
-    let lookup_ty sym = List.find (fun (sym', _) -> Sym.equal sym sym') bs in
-    let env_cell = ref env in
-    List.iter
-      (fun s ->
-         match s.node with
-         (* Update the environment when variables are declared *)
-         | AilSdeclaration xs ->
-           List.iter
-             (function
-               | sym, None ->
-                 env_cell := lookup_ty sym :: !env_cell;
-                 ()
-               | sym, Some e ->
-                 env_cell := lookup_ty sym :: !env_cell;
-                 f_expr e !env_cell)
-             xs
-         | _ -> f_stmt s !env_cell)
-      ss
-  in
-  let rec aux_expr (AnnotatedExpression (_, _, loc, expr_)) env =
-    match expr_ with
-    | AilErvalue lvalue ->
-      acc := (Load { loc; lvalue }, env) :: !acc;
-      aux_expr lvalue env
-    | AilEassign (lvalue, expr) ->
-      acc := (Store { loc; lvalue; expr }, env) :: !acc;
-      aux_expr lvalue env;
-      aux_expr expr env
-    | AilEcompoundAssign (lvalue, aop, expr) ->
-      acc := (StoreOp { loc; lvalue; aop; expr }, env) :: !acc;
-      aux_expr lvalue env;
-      aux_expr expr env
-    | AilEunary (PostfixIncr, lvalue) ->
-      acc := (Postfix { loc; op = `Incr; lvalue }, env) :: !acc;
-      aux_expr lvalue env
-    | AilEunary (PostfixDecr, lvalue) ->
-      acc := (Postfix { loc; op = `Decr; lvalue }, env) :: !acc;
-      aux_expr lvalue env
-    | AilEunion (_, _, None)
-    | AilEoffsetof _ | AilEbuiltin _ | AilEstr _ | AilEconst _ | AilEident _
-    (* TODO(vla): if the type is a VLA, the size expression is evaluated *)
-    | AilEsizeof _
-    (* the sub-expr is not evaluated; TODO(vla): except if it is possible
-           to have an expression with VLA type here (?) *)
-    | AilEsizeof_expr _ | AilEalignof _ | AilEreg_load _ | AilEinvalid _ ->
-      ()
-    | AilEunary (_, e)
-    | AilEcast (_, _, e)
-    | AilEassert e
-    | AilEunion (_, _, Some e)
-    | AilEcompound (_, _, e)
-    | AilEmemberof (e, _)
-    | AilEmemberofptr (e, _)
-    | AilEannot (_, e)
-    | AilEva_start (e, _)
-    | AilEva_arg (e, _)
-    | AilEva_end e
-    | AilEprint_type e
-    | AilEbmc_assume e
-    | AilEarray_decay e
-    | AilEfunction_decay e
-    | AilEatomic e ->
-      aux_expr e env
-    | AilEbinary (e1, _, e2) | AilEcond (e1, None, e2) | AilEva_copy (e1, e2) ->
-      aux_expr e1 env;
-      aux_expr e2 env
-    | AilEcond (e1, Some e2, e3) ->
-      aux_expr e1 env;
-      aux_expr e2 env;
-      aux_expr e3 env
-    | AilEcall (e, es) ->
-      aux_expr e env;
-      List.iter (fun e -> aux_expr e env) es
-    | AilEgeneric (e, _, gas) ->
-      aux_expr e env;
-      List.iter (function AilGAtype (_, _, e) | AilGAdefault e -> aux_expr e env) gas
-    | AilEarray (_, _, xs) ->
-      List.iter (function None -> () | Some e -> aux_expr e env) xs
-    | AilEstruct (_, xs) ->
-      List.iter (function _, None -> () | _, Some e -> aux_expr e env) xs
-    | AilEgcc_statement (bs, ss) ->
-      scan_for_decls_and_update_env (bs, ss) env aux_expr aux_stmt
-  and aux_stmt stmt env =
-    match stmt.node with
-    | AilSskip | AilSbreak | AilScontinue | AilSreturnVoid | AilSgoto _ -> ()
-    | AilSexpr e | AilSreturn e | AilSreg_store (_, e) -> aux_expr e env
-    | AilSblock (bs, ss) -> scan_for_decls_and_update_env (bs, ss) env aux_expr aux_stmt
-    | AilSpar ss -> List.iter (fun s -> aux_stmt s env) ss
-    | AilSif (e, s1, s2) ->
-      aux_expr e env;
-      aux_stmt s1 env;
-      aux_stmt s2 env
-    | AilSwhile (e, s, _) | AilSdo (s, e, _) | AilSswitch (e, s) ->
-      aux_expr e env;
-      aux_stmt s env
-    | AilScase (_, s)
-    | AilScase_rangeGNU (_, _, s)
-    | AilSdefault s
-    | AilSlabel (_, s, _)
-    | AilSmarker (_, s) ->
-      aux_stmt s env
-    | AilSdeclaration _ ->
-      (* AilSdeclaration must be handled in `AilSblock` *)
-      failwith "unreachable"
-  in
-  List.iter (fun (_, (_, _, _, _, stmt)) -> aux_stmt stmt []) sigm.function_definitions;
-  !acc
-
-
-let memory_accesses_injections ail_prog =
-  let open Cerb_frontend in
-  let open Cerb_location in
+(* Rewrite memory access expressions in-place in the AST.
+   - AilErvalue(lv) -> AilEcall(CN_LOAD, [lv])
+   - AilEassign(lv, e) -> AilEcall(CN_STORE, [lv, e])
+   - AilEcompoundAssign(lv, op, e) -> AilEcall(CN_STORE_OP, [lv, op_expr, e])
+   - AilEunary(PostfixIncr/Decr, lv) -> AilEcall(CN_POSTFIX, [lv, op_str]) *)
+let rewrite_memory_accesses_in_sigma (sigm : CF.GenTypes.genTypeCategory A.sigma)
+  : CF.GenTypes.genTypeCategory A.sigma
+  =
+  let mk_expr = Utils.mk_expr in
+  let mk_ident s = mk_expr (A.AilEident (Sym.fresh s)) in
   let string_of_aop aop =
     match aop with
-    | AilSyntax.Mul -> "*"
+    | A.Mul -> "*"
     | Div -> "/"
     | Mod -> "%"
     | Add -> "+"
@@ -173,82 +33,119 @@ let memory_accesses_injections ail_prog =
     | Band -> "&"
     | Bxor -> "^"
     | Bor -> "|"
-    (* We could use the below here, but it's only the same by coincidence, Pp_ail is not intended to produce C output
-       CF.Pp_utils.to_plain_string (Pp_ail.pp_arithmeticOperator aop) *)
   in
-  let loc_of_expr (AilSyntax.AnnotatedExpression (_, _, loc, _)) = loc in
-  let pos_bbox loc =
-    match bbox [ loc ] with `Other _ -> assert false | `Bbox (b, e) -> (b, e)
+  let rec rewrite_expr (A.AnnotatedExpression (gtc, strs, loc, e_)) =
+    let rewrap e_' = A.AnnotatedExpression (gtc, strs, loc, e_') in
+    match e_ with
+    | A.AilErvalue lv ->
+      let lv' = rewrite_expr lv in
+      rewrap (A.AilEcall (mk_ident "CN_LOAD", [ lv' ]))
+    | A.AilEassign (lv, e) ->
+      let lv' = rewrite_expr lv in
+      let e' = rewrite_expr e in
+      rewrap (A.AilEcall (mk_ident "CN_STORE", [ lv'; e' ]))
+    | A.AilEcompoundAssign (lv, aop, e) ->
+      let lv' = rewrite_expr lv in
+      let e' = rewrite_expr e in
+      let aop_expr = mk_expr (A.AilEident (Sym.fresh (string_of_aop aop))) in
+      rewrap (A.AilEcall (mk_ident "CN_STORE_OP", [ lv'; aop_expr; e' ]))
+    | A.AilEunary (A.PostfixIncr, lv) ->
+      let lv' = rewrite_expr lv in
+      let op_expr = mk_expr (A.AilEident (Sym.fresh "++")) in
+      rewrap (A.AilEcall (mk_ident "CN_POSTFIX", [ lv'; op_expr ]))
+    | A.AilEunary (A.PostfixDecr, lv) ->
+      let lv' = rewrite_expr lv in
+      let op_expr = mk_expr (A.AilEident (Sym.fresh "--")) in
+      rewrap (A.AilEcall (mk_ident "CN_POSTFIX", [ lv'; op_expr ]))
+    (* Recursively rewrite sub-expressions *)
+    | AilEunary (op, e) -> rewrap (AilEunary (op, rewrite_expr e))
+    | AilEcast (q, ct, e) -> rewrap (AilEcast (q, ct, rewrite_expr e))
+    | AilEbinary (e1, op, e2) ->
+      rewrap (AilEbinary (rewrite_expr e1, op, rewrite_expr e2))
+    | AilEcond (e1, e2_opt, e3) ->
+      rewrap (AilEcond (rewrite_expr e1, Option.map rewrite_expr e2_opt, rewrite_expr e3))
+    | AilEcall (e, es) -> rewrap (AilEcall (rewrite_expr e, List.map rewrite_expr es))
+    | AilEassert e -> rewrap (AilEassert (rewrite_expr e))
+    | AilEcompound (q, ct, e) -> rewrap (AilEcompound (q, ct, rewrite_expr e))
+    | AilEmemberof (e, m) -> rewrap (AilEmemberof (rewrite_expr e, m))
+    | AilEmemberofptr (e, m) -> rewrap (AilEmemberofptr (rewrite_expr e, m))
+    | AilEannot (ct, e) -> rewrap (AilEannot (ct, rewrite_expr e))
+    | AilEva_start (e, s) -> rewrap (AilEva_start (rewrite_expr e, s))
+    | AilEva_arg (e, ct) -> rewrap (AilEva_arg (rewrite_expr e, ct))
+    | AilEva_end e -> rewrap (AilEva_end (rewrite_expr e))
+    | AilEva_copy (e1, e2) -> rewrap (AilEva_copy (rewrite_expr e1, rewrite_expr e2))
+    | AilEprint_type e -> rewrap (AilEprint_type (rewrite_expr e))
+    | AilEbmc_assume e -> rewrap (AilEbmc_assume (rewrite_expr e))
+    | AilEarray_decay e -> rewrite_expr e
+    | AilEfunction_decay e -> rewrite_expr e
+    | AilEatomic e -> rewrap (AilEatomic (rewrite_expr e))
+    | AilEunion (t, m, Some e) -> rewrap (AilEunion (t, m, Some (rewrite_expr e)))
+    | AilEgeneric (e, ct, gas) ->
+      let gas' =
+        List.map
+          (function
+            | A.AilGAtype (q, ct, e) -> A.AilGAtype (q, ct, rewrite_expr e)
+            | A.AilGAdefault e -> A.AilGAdefault (rewrite_expr e))
+          gas
+      in
+      rewrap (AilEgeneric (rewrite_expr e, ct, gas'))
+    | AilEarray (q, ct, xs) ->
+      rewrap (AilEarray (q, ct, List.map (Option.map rewrite_expr) xs))
+    | AilEstruct (tag, xs) ->
+      rewrap
+        (AilEstruct
+           (tag, List.map (fun (m, e_opt) -> (m, Option.map rewrite_expr e_opt)) xs))
+    | AilEgcc_statement (bs, ss) ->
+      rewrap (AilEgcc_statement (bs, List.map rewrite_stmt ss))
+    | AilEsizeof_expr e -> rewrap (AilEsizeof_expr (rewrite_expr e))
+    (* Leaf nodes *)
+    | AilEunion (_, _, None)
+    | AilEoffsetof _ | AilEbuiltin _ | AilEstr _ | AilEconst _ | AilEident _
+    | AilEsizeof _ | AilEalignof _ | AilEreg_load _ | AilEinvalid _ ->
+      rewrap e_
+  and rewrite_stmt (A.{ loc; desug_info; attrs; node = s_ } as _stmt) =
+    let rewrap s_' = A.{ loc; desug_info; attrs; node = s_' } in
+    match s_ with
+    | A.AilSexpr e -> rewrap (A.AilSexpr (rewrite_expr e))
+    | AilSreturn e -> rewrap (AilSreturn (rewrite_expr e))
+    | AilSblock (bs, ss) -> rewrap (AilSblock (bs, List.map rewrite_stmt ss))
+    | AilSif (e, s1, s2) ->
+      rewrap (AilSif (rewrite_expr e, rewrite_stmt s1, rewrite_stmt s2))
+    | AilSwhile (e, s, annot) ->
+      rewrap (AilSwhile (rewrite_expr e, rewrite_stmt s, annot))
+    | AilSdo (s, e, annot) -> rewrap (AilSdo (rewrite_stmt s, rewrite_expr e, annot))
+    | AilSswitch (e, s) -> rewrap (AilSswitch (rewrite_expr e, rewrite_stmt s))
+    | AilScase (c, s) -> rewrap (AilScase (c, rewrite_stmt s))
+    | AilScase_rangeGNU (c1, c2, s) -> rewrap (AilScase_rangeGNU (c1, c2, rewrite_stmt s))
+    | AilSdefault s -> rewrap (AilSdefault (rewrite_stmt s))
+    | AilSlabel (l, s, annot) -> rewrap (AilSlabel (l, rewrite_stmt s, annot))
+    | AilSmarker (m, s) -> rewrap (AilSmarker (m, rewrite_stmt s))
+    | AilSpar ss -> rewrap (AilSpar (List.map rewrite_stmt ss))
+    | AilSreg_store (r, e) -> rewrap (AilSreg_store (r, rewrite_expr e))
+    | AilSdeclaration decls ->
+      let decls' =
+        List.map (fun (sym, e_opt) -> (sym, Option.map rewrite_expr e_opt)) decls
+      in
+      rewrap (AilSdeclaration decls')
+    | AilSskip | AilSbreak | AilScontinue | AilSreturnVoid | AilSgoto _ -> rewrap s_
   in
-  let acc = ref [] in
-  let xs = collect_memory_accesses ail_prog in
-  List.iter
-    (* HK: Currently, `env` is ignored. It will be used in future patches. *)
-    (fun (access, _env) ->
-       match access with
-       | Load { loc; _ } ->
-         let b, e = pos_bbox loc in
-         acc := (point b, [ "CN_LOAD(" ]) :: (point e, [ ")" ]) :: !acc
-       | Store { lvalue; expr; _ } ->
-         (* NOTE: we are not using the location of the access (the AilEassign), because if
-           in the source the assignment was surrounded by parens its location will contain
-           the parens, which will break the CN_STORE macro call *)
-         let b, pos1 = pos_bbox (loc_of_expr lvalue) in
-         let pos2, e = pos_bbox (loc_of_expr expr) in
-         acc
-         := (point b, [ "CN_STORE(" ])
-            :: (region (pos1, pos2) NoCursor, [ ", " ])
-            :: (point e, [ ")" ])
-            :: !acc
-       | StoreOp { lvalue; aop; expr; loc } ->
-         (match bbox [ loc_of_expr expr ] with
-          | `Other _ ->
-            (* This prettyprinter doesn not produce valid C, but it's
-                     correct for simple expressions and we use it here for
-                     simple literals *)
-            let pp_expr e = CF.Pp_utils.to_plain_string (Pp_ail.pp_expression e) in
-            let sstart, ssend = pos_bbox loc in
-            let b, _ = pos_bbox (loc_of_expr lvalue) in
-            acc
-            := (region (sstart, b) NoCursor, [ "" ])
-               :: ( point b,
-                    [ "CN_STORE_OP("
-                      ^ pp_expr lvalue
-                      ^ ","
-                      ^ string_of_aop aop
-                      ^ ","
-                      ^ pp_expr expr
-                      ^ ")"
-                    ] )
-               :: (region (b, ssend) NoCursor, [ "" ])
-               :: !acc
-          | `Bbox _ ->
-            let b, pos1 = pos_bbox (loc_of_expr lvalue) in
-            let pos2, e = pos_bbox (loc_of_expr expr) in
-            acc
-            := (point b, [ "CN_STORE_OP(" ])
-               :: (region (pos1, pos2) NoCursor, [ "," ^ string_of_aop aop ^ "," ])
-               :: (point e, [ ")" ])
-               :: !acc)
-       | Postfix { loc; op; lvalue } ->
-         let op_str = match op with `Incr -> "++" | `Decr -> "--" in
-         let b, e = pos_bbox loc in
-         let pos1, pos2 = pos_bbox (loc_of_expr lvalue) in
-         (* E++ *)
-         acc
-         := (region (b, pos1) NoCursor, [ "CN_POSTFIX(" ])
-            :: (region (pos2, e) NoCursor, [ ", " ^ op_str ^ ")" ])
-            :: !acc)
-    xs;
-  !acc
+  let function_definitions =
+    List.map
+      (fun (sym, (loc, n, attrs, params, body)) ->
+         (sym, (loc, n, attrs, params, rewrite_stmt body)))
+      sigm.function_definitions
+  in
+  { sigm with function_definitions }
 
 
-(* Lifetime of compound literals can change if enclosed in a block via gen_single_stat_control_flow_injs, so need to check for any instances *)
+(* ===== AST Rewriting: Ensure Block Bodies ===== *)
+
+(* Lifetime of compound literals can change if enclosed in a block, so check *)
 let contains_compound_literal s =
   let rec aux_expr (A.AnnotatedExpression (_, _, _, e_)) =
     match e_ with
     | AilEcompound _ -> true
-    | AilEgcc_statement (_, ss) -> List.fold_left ( || ) false (List.map aux_stmt ss)
+    | AilEgcc_statement (_, ss) -> List.exists aux_stmt ss
     | AilEunion (_, _, None)
     | AilEoffsetof _ | AilEbuiltin _ | AilEstr _ | AilEconst _ | AilEident _
     | AilEsizeof _ | AilEalignof _ | AilEreg_load _ | AilEinvalid _ ->
@@ -278,30 +175,21 @@ let contains_compound_literal s =
     | AilEcompoundAssign (e1, _, e2) ->
       aux_expr e1 || aux_expr e2
     | AilEcond (e1, Some e2, e3) -> aux_expr e1 || aux_expr e2 || aux_expr e3
-    | AilEcall (e, es) -> aux_expr e || List.fold_left ( || ) false (List.map aux_expr es)
+    | AilEcall (e, es) -> aux_expr e || List.exists aux_expr es
     | AilEgeneric (e, _, gas) ->
-      let bs =
-        List.map (function A.AilGAtype (_, _, e) | AilGAdefault e -> aux_expr e) gas
-      in
-      aux_expr e || List.fold_left ( || ) false bs
+      aux_expr e
+      || List.exists (function A.AilGAtype (_, _, e) | AilGAdefault e -> aux_expr e) gas
     | AilEarray (_, _, xs) ->
-      let bs = List.map (function None -> false | Some e -> aux_expr e) xs in
-      List.fold_left ( || ) false bs
+      List.exists (function None -> false | Some e -> aux_expr e) xs
     | AilEstruct (_, xs) ->
-      let bs = List.map (function _, None -> false | _, Some e -> aux_expr e) xs in
-      List.fold_left ( || ) false bs
+      List.exists (function _, None -> false | _, Some e -> aux_expr e) xs
   and aux_stmt A.{ node = s_; _ } =
     match s_ with
     | A.(AilSdeclaration decls) ->
-      let bs =
-        List.map
-          (fun (_, e_opt) -> match e_opt with Some e -> aux_expr e | None -> false)
-          decls
-      in
-      List.fold_left ( || ) false bs
-    | AilSblock (_, ss) ->
-      let bs = List.map aux_stmt ss in
-      List.fold_left ( || ) false bs
+      List.exists
+        (fun (_, e_opt) -> match e_opt with Some e -> aux_expr e | None -> false)
+        decls
+    | AilSblock (_, ss) -> List.exists aux_stmt ss
     | AilSif (e, s1, s2) -> aux_expr e || aux_stmt s1 || aux_stmt s2
     | AilSwhile (e, s, _) | AilSdo (s, e, _) | AilSswitch (e, s) ->
       aux_expr e || aux_stmt s
@@ -316,136 +204,502 @@ let contains_compound_literal s =
   aux_stmt s
 
 
-let gen_single_stat_control_flow_injs statement =
-  let gen_curly_braces_inj loc =
-    [ (Utils.get_start_loc loc, [ "{" ]); (Utils.get_end_loc loc, [ "}" ]) ]
+let wrap_in_block s = Utils.mk_stmt (A.AilSblock ([], [ s ]))
+
+let ensure_block_bodies_stmt stmt =
+  let is_single_stat A.{ node = s_; _ } =
+    match s_ with
+    | A.(
+        ( AilSexpr _ | AilSreturn _ | AilSgoto _ | AilScontinue | AilSbreak | AilSskip
+        | AilSreturnVoid )) ->
+      true
+    | _ -> false
   in
-  let is_valid_single_stat s =
-    let is_single_stat A.{ node = s_; _ } =
-      match s_ with
-      | A.(AilSexpr _)
-      | AilSreturn _ | AilSgoto _ | AilScontinue | AilSbreak | AilSskip | AilSreturnVoid
-        ->
-        true
-      | _ -> false
-    in
-    let b = is_single_stat s in
-    if b && contains_compound_literal s then
-      failwith
-        "Cannot enclose single statement with curly braces: compound literal found in \
-         statement"
-    else
-      b
-  in
-  let rec aux_expr (A.AnnotatedExpression (_, _, _, e_)) =
-    match e_ with
-    | AilEcompound _ -> []
-    | AilEgcc_statement (_, ss) -> List.concat (List.map aux_stmt ss)
-    | AilEunion (_, _, None)
-    | AilEoffsetof _ | AilEbuiltin _ | AilEstr _ | AilEconst _ | AilEident _
-    | AilEsizeof _ | AilEalignof _ | AilEreg_load _ | AilEinvalid _ ->
-      []
-    | AilEsizeof_expr e
-    | AilErvalue e
-    | AilEunary (_, e)
-    | AilEcast (_, _, e)
-    | AilEassert e
-    | AilEunion (_, _, Some e)
-    | AilEmemberof (e, _)
-    | AilEmemberofptr (e, _)
-    | AilEannot (_, e)
-    | AilEva_start (e, _)
-    | AilEva_arg (e, _)
-    | AilEva_end e
-    | AilEprint_type e
-    | AilEbmc_assume e
-    | AilEarray_decay e
-    | AilEfunction_decay e
-    | AilEatomic e ->
-      aux_expr e
-    | AilEbinary (e1, _, e2)
-    | AilEcond (e1, None, e2)
-    | AilEva_copy (e1, e2)
-    | AilEassign (e1, e2)
-    | AilEcompoundAssign (e1, _, e2) ->
-      aux_expr e1 @ aux_expr e2
-    | AilEcond (e1, Some e2, e3) -> aux_expr e1 @ aux_expr e2 @ aux_expr e3
-    | AilEcall (e, es) -> aux_expr e @ List.concat (List.map aux_expr es)
-    | AilEgeneric (e, _, gas) ->
-      let injs =
-        List.map (function A.AilGAtype (_, _, e) | AilGAdefault e -> aux_expr e) gas
-      in
-      aux_expr e @ List.concat injs
-    | AilEarray (_, _, xs) ->
-      let injs = List.map (function None -> [] | Some e -> aux_expr e) xs in
-      List.concat injs
-    | AilEstruct (_, xs) ->
-      let injs = List.map (function _, None -> [] | _, Some e -> aux_expr e) xs in
-      List.concat injs
-  and aux_stmt (A.{ node = s_; _ } as stmt) =
+  let should_wrap s = is_single_stat s && not (contains_compound_literal s) in
+  let rec aux_stmt stmt =
+    let rewrap s_' = A.{ stmt with node = s_' } in
     let is_forloop_body A.{ desug_info; _ } = desug_info.is_forloop_body in
-    (if is_forloop_body stmt then
-       fun z -> gen_curly_braces_inj stmt.loc @ z
-     else
-       Fun.id)
-      (match s_ with
-       | A.AilSblock (_, ss) -> List.concat (List.map aux_stmt ss)
-       | AilSif (e, (A.{ loc = loc1; _ } as s1), (A.{ loc = loc2; _ } as s2)) ->
-         let inj_e = aux_expr e in
-         let inj_true =
-           if is_valid_single_stat s1 then
-             gen_curly_braces_inj loc1 @ aux_stmt s1
-           else
-             aux_stmt s1
-         in
-         let inj_false =
-           if is_valid_single_stat s2 then
-             gen_curly_braces_inj loc2 @ aux_stmt s2
-           else
-             aux_stmt s2
-         in
-         inj_e @ inj_true @ inj_false
-       | AilSwhile (e, (A.{ loc; _ } as s), _)
-       | AilSdo ((A.{ loc; _ } as s), e, _)
-       | AilSswitch (e, (A.{ loc; _ } as s)) ->
-         let inj_e = aux_expr e in
-         let inj_s =
-           if is_valid_single_stat s then
-             gen_curly_braces_inj loc @ aux_stmt s
-           else
-             aux_stmt s
-         in
-         inj_e @ inj_s
-       | AilScase (_, (A.{ loc; _ } as s)) | AilScase_rangeGNU (_, _, (A.{ loc; _ } as s))
-         ->
-         if is_valid_single_stat s then
-           gen_curly_braces_inj loc @ aux_stmt s
-         else
-           aux_stmt s
-       | AilSdeclaration xs ->
-         let injs =
-           List.map
-             (fun (_, e_opt) -> match e_opt with None -> [] | Some e -> aux_expr e)
-             xs
-         in
-         List.concat injs
-       | AilSlabel (_, s, _) | AilSdefault s -> aux_stmt s
-       | AilSreturn e | AilSexpr e | AilSreg_store (_, e) -> aux_expr e
-       | AilSgoto _ | AilScontinue | AilSbreak | AilSskip | AilSreturnVoid | AilSpar _
-       | AilSmarker _ ->
-         [])
+    let stmt =
+      if is_forloop_body stmt then
+        rewrap (A.AilSblock ([], [ stmt ]))
+      else
+        stmt
+    in
+    match stmt.node with
+    | A.AilSblock (bs, ss) -> rewrap (AilSblock (bs, List.map aux_stmt ss))
+    | AilSif (e, s1, s2) ->
+      let s1' = if should_wrap s1 then wrap_in_block (aux_stmt s1) else aux_stmt s1 in
+      let s2' = if should_wrap s2 then wrap_in_block (aux_stmt s2) else aux_stmt s2 in
+      rewrap (AilSif (e, s1', s2'))
+    | AilSwhile (e, s, annot) ->
+      let s' = if should_wrap s then wrap_in_block (aux_stmt s) else aux_stmt s in
+      rewrap (AilSwhile (e, s', annot))
+    | AilSdo (s, e, annot) ->
+      let s' = if should_wrap s then wrap_in_block (aux_stmt s) else aux_stmt s in
+      rewrap (AilSdo (s', e, annot))
+    | AilSswitch (e, s) ->
+      let s' = if should_wrap s then wrap_in_block (aux_stmt s) else aux_stmt s in
+      rewrap (AilSswitch (e, s'))
+    | AilScase (c, s) ->
+      let s' = if should_wrap s then wrap_in_block (aux_stmt s) else aux_stmt s in
+      rewrap (AilScase (c, s'))
+    | AilScase_rangeGNU (c1, c2, s) ->
+      let s' = if should_wrap s then wrap_in_block (aux_stmt s) else aux_stmt s in
+      rewrap (AilScase_rangeGNU (c1, c2, s'))
+    | AilSdefault s -> rewrap (AilSdefault (aux_stmt s))
+    | AilSlabel (l, s, annot) -> rewrap (AilSlabel (l, aux_stmt s, annot))
+    | AilSmarker (m, s) -> rewrap (AilSmarker (m, aux_stmt s))
+    | _ -> stmt
   in
-  aux_stmt statement
+  aux_stmt stmt
 
 
-let get_c_control_flow_extra_curly_braces
-      (sigm : CF.GenTypes.genTypeCategory CF.AilSyntax.sigma)
+let ensure_all_block_bodies (sigm : CF.GenTypes.genTypeCategory A.sigma) =
+  let function_definitions =
+    List.map
+      (fun (sym, (loc, n, attrs, params, body)) ->
+         (sym, (loc, n, attrs, params, ensure_block_bodies_stmt body)))
+      sigm.function_definitions
+  in
+  { sigm with function_definitions }
+
+
+(* ===== AST Modification: Instrument Function Bodies ===== *)
+
+(* Convert ail_bs_and_ss to a list of statements, wrapping in a block if there are bindings *)
+let bs_and_ss_to_stmts ((bs, ss) : Internal.ail_bs_and_ss) =
+  if List.is_empty bs then
+    List.map Utils.mk_stmt ss
+  else
+    [ Utils.mk_stmt (A.AilSblock (bs, List.map Utils.mk_stmt ss)) ]
+
+
+(* Extract bindings and statements separately *)
+let extract_bs_and_ss ((bs, ss) : Internal.ail_bs_and_ss) = (bs, List.map Utils.mk_stmt ss)
+
+(* Context for the unified ownership + return-rewriting walk *)
+type ownership_ctx =
+  { in_scope_vars : (Sym.t * C.ctype) list;
+    break_vars : (Sym.t * C.ctype) list;
+    continue_vars : (Sym.t * C.ctype) list;
+    cn_ret_sym : Sym.t;
+    epilogue_sym : Sym.t;
+    is_void : bool;
+    loop_invariants : Cn_to_ail.loop_info list;
+    in_stmt_injs : (Cerb_location.t * Internal.ail_bs_and_ss) list ref
+  }
+
+(* Generate ownership entry stmts for a list of declared variables *)
+let make_entry_stmts vars =
+  List.concat_map
+    (fun (sym, ctype) ->
+       let bs, ss = Ownership.generate_c_local_ownership_entry_bs_and_ss (sym, ctype) in
+       if List.is_empty bs then
+         List.map Utils.mk_stmt ss
+       else
+         [ Utils.mk_stmt (A.AilSblock (bs, List.map Utils.mk_stmt ss)) ])
+    vars
+
+
+(* Generate ownership exit stmts for a list of variables *)
+let make_exit_stmts vars =
+  List.map (fun v -> Utils.mk_stmt (Ownership.generate_c_local_ownership_exit v)) vars
+
+
+(* Get declared variable types from a declaration statement *)
+let get_declared_vars bindings decls =
+  List.map (fun (sym, _) -> (sym, Utils.find_ctype_from_bindings bindings sym)) decls
+
+
+(* Find a loop_info matching this statement's location *)
+let find_loop_invariant loc loop_invariants =
+  List.find_opt
+    (fun (li : Cn_to_ail.loop_info) ->
+       String.equal
+         (Cerb_location.location_to_string loc)
+         (Cerb_location.location_to_string li.loop_loc))
+    loop_invariants
+
+
+(* Check if an injection location falls between prev_loc and next_loc *)
+let loc_line loc =
+  match Cerb_location.to_cartesian_raw loc with
+  | Some ((sl, _), _) -> Some sl
+  | None -> None
+
+
+(* Drain in_stmt_injs that should be inserted after a statement at the given line *)
+let drain_in_stmt_injs_after stmt_loc next_loc_opt injs_ref =
+  let stmt_line = loc_line stmt_loc in
+  let next_line = Option.bind next_loc_opt loc_line in
+  let matching, rest =
+    List.partition
+      (fun (inj_loc, _) ->
+         let inj_line = loc_line inj_loc in
+         match (stmt_line, inj_line, next_line) with
+         | Some sl, Some il, Some nl -> il >= sl && il < nl
+         | Some sl, Some il, None -> il >= sl
+         | _ -> false)
+      !injs_ref
+  in
+  injs_ref := rest;
+  List.concat_map (fun (_, bs_and_ss) -> bs_and_ss_to_stmts bs_and_ss) matching
+
+
+(* The unified walk: rewrites returns, inserts ownership entry/exit at block
+   boundaries and control flow points, inserts loop invariants and in-stmt
+   injections. *)
+let rec instrument_stmt ctx bindings (stmt : CF.GenTypes.genTypeCategory A.statement) =
+  let rewrap s_' = A.{ stmt with node = s_' } in
+  match stmt.node with
+  | A.AilSblock (bs, ss) ->
+    let all_bindings = bs @ bindings in
+    let new_ss, declared_vars = instrument_block_stmts ctx all_bindings [] ss in
+    (* Add exit cleanup at end of block for all bindings declared in this block *)
+    let block_binding_vars =
+      List.map (fun (b_sym, ((_, _, _), _, _, b_ctype)) -> (b_sym, b_ctype)) bs
+    in
+    let exit_stmts = make_exit_stmts (declared_vars @ block_binding_vars) in
+    rewrap (A.AilSblock (bs, new_ss @ exit_stmts))
+  | A.AilSreturn e ->
+    (* __cn_ret = e; cleanup_in_scope_vars; goto __cn_epilogue *)
+    let cleanup_stmts = make_exit_stmts ctx.in_scope_vars in
+    if ctx.is_void then
+      rewrap
+        (A.AilSblock ([], cleanup_stmts @ [ Utils.mk_stmt (A.AilSgoto ctx.epilogue_sym) ]))
+    else
+      rewrap
+        (A.AilSblock
+           ( [],
+             [ Utils.mk_stmt
+                 (A.AilSexpr
+                    (Utils.mk_expr
+                       (A.AilEassign (Utils.mk_expr (A.AilEident ctx.cn_ret_sym), e))))
+             ]
+             @ cleanup_stmts
+             @ [ Utils.mk_stmt (A.AilSgoto ctx.epilogue_sym) ] ))
+  | A.AilSreturnVoid ->
+    let cleanup_stmts = make_exit_stmts ctx.in_scope_vars in
+    rewrap
+      (A.AilSblock ([], cleanup_stmts @ [ Utils.mk_stmt (A.AilSgoto ctx.epilogue_sym) ]))
+  | A.AilSbreak ->
+    let cleanup_stmts = make_exit_stmts ctx.break_vars in
+    if List.is_empty cleanup_stmts then
+      stmt
+    else
+      rewrap (A.AilSblock ([], cleanup_stmts @ [ Utils.mk_stmt A.AilSbreak ]))
+  | A.AilSgoto _ ->
+    (match stmt.desug_info.desug_case with
+     | Some A.Desug_continue ->
+       let cleanup_stmts = make_exit_stmts ctx.continue_vars in
+       if List.is_empty cleanup_stmts then
+         stmt
+       else
+         rewrap (A.AilSblock ([], cleanup_stmts @ [ stmt ]))
+     | _ ->
+       (* Real goto: clean up all in-scope vars *)
+       let cleanup_stmts = make_exit_stmts ctx.in_scope_vars in
+       if List.is_empty cleanup_stmts then
+         stmt
+       else
+         rewrap (A.AilSblock ([], cleanup_stmts @ [ stmt ])))
+  | A.AilSlabel (label_sym, s, label_annot_opt) ->
+    let s' = instrument_stmt ctx bindings s in
+    (* For real labels (not compiler-generated), re-enter scope for in-scope vars *)
+    (match label_annot_opt with
+     | None ->
+       let entry_stmts =
+         List.map
+           (fun (sym, ctype) ->
+              Utils.mk_stmt
+                A.(
+                  AilSexpr (Ownership.generate_c_local_ownership_entry_fcall (sym, ctype))))
+           ctx.in_scope_vars
+       in
+       if List.is_empty entry_stmts then
+         rewrap (A.AilSlabel (label_sym, s', label_annot_opt))
+       else
+         rewrap
+           (A.AilSlabel
+              ( label_sym,
+                Utils.mk_stmt (A.AilSblock ([], entry_stmts @ [ s' ])),
+                label_annot_opt ))
+     | _ -> rewrap (A.AilSlabel (label_sym, s', label_annot_opt)))
+  | A.AilSif (e, s1, s2) ->
+    rewrap
+      (A.AilSif (e, instrument_stmt ctx bindings s1, instrument_stmt ctx bindings s2))
+  | A.AilSwhile (e, s, annot) ->
+    let ctx' = { ctx with break_vars = []; continue_vars = [] } in
+    let s' = instrument_stmt ctx' bindings s in
+    (match find_loop_invariant stmt.loc ctx.loop_invariants with
+     | Some loop_info ->
+       let entry_stmts = bs_and_ss_to_stmts loop_info.loop_entry in
+       let _cond_loc, cond_bs_and_ss = loop_info.cond in
+       let cond_stmts = bs_and_ss_to_stmts cond_bs_and_ss in
+       let exit_stmts_internal = bs_and_ss_to_stmts loop_info.loop_exit in
+       let exit_stmts_external = bs_and_ss_to_stmts loop_info.loop_exit in
+       (* Wrap loop body: cond check at top, exit at bottom *)
+       let augmented_body =
+         match s'.A.node with
+         | A.AilSblock (bs, ss) ->
+           A.{ s' with node = A.AilSblock (bs, cond_stmts @ ss @ exit_stmts_internal) }
+         | _ ->
+           Utils.mk_stmt (A.AilSblock ([], cond_stmts @ [ s' ] @ exit_stmts_internal))
+       in
+       (* Entry before loop, loop, exit after loop *)
+       Utils.mk_stmt
+         (A.AilSblock
+            ( [],
+              entry_stmts
+              @ [ rewrap (A.AilSwhile (e, augmented_body, annot)) ]
+              @ exit_stmts_external ))
+     | None -> rewrap (A.AilSwhile (e, s', annot)))
+  | A.AilSdo (s, e, annot) ->
+    let ctx' = { ctx with break_vars = []; continue_vars = [] } in
+    let s' = instrument_stmt ctx' bindings s in
+    (match find_loop_invariant stmt.loc ctx.loop_invariants with
+     | Some loop_info ->
+       let entry_stmts = bs_and_ss_to_stmts loop_info.loop_entry in
+       let _cond_loc, cond_bs_and_ss = loop_info.cond in
+       let cond_stmts = bs_and_ss_to_stmts cond_bs_and_ss in
+       let exit_stmts_internal = bs_and_ss_to_stmts loop_info.loop_exit in
+       let exit_stmts_external = bs_and_ss_to_stmts loop_info.loop_exit in
+       let augmented_body =
+         match s'.A.node with
+         | A.AilSblock (bs, ss) ->
+           A.{ s' with node = A.AilSblock (bs, cond_stmts @ ss @ exit_stmts_internal) }
+         | _ ->
+           Utils.mk_stmt (A.AilSblock ([], cond_stmts @ [ s' ] @ exit_stmts_internal))
+       in
+       Utils.mk_stmt
+         (A.AilSblock
+            ( [],
+              entry_stmts
+              @ [ rewrap (A.AilSdo (augmented_body, e, annot)) ]
+              @ exit_stmts_external ))
+     | None -> rewrap (A.AilSdo (s', e, annot)))
+  | A.AilSswitch (e, s) ->
+    let ctx' = { ctx with break_vars = [] } in
+    rewrap (A.AilSswitch (e, instrument_stmt ctx' bindings s))
+  | A.AilScase (c, s) -> rewrap (A.AilScase (c, instrument_stmt ctx bindings s))
+  | A.AilScase_rangeGNU (c1, c2, s) ->
+    rewrap (A.AilScase_rangeGNU (c1, c2, instrument_stmt ctx bindings s))
+  | A.AilSdefault s -> rewrap (A.AilSdefault (instrument_stmt ctx bindings s))
+  | A.AilSmarker (m, s) -> rewrap (A.AilSmarker (m, instrument_stmt ctx bindings s))
+  | A.AilSpar ss -> rewrap (A.AilSpar (List.map (instrument_stmt ctx bindings) ss))
+  | A.AilSdeclaration _ | A.AilSexpr _ | A.AilSskip | A.AilScontinue | A.AilSreg_store _
+    ->
+    stmt
+
+
+(* Process statements in a block sequentially, inserting ownership entry
+   after each declaration, in-stmt injections between statements,
+   and tracking declared variables for context updates *)
+and instrument_block_stmts ctx bindings declared_so_far stmts =
+  let next_loc stmts = match stmts with s :: _ -> Some s.A.loc | [] -> None in
+  match stmts with
+  | [] -> ([], declared_so_far)
+  | stmt :: rest ->
+    (match stmt.A.node with
+     | A.AilSdeclaration decls ->
+       let new_vars = get_declared_vars bindings decls in
+       let entry_stmts = make_entry_stmts new_vars in
+       let in_stmt_after =
+         drain_in_stmt_injs_after stmt.loc (next_loc rest) ctx.in_stmt_injs
+       in
+       let ctx' =
+         { ctx with
+           in_scope_vars = new_vars @ ctx.in_scope_vars;
+           break_vars = new_vars @ ctx.break_vars;
+           continue_vars = new_vars @ ctx.continue_vars
+         }
+       in
+       let rest_stmts, all_declared =
+         instrument_block_stmts ctx' bindings (new_vars @ declared_so_far) rest
+       in
+       ((stmt :: entry_stmts) @ in_stmt_after @ rest_stmts, all_declared)
+     | _ ->
+       let stmt' = instrument_stmt ctx bindings stmt in
+       let in_stmt_after =
+         drain_in_stmt_injs_after stmt.loc (next_loc rest) ctx.in_stmt_injs
+       in
+       let rest_stmts, all_declared =
+         instrument_block_stmts ctx bindings declared_so_far rest
+       in
+       ((stmt' :: in_stmt_after) @ rest_stmts, all_declared))
+
+
+(* Instrument a function body with pre/post conditions, return rewriting,
+   and ownership tracking. This is the unified entry point that replaces
+   both the old return-rewriting pass and the injection-based ownership system. *)
+let instrument_function_body
+      ~with_testing
+      fn_sym
+      (pre : Internal.ail_bs_and_ss)
+      (post : Internal.ail_bs_and_ss)
+      (in_stmt_injs : (Cerb_location.t * Internal.ail_bs_and_ss) list)
+      (loop_invariants : Cn_to_ail.loop_info list)
+      (sigm : CF.GenTypes.genTypeCategory A.sigma)
   =
-  sigm.function_definitions
-  |> List.map (fun (_, (_, _, _, _, fn_body)) ->
-    gen_single_stat_control_flow_injs fn_body)
-  |> List.concat
+  let is_main = String.equal "main" (Sym.pp_string fn_sym) in
+  match
+    ( List.assoc_opt Sym.equal fn_sym sigm.function_definitions,
+      List.assoc_opt Sym.equal fn_sym sigm.declarations )
+  with
+  | Some (floc, n, attrs, params, body), Some (_, _, decl) ->
+    let ret_ty =
+      match decl with
+      | A.Decl_function (_, (_, ret_ty), _, _, _, _) -> ret_ty
+      | _ -> C.void
+    in
+    let is_void = CF.AilTypesAux.is_void ret_ty in
+    if with_testing && is_main then (
+      let function_definitions =
+        List.filter (fun (sym, _) -> not (Sym.equal sym fn_sym)) sigm.function_definitions
+      in
+      let declarations =
+        List.filter (fun (sym, _) -> not (Sym.equal sym fn_sym)) sigm.declarations
+      in
+      { sigm with function_definitions; declarations })
+    else (
+      match body.node with
+      | A.AilSblock (body_bs, body_ss) ->
+        let pre_bs, pre_ss = extract_bs_and_ss pre in
+        let post_bs, post_ss = extract_bs_and_ss post in
+        let cn_ret_sym = Sym.fresh "__cn_ret" in
+        let epilogue_sym = Sym.fresh "__cn_epilogue" in
+        let extra_bs, extra_decl_ss =
+          if is_void then
+            ([], [])
+          else (
+            let init_expr =
+              if is_main then
+                Some
+                  (Utils.mk_expr
+                     (A.AilEconst
+                        (A.ConstantInteger (A.IConstant (Z.zero, A.Decimal, None)))))
+              else
+                None
+            in
+            ( [ Utils.create_binding cn_ret_sym ret_ty ],
+              [ Utils.mk_stmt (A.AilSdeclaration [ (cn_ret_sym, init_expr) ]) ] ))
+        in
+        let epilogue_stmts =
+          let label_stmt =
+            if List.is_empty post_ss then
+              [ Utils.mk_stmt (A.AilSlabel (epilogue_sym, Utils.mk_stmt A.AilSskip, None))
+              ]
+            else (
+              let post_block = Utils.mk_stmt (A.AilSblock (post_bs, post_ss)) in
+              [ Utils.mk_stmt (A.AilSlabel (epilogue_sym, post_block, None)) ])
+          in
+          let return_stmt =
+            if is_void then
+              [ Utils.mk_stmt A.AilSreturnVoid ]
+            else
+              [ Utils.mk_stmt (A.AilSreturn (Utils.mk_expr (A.AilEident cn_ret_sym))) ]
+          in
+          label_stmt @ return_stmt
+        in
+        let ctx =
+          { in_scope_vars = [];
+            break_vars = [];
+            continue_vars = [];
+            cn_ret_sym;
+            epilogue_sym;
+            is_void;
+            loop_invariants;
+            in_stmt_injs = ref in_stmt_injs
+          }
+        in
+        let instrumented_ss, declared_vars =
+          instrument_block_stmts ctx body_bs [] body_ss
+        in
+        (* Exit cleanup for variables declared in the function body *)
+        let body_var_exit_stmts = make_exit_stmts declared_vars in
+        (* Any remaining in-stmt injections that weren't matched go at the end *)
+        let trailing =
+          List.concat_map
+            (fun (_, bs_and_ss) -> bs_and_ss_to_stmts bs_and_ss)
+            !(ctx.in_stmt_injs)
+        in
+        let new_body =
+          Utils.mk_stmt
+            (A.AilSblock
+               ( extra_bs @ pre_bs @ body_bs,
+                 extra_decl_ss
+                 @ pre_ss
+                 @ instrumented_ss
+                 @ trailing
+                 @ body_var_exit_stmts
+                 @ epilogue_stmts ))
+        in
+        let function_definitions =
+          List.map
+            (fun ((sym, _def) as orig) ->
+               if Sym.equal sym fn_sym then
+                 (sym, (floc, n, attrs, params, new_body))
+               else
+                 orig)
+            sigm.function_definitions
+        in
+        { sigm with function_definitions }
+      | _ -> sigm)
+  | _ -> sigm
 
+
+(* ===== Static Wrappers ===== *)
+
+let generate_static_wrapper filename (fn_sym : Sym.t) (decl : A.sigma_declaration) =
+  let prefix = Utils.static_prefix filename in
+  let fsym = Sym.fresh (prefix ^ "_" ^ Sym.pp_string fn_sym) in
+  let ret_ty, arg_tys =
+    match snd decl with
+    | _, _, A.Decl_function (_, (_, ret_ty), arg_tys, _, _, _) -> (ret_ty, arg_tys)
+    | _ -> failwith __LOC__
+  in
+  let args =
+    let rec aux n tys =
+      match tys with
+      | _ :: tys' -> Sym.fresh ("arg_" ^ string_of_int n) :: aux (n + 1) tys'
+      | [] -> []
+    in
+    aux 0 arg_tys
+  in
+  let e_call =
+    Utils.mk_expr
+      (A.AilEcall
+         ( Utils.mk_expr (A.AilEident fn_sym),
+           List.map (fun x -> Utils.mk_expr (A.AilEident x)) args ))
+  in
+  let wrapper_decl : A.sigma_declaration =
+    ( fsym,
+      ( Locations.other __LOC__,
+        CF.Annot.Attrs [],
+        A.Decl_function (false, (C.no_qualifiers, ret_ty), arg_tys, false, false, false)
+      ) )
+  in
+  let wrapper_def : CF.GenTypes.genTypeCategory A.sigma_function_definition =
+    ( fsym,
+      ( Locations.other __LOC__,
+        0,
+        CF.Annot.Attrs [],
+        args,
+        Utils.mk_stmt
+          A.(
+            AilSblock
+              ( [],
+                [ Utils.mk_stmt
+                    (if C.ctypeEqual C.void ret_ty then
+                       AilSexpr e_call
+                     else
+                       AilSreturn e_call)
+                ] )) ) )
+  in
+  (wrapper_decl, wrapper_def)
+
+
+(* ===== Filtering ===== *)
 
 let filter_selected_fns
       (is_sym_selected : Sym.t -> bool)
@@ -476,7 +730,6 @@ let get_main_sym sym_list =
   List.filter (fun sym -> String.equal (Sym.pp_string sym) "main") sym_list
 
 
-(* Filtering *)
 let filter_using_skip_and_only
       skip_and_only
       ( (prog5 : unit Mucore.file),
@@ -551,13 +804,11 @@ let main
       out_filename
       output_dir
       cabs_tunit
-      ((startup_sym_opt, (sigm : CF.GenTypes.genTypeCategory CF.AilSyntax.sigma)) as
-       ail_prog)
+      ((_startup_sym_opt, (sigm : CF.GenTypes.genTypeCategory CF.AilSyntax.sigma)) as
+       _ail_prog)
       prog5
   =
   let out_filename = get_filename_with_prefix output_dir out_filename in
-  (* disabled until fixed *)
-  (* _gen_compile_commands_json cc output_dir out_filename; *)
   let (full_instrumentation : Extract.instrumentation list), _ =
     Extract.collect_instrumentation cabs_tunit prog5
   in
@@ -571,7 +822,6 @@ let main
     |> List.map (fun (inst : Extract.instrumentation) -> inst.fn)
     |> Sym.Set.of_list
   in
-  let filtered_ail_prog = (startup_sym_opt, filtered_sigm) in
   Records.populate_record_map filtered_instrumentation prog5;
   let executable_spec =
     generate_c_specs
@@ -609,29 +859,16 @@ let main
   let cn_converted_struct_defs = generate_cn_versions_of_structs ordered_ail_tag_defs in
   let record_fun_defs, record_fun_decls = Records.generate_c_record_funs sigm in
   let record_defs = Records.generate_all_record_strs () in
-  let fn_call_ghost_args_injs =
-    generate_fn_call_ghost_args_injs filename cabs_tunit sigm prog5
-  in
   let cn_ghost_enum = generate_ghost_enum prog5 in
   let cn_ghost_call_site_glob = generate_ghost_call_site_glob () in
   (* Forward declarations and CN types *)
   let cn_header_decls_list =
     List.concat
-      (* TODO instead use hcat on these includes and typedefs *)
-      [ [ (* TODO need handling for the stuff in stdlib.h and stdint.h but we
-             can't include them here, they'll clash in essentially unavoidable
-             ways with the stuff we already included and processed *)
-          "#include <cn-executable/cerb_types.h>\n";
-          (* TODO necessary because of the types in the struct decls. proper
-             handling would be to hoist all definitions and toposort them *)
-          (* TODO actually instead of *hoisting* types we can *lower* structs
-             etc to the highest place they're valid *)
+      [ [ "#include <cn-executable/cerb_types.h>\n";
           "typedef __cerbty_intptr_t intptr_t;\n";
           "typedef __cerbty_uintptr_t uintptr_t;\n";
           "typedef __cerbty_intmax_t intmax_t;\n";
           "typedef __cerbty_uintmax_t uintmax_t;\n";
-          (* TODO need to inject definitions for all the __cerbvars in cerberus
-             builtins.lem. Hoisting/lowering doesn't affect needing to do this *)
           "static const int __cerbvar_INT_MAX = 0x7fffffff;\n";
           "static const int __cerbvar_INT_MIN = ~0x7fffffff;\n";
           "static const unsigned long long __cerbvar_SIZE_MAX = ~(0ULL);\n";
@@ -660,11 +897,8 @@ let main
       ]
   in
   (* Definitions for CN helper functions *)
-  (* TODO: Topological sort *)
   let cn_defs_list =
-    [ (* record_equality_fun_strs; *)
-      (* record_equality_fun_strs'; *)
-      "/* RECORD */\n";
+    [ "/* RECORD */\n";
       record_fun_defs;
       "/* CONVERSION */\n";
       conversion_function_defs;
@@ -677,79 +911,25 @@ let main
       c_lemma_defs
     ]
   in
-  let c_datatype_locs = List.map fst c_datatype_defs in
-  let toplevel_locs = group_toplevel_defs [] c_datatype_locs in
-  let toplevel_injections = List.map (fun loc -> (loc, [ "" ])) toplevel_locs in
-  let accesses_stmt_injs =
-    if without_ownership_checking then
-      []
+  (* === Build the AST modification pipeline === *)
+  (* 1. Start with filtered sigma *)
+  let sigma = filtered_sigm in
+  (* 2. Optionally wrap single-statement bodies in blocks *)
+  let sigma =
+    if experimental_curly_braces then ensure_all_block_bodies sigma else sigma
+  in
+  (* 3. Rewrite memory accesses *)
+  let sigma =
+    if not without_ownership_checking then
+      rewrite_memory_accesses_in_sigma sigma
     else
-      memory_accesses_injections filtered_ail_prog
+      sigma
   in
-  (* Use order of tag definitions from source when injecting on them directly - no call to Internal.order_ail_tag_definitions *)
-  let tag_def_injs = generate_tag_definition_injs sigm.tag_definitions in
-  let give_precedence_map n = List.map (fun x -> (n, x)) in
-  (* workaround for https://github.com/rems-project/cn/issues/392
-  HK: This workaround is not so clean, which should be fixed later.
-  This is for handling the case where multiple insertions take place at the same location.
-  Previously, it was handled by using fixed "precedences", which is incorrect as pointed out in the above issue.
-  To address this issue, we assign precedences based on the position of the corresponding closing parenthesis for each "CN_LOAD(" or such.
-
-  **This function is designed specifically for memory access injections and ghost arg injections, so adding a different kind of injections may require modification.**
-  *)
-  let give_parenthesis_aware_precedence_map l =
-    let rec look_for_closing_parenthesis par acc = function
-      | [] -> assert false
-      | (p, [ s ]) :: xs when Char.equal (String.get s (String.length s - 1)) par ->
-        (acc, xs, p, s)
-      | x :: xs -> look_for_closing_parenthesis par (x :: acc) xs
-    in
-    let rec aux acc = function
-      | [] -> acc
-      | (p, strs) :: xs ->
-        let par, static_prec =
-          if List.equal String.equal strs [ "{" ] then ('}', 1) else (')', 0)
-        in
-        let injs, xs, p', closing_expr = look_for_closing_parenthesis par [] xs in
-        let pos_x, pos_y =
-          match Cerb_location.to_cartesian_user p' with
-          | Some (start_pos, _) -> start_pos
-          | _ -> failwith "error"
-        in
-        let open Source_injection in
-        (*  ')': 1, '(': 2, '{': 3 *)
-        let a =
-          if static_prec = 1 then
-            (Normal (-1), (p, strs))
-          else
-            (Cartesian (true, pos_x, pos_y), (p, strs))
-        in
-        let cs = give_precedence_map (Normal 0) injs in
-        let b = (Cartesian (false, pos_x, pos_y), (p', [ closing_expr ])) in
-        let cs' = a :: b :: cs in
-        aux (cs' @ acc) xs
-    in
-    aux [] l
-  in
-  let bot = Source_injection.Normal 0 in
-  let in_stmt_injs =
-    (if experimental_curly_braces then
-       give_parenthesis_aware_precedence_map
-         (get_c_control_flow_extra_curly_braces filtered_sigm)
-     else
-       [])
-    @ give_precedence_map bot executable_spec.in_stmt
-    @ give_parenthesis_aware_precedence_map accesses_stmt_injs
-    @ give_precedence_map bot toplevel_injections
-    @ give_precedence_map bot tag_def_injs
-    @ give_parenthesis_aware_precedence_map fn_call_ghost_args_injs
-  in
+  (* 4. Build pre_post pairs including global ownership for main *)
   let pre_post_pairs =
     if with_testing || without_ownership_checking then
       executable_spec.pre_post
     else (
-      (* XXX: ONLY IF THERE IS A MAIN *)
-      (* Inject ownership init function calls and mapping and unmapping of globals into provided main function *)
       let global_ownership_init_pair =
         generate_global_assignments
           ~exec_c_locs_mode
@@ -762,7 +942,57 @@ let main
       in
       global_ownership_init_pair @ executable_spec.pre_post)
   in
-  (* Save things *)
+  (* 5. Instrument each function body with pre/post/returns/in-stmt *)
+  let sigma =
+    List.fold_left
+      (fun sigma (fn_sym, (pre, post)) ->
+         let fn_in_stmt =
+           match List.assoc_opt Sym.equal fn_sym executable_spec.in_stmt with
+           | Some injs -> injs
+           | None -> []
+         in
+         let fn_loops =
+           match List.assoc_opt Sym.equal fn_sym executable_spec.loops with
+           | Some loops -> loops
+           | None -> []
+         in
+         instrument_function_body ~with_testing fn_sym pre post fn_in_stmt fn_loops sigma)
+      sigma
+      pre_post_pairs
+  in
+  (* 6. Add static wrappers *)
+  let sigma =
+    Sym.Set.fold
+      (fun fn_sym sigma ->
+         match List.assoc_opt Sym.equal fn_sym sigma.A.declarations with
+         | Some decl ->
+           let wrapper_decl, wrapper_def =
+             generate_static_wrapper filename fn_sym (fn_sym, decl)
+           in
+           { sigma with
+             declarations = sigma.declarations @ [ wrapper_decl ];
+             function_definitions = sigma.function_definitions @ [ wrapper_def ]
+           }
+         | None -> sigma)
+      static_funcs
+      sigma
+  in
+  (* 7. Filter sigma for pretty-printing: only keep declarations that have
+     corresponding function definitions (drops stdlib declarations like
+     calloc, qsort etc. that use size_t which isn't defined in our output) *)
+  let print_sigma =
+    let defined_syms = List.map fst sigma.function_definitions |> Sym.Set.of_list in
+    let filtered_decls =
+      List.filter (fun (sym, _) -> Sym.Set.mem sym defined_syms) sigma.declarations
+    in
+    { sigma with declarations = filtered_decls }
+  in
+  let instrumented_source =
+    Pp.plain
+      CF.Pp_ail.(
+        with_executable_spec (pp_program ~show_include:false) (None, print_sigma))
+  in
+  (* 8. Write output *)
   let oc = Stdlib.open_out out_filename in
   output_to_oc oc [ "#define __CN_INSTRUMENT\n"; "#include <cn-executable/utils.h>\n" ];
   output_to_oc oc cn_header_decls_list;
@@ -778,25 +1008,8 @@ let main
     oc
     ("void* memcpy(void* dest, const void* src, __cerbty_size_t count );\n"
      ^ Globals.accessors_prototypes filename cabs_tunit prog5);
-  (match
-     Source_injection.(
-       output_injections
-         oc
-         { orig_filename = filename;
-           filename = in_filename;
-           program = ail_prog;
-           static_funcs;
-           pre_post = pre_post_pairs;
-           in_stmt = in_stmt_injs;
-           returns = executable_spec.returns;
-           inject_in_preproc = true;
-           with_testing
-         })
-   with
-   | Ok () -> ()
-   | Error str ->
-     (* TODO(Christopher/Rini): maybe lift this error to the exception monad? *)
-     prerr_endline str);
+  (* Pretty-printed instrumented program *)
+  output_string oc instrumented_source;
   output_to_oc oc [ Globals.accessors_str filename cabs_tunit prog5 ];
   output_to_oc oc cn_defs_list;
   close_out oc;

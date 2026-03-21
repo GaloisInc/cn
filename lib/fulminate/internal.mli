@@ -1,13 +1,17 @@
 open Cerb_frontend
 
+type ail_bs_and_ss = Cn_to_ail.ail_bindings_and_statements
+
 type executable_spec =
-  { pre_post : (AilSyntax.ail_identifier * (string list * string list)) list;
-    in_stmt : (Cerb_location.t * string list) list;
-    returns :
-      (Cerb_location.t
-      * (GenTypes.genTypeCategory AilSyntax.expression option * string list))
-        list
+  { pre_post : (AilSyntax.ail_identifier * (ail_bs_and_ss * ail_bs_and_ss)) list;
+    in_stmt : (AilSyntax.ail_identifier * (Cerb_location.t * ail_bs_and_ss) list) list;
+    loops : (AilSyntax.ail_identifier * Cn_to_ail.loop_info list) list
   }
+
+val generate_ail_stat_strs
+  :  ?with_newline:bool ->
+  Cn_to_ail.ail_bindings_and_statements ->
+  string list
 
 val generate_c_assume_pres_internal
   :  string ->
@@ -102,15 +106,4 @@ val generate_global_assignments
   Cabs.translation_unit ->
   GenTypes.genTypeCategory AilSyntax.sigma ->
   unit Mucore.file ->
-  (Sym.t * (string list * string list)) list
-
-val generate_fn_call_ghost_args_injs
-  :  string ->
-  Cabs.translation_unit ->
-  GenTypes.genTypeCategory AilSyntax.sigma ->
-  unit Mucore.file ->
-  (Cerb_location.t * string list) list
-
-val generate_tag_definition_injs
-  :  AilSyntax.sigma_tag_definition list ->
-  (Cerb_location.t * string list) list
+  (Sym.t * (ail_bs_and_ss * ail_bs_and_ss)) list
