@@ -123,7 +123,7 @@ let run_tests
     ~magic_comment_char_dollar
     ~allow_split_magic_comments (* Callbacks *)
     ~save_cpp:(Some pp_file)
-    ~disable_linemarkers:true
+    ~disable_linemarkers:false
     ~skip_label_inlining:true
     ~handle_error
     ~f:(fun ~cabs_tunit ~prog5 ~ail_prog ~statement_locs:_ ~paused ->
