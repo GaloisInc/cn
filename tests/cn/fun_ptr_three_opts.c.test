@@ -1,0 +1,11 @@
+return code: 1
+./fun_ptr_three_opts.test.c:474:45: error: use of undeclared identifier 'f1'
+  474 |   cn_assert(cn_bool_or(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), ptr_eq(f, f3)), spec_mode);
+      |                                             ^
+./fun_ptr_three_opts.test.c:474:60: error: use of undeclared identifier 'f2'
+  474 |   cn_assert(cn_bool_or(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), ptr_eq(f, f3)), spec_mode);
+      |                                                            ^
+./fun_ptr_three_opts.test.c:474:76: error: use of undeclared identifier 'f3'
+  474 |   cn_assert(cn_bool_or(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), ptr_eq(f, f3)), spec_mode);
+      |                                                                            ^
+3 errors generated.

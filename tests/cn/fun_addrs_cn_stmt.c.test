@@ -1,0 +1,8 @@
+return code: 1
+./fun_addrs_cn_stmt.test.c:362:46: error: use of undeclared identifier 'g'
+  362 |   a_971->x1 = cast_cn_pointer_to_cn_bits_u32(g);
+      |                                              ^
+./fun_addrs_cn_stmt.test.c:363:46: error: use of undeclared identifier 'extern_f'
+  363 |   a_971->x2 = cast_cn_pointer_to_cn_bits_u32(extern_f);
+      |                                              ^
+2 errors generated.

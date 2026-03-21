@@ -123,6 +123,8 @@ Don't just call `todo()` - implement proper type inference to avoid crashes on v
 - Keep commits small and self-contained
 - Write clear commit messages explaining "why" not just "what"
 - Each commit should build successfully (supports `git bisect`)
+- **NEVER use `git add -A` or `git add .`**
+- always add specific files by name to avoid accidentally committing untracked files, build artifacts, or sensitive data
 
 ## Test Cases
 

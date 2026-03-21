@@ -333,7 +333,7 @@ let save ?(perm = 0o666) (output_dir : string) (filename : string) (doc : Pp.doc
       perm
       (Filename.concat output_dir filename)
   in
-  output_string oc (Pp.plain ~width:80 doc);
+  output_string oc (Pp.plain ~width:max_int doc);
   close_out oc
 
 

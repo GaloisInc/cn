@@ -1,3 +1,14 @@
-return code: 2
-/tmp/run_tests.sh: line 20: syntax error near unexpected token `fi'
-/tmp/run_tests.sh: line 20: `fi'
+return code: 1
+./spec_accesses.exec.c:91:37: error: use of undeclared identifier 'y'
+   91 |     __cn_ret = CN_LOAD(x) + CN_LOAD(y);
+      |                                     ^
+./spec_accesses.exec.c:91:37: error: use of undeclared identifier 'y'
+./spec_accesses.exec.c:91:37: error: use of undeclared identifier 'y'
+./spec_accesses.exec.c:91:37: error: use of undeclared identifier 'y'
+./spec_accesses.exec.c:114:11: error: use of undeclared identifier 'y'
+  114 |   return &y;
+      |           ^
+./spec_accesses.exec.c:119:12: error: use of undeclared identifier 'y'
+  119 |   memcpy((&y), ptr, sizeof(signed int));
+      |            ^
+6 errors generated.

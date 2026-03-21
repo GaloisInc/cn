@@ -1,1 +1,14 @@
 return code: 1
+./libfile.exec.c:76:24: error: use of undeclared identifier 'myval'
+   76 |     __cn_ret = CN_LOAD(myval);
+      |                        ^
+./libfile.exec.c:76:24: error: use of undeclared identifier 'myval'
+./libfile.exec.c:76:24: error: use of undeclared identifier 'myval'
+./libfile.exec.c:76:24: error: use of undeclared identifier 'myval'
+./libfile.exec.c:95:11: error: use of undeclared identifier 'myval'
+   95 |   return &myval;
+      |           ^
+./libfile.exec.c:100:12: error: use of undeclared identifier 'myval'
+  100 |   memcpy((&myval), ptr, sizeof(signed int));
+      |            ^
+6 errors generated.

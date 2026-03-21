@@ -1,6 +1,6 @@
 {
   "name": "test",
-  "args": ["test", "--output-dir=/tmp"],
+  "args": ["test", "--output-dir=/tmp", "--quiet"],
   "filter": "^(.*(?<!error)\\.c)$",
   "timeout": 120
 }

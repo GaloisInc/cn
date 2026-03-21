@@ -1,0 +1,94 @@
+return code: 1
+cn/get_from_array.c:16:5: warning: experimental keyword 'cn_function' (use of experimental features is discouraged)
+/*@ cn_function global_array_width; @*/
+    ^~~~~~~~~~~ 
+cn/get_from_array.c:24:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take Arr = each (i32 i; 0i32 <= i && i < global_array_width ())
+       ^
+cn/get_from_array.c:40:23: warning: 'focus' prefers a 'u64', but '(i32)idx' has type 'i32'.
+  /*@ focus RW<int>, ((i32) idx); @*/
+                      ^~~~~~~~~ 
+In file included from ./get_from_array.test.c:168:
+./get_from_array.gen.h:71:124: error: call to undeclared function 'cast_cn_alloc_id_to_cn_pointer'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   71 |     cn_bits_u64_equality(cn_bits_u64_mod(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)), convert_to_cn_bits_u64(0ULL));
+      |                                                                                                                            ^
+./get_from_array.gen.h:71:124: note: did you mean 'cast_cn_bits_i8_to_cn_pointer'?
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:531:1: note: 'cast_cn_bits_i8_to_cn_pointer' declared here
+  531 | CN_GEN_PTR_CASTS_SIGNED(int8_t, cn_bits_i8)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:486:3: note: expanded from macro 'CN_GEN_PTR_CASTS_SIGNED'
+  486 |   CN_GEN_CAST_TO_PTR(CNTYPE, intptr_t)                                                   \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:430:29: note: expanded from macro 'CN_GEN_CAST_TO_PTR'
+  430 |   static inline cn_pointer* cast_##CNTYPE##_to_cn_pointer(CNTYPE* i) {                   \
+      |                             ^
+<scratch space>:126:1: note: expanded from here
+  126 | cast_cn_bits_i8_to_cn_pointer
+      | ^
+In file included from ./get_from_array.test.c:168:
+./get_from_array.gen.h:71:124: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'cn_pointer *' (aka 'struct cn_pointer *') [-Wint-conversion]
+   71 |     cn_bits_u64_equality(cn_bits_u64_mod(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)), convert_to_cn_bits_u64(0ULL));
+      |                                                                                                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:538:1: note: passing argument to parameter 'ptr' here
+  538 | CN_GEN_PTR_CASTS_UNSIGNED(uint64_t, cn_bits_u64)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:483:3: note: expanded from macro 'CN_GEN_PTR_CASTS_UNSIGNED'
+  483 |   CN_GEN_CAST_FROM_PTR(CTYPE, CNTYPE, uintptr_t)
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:437:65: note: expanded from macro 'CN_GEN_CAST_FROM_PTR'
+  437 |   static inline CNTYPE* cast_cn_pointer_to_##CNTYPE(cn_pointer* ptr) {                   \
+      |                                                                 ^
+In file included from ./get_from_array.test.c:168:
+./get_from_array.gen.h:75:121: error: call to undeclared function 'cast_cn_alloc_id_to_cn_pointer'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   75 |     cn_bits_u64_lt(cn_bits_u64_divide(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)), convert_to_cn_bits_u64(42ULL));
+      |                                                                                                                         ^
+./get_from_array.gen.h:75:121: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'cn_pointer *' (aka 'struct cn_pointer *') [-Wint-conversion]
+   75 |     cn_bits_u64_lt(cn_bits_u64_divide(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)), convert_to_cn_bits_u64(42ULL));
+      |                                                                                                                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:538:1: note: passing argument to parameter 'ptr' here
+  538 | CN_GEN_PTR_CASTS_UNSIGNED(uint64_t, cn_bits_u64)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:483:3: note: expanded from macro 'CN_GEN_PTR_CASTS_UNSIGNED'
+  483 |   CN_GEN_CAST_FROM_PTR(CTYPE, CNTYPE, uintptr_t)
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:437:65: note: expanded from macro 'CN_GEN_CAST_FROM_PTR'
+  437 |   static inline CNTYPE* cast_cn_pointer_to_##CNTYPE(cn_pointer* ptr) {                   \
+      |                                                                 ^
+In file included from ./get_from_array.test.c:168:
+./get_from_array.gen.h:79:151: error: call to undeclared function 'cast_cn_alloc_id_to_cn_pointer'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   79 |     cn_bits_u64_le(convert_to_cn_bits_u64(0ULL), cn_bits_u64_divide(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)));
+      |                                                                                                                                                       ^
+./get_from_array.gen.h:79:151: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'cn_pointer *' (aka 'struct cn_pointer *') [-Wint-conversion]
+   79 |     cn_bits_u64_le(convert_to_cn_bits_u64(0ULL), cn_bits_u64_divide(cn_bits_u64_sub(cast_cn_pointer_to_cn_bits_u64(p), cast_cn_pointer_to_cn_bits_u64(cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0)))), convert_to_cn_bits_u64(4ULL)));
+      |                                                                                                                                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:538:1: note: passing argument to parameter 'ptr' here
+  538 | CN_GEN_PTR_CASTS_UNSIGNED(uint64_t, cn_bits_u64)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:483:3: note: expanded from macro 'CN_GEN_PTR_CASTS_UNSIGNED'
+  483 |   CN_GEN_CAST_FROM_PTR(CTYPE, CNTYPE, uintptr_t)
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:437:65: note: expanded from macro 'CN_GEN_CAST_FROM_PTR'
+  437 |   static inline CNTYPE* cast_cn_pointer_to_##CNTYPE(cn_pointer* ptr) {                   \
+      |                                                                 ^
+In file included from ./get_from_array.test.c:168:
+./get_from_array.gen.h:87:5: error: call to undeclared function 'cast_cn_alloc_id_to_cn_pointer'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   87 |     cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0));
+      |     ^
+./get_from_array.gen.h:86:15: error: incompatible integer to pointer conversion initializing 'cn_pointer *' (aka 'struct cn_pointer *') with an expression of type 'int' [-Wint-conversion]
+   86 |   cn_pointer* a_1020 = ({
+      |               ^        ~~
+   87 |     cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0));
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   88 |   });
+      |   ~~
+./get_from_array.gen.h:96:5: error: call to undeclared function 'cast_cn_alloc_id_to_cn_pointer'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   96 |     cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0));
+      |     ^
+./get_from_array.gen.h:95:15: error: incompatible integer to pointer conversion initializing 'cn_pointer *' (aka 'struct cn_pointer *') with an expression of type 'int' [-Wint-conversion]
+   95 |   cn_pointer* a_1034 = ({
+      |               ^        ~~
+   96 |     cast_cn_alloc_id_to_cn_pointer(convert_to_cn_alloc_id(0));
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   97 |   });
+      |   ~~
+10 errors generated.

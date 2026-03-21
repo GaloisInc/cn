@@ -1,4 +1,4 @@
-return code: 2
+return code: 0
 cn/swap.c:4:9: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
    take pairStart = each (i32 j; 0i32 <= j && j < 2i32) {RW(array_shift(pair, j))};
         ^
@@ -23,5 +23,6 @@ cn/swap.c:4:9: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
 cn/swap.c:6:10: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
     take pairEnd = each (i32 j; 0i32 <= j && j < 2i32) {RW(array_shift(pair, j))};
          ^
-/tmp/run_tests.sh: line 35: unexpected EOF while looking for matching `"'
-/tmp/run_tests.sh: line 45: syntax error: unexpected end of file
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

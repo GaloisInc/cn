@@ -1,1 +1,17 @@
 return code: 1
+./clientfile.exec.c:75:12: error: use of undeclared identifier 'myval'
+   75 |   CN_STORE(myval, 1);
+      |            ^
+./clientfile.exec.c:75:12: error: use of undeclared identifier 'myval'
+./clientfile.exec.c:75:12: error: use of undeclared identifier 'myval'
+./clientfile.exec.c:75:12: error: use of undeclared identifier 'myval'
+./clientfile.exec.c:77:16: error: call to undeclared function 'foo'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   77 |     __cn_ret = foo(1);
+      |                ^
+./clientfile.exec.c:96:11: error: use of undeclared identifier 'myval'
+   96 |   return &myval;
+      |           ^
+./clientfile.exec.c:101:12: error: use of undeclared identifier 'myval'
+  101 |   memcpy((&myval), ptr, sizeof(signed int));
+      |            ^
+7 errors generated.

@@ -1,3 +1,8 @@
-return code: 2
-/tmp/run_tests.sh: line 35: unexpected EOF while looking for matching `"'
-/tmp/run_tests.sh: line 45: syntax error: unexpected end of file
+return code: 1
+./f.exec.c:74:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   74 |   CN_STORE(r, f(12));
+      |               ^
+./f.exec.c:87:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   87 |   CN_STORE(r, f(25));
+      |               ^
+2 errors generated.

@@ -1,4 +1,4 @@
-return code: 2
-/tmp/run_tests.sh: line 20: 1: command not found
-/tmp/run_tests.sh: line 21: syntax error near unexpected token `fi'
-/tmp/run_tests.sh: line 21: `fi'
+return code: 0
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

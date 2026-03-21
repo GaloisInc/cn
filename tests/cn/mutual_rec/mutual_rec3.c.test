@@ -1,0 +1,244 @@
+return code: 1
+./mutual_rec3.test.c:176:8: error: redefinition of 'a_node'
+  176 | struct a_node {
+      |        ^
+./mutual_rec3.test.c:127:8: note: previous definition is here
+  127 | struct a_node {
+      |        ^
+./mutual_rec3.test.c:203:8: error: redefinition of 'b_node'
+  203 | struct b_node {
+      |        ^
+./mutual_rec3.test.c:134:8: note: previous definition is here
+  134 | struct b_node {
+      |        ^
+In file included from ./mutual_rec3.test.c:288:
+./mutual_rec3.gen.h:82:30: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+   82 |       a_1346->u.b_node->even = E_3->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:83:29: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+   83 |       a_1346->u.b_node->odd = O_3->t;
+      |                             ^ ~~~~~~
+./mutual_rec3.gen.h:123:30: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  123 |       a_1405->u.b_node->even = E_2->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:124:29: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  124 |       a_1405->u.b_node->odd = O_2->t;
+      |                             ^ ~~~~~~
+./mutual_rec3.gen.h:164:30: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  164 |       a_1464->u.b_node->even = E_1->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:165:29: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  165 |       a_1464->u.b_node->odd = O_1->t;
+      |                             ^ ~~~~~~
+./mutual_rec3.gen.h:210:30: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  210 |       a_1537->u.b_node->even = E->t;
+      |                              ^ ~~~~
+./mutual_rec3.gen.h:211:29: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  211 |       a_1537->u.b_node->odd = O->t;
+      |                             ^ ~~~~
+./mutual_rec3.gen.h:276:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  276 |       a_1609->u.a_node->k = fresh_11;
+      |                           ^ ~~~~~~~~
+./mutual_rec3.gen.h:277:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  277 |       a_1609->u.a_node->v = fresh_10;
+      |                           ^ ~~~~~~~~
+./mutual_rec3.gen.h:278:30: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  278 |       a_1609->u.a_node->left = L_3->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:279:31: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  279 |       a_1609->u.a_node->right = R_3->t;
+      |                               ^ ~~~~~~
+./mutual_rec3.gen.h:323:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  323 |       a_1672->u.a_node->k = fresh_9;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:324:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  324 |       a_1672->u.a_node->v = fresh_8;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:325:30: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  325 |       a_1672->u.a_node->left = L_2->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:326:31: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  326 |       a_1672->u.a_node->right = R_2->t;
+      |                               ^ ~~~~~~
+./mutual_rec3.gen.h:370:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  370 |       a_1735->u.a_node->k = fresh_6;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:371:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  371 |       a_1735->u.a_node->v = fresh_5;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:372:30: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  372 |       a_1735->u.a_node->left = L_1->t;
+      |                              ^ ~~~~~~
+./mutual_rec3.gen.h:373:31: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  373 |       a_1735->u.a_node->right = R_1->t;
+      |                               ^ ~~~~~~
+./mutual_rec3.gen.h:422:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  422 |       a_1812->u.a_node->k = fresh_3;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:423:27: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  423 |       a_1812->u.a_node->v = fresh_2;
+      |                           ^ ~~~~~~~
+./mutual_rec3.gen.h:424:30: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  424 |       a_1812->u.a_node->left = L->t;
+      |                              ^ ~~~~
+./mutual_rec3.gen.h:425:31: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  425 |       a_1812->u.a_node->right = R->t;
+      |                               ^ ~~~~
+./mutual_rec3.test.c:335:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  335 |     a_2664->u.a_node->k = V->k;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:336:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  336 |     a_2664->u.a_node->v = V->v;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:337:28: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  337 |     a_2664->u.a_node->left = L->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:338:29: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  338 |     a_2664->u.a_node->right = R->t;
+      |                             ^ ~~~~
+./mutual_rec3.test.c:363:28: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  363 |     a_2683->u.b_node->even = E->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:364:27: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  364 |     a_2683->u.b_node->odd = O->t;
+      |                           ^ ~~~~
+./mutual_rec3.test.c:421:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  421 |     a_2609->u.a_node->k = V->k;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:422:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  422 |     a_2609->u.a_node->v = V->v;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:423:28: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  423 |     a_2609->u.a_node->left = L->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:424:29: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  424 |     a_2609->u.a_node->right = R->t;
+      |                             ^ ~~~~
+./mutual_rec3.test.c:447:28: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  447 |     a_2630->u.b_node->even = E->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:448:27: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  448 |     a_2630->u.b_node->odd = O->t;
+      |                           ^ ~~~~
+./mutual_rec3.test.c:613:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  613 |     a_2519->u.a_node->k = V->k;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:614:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
+  614 |     a_2519->u.a_node->v = V->v;
+      |                         ^ ~~~~
+./mutual_rec3.test.c:615:28: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  615 |     a_2519->u.a_node->left = L->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:616:29: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
+  616 |     a_2519->u.a_node->right = R->t;
+      |                             ^ ~~~~
+./mutual_rec3.test.c:639:28: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  639 |     a_2535->u.b_node->even = E->t;
+      |                            ^ ~~~~
+./mutual_rec3.test.c:640:27: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
+  640 |     a_2535->u.b_node->odd = O->t;
+      |                           ^ ~~~~
+./mutual_rec3.test.c:855:49: warning: incompatible pointer types passing 'struct a_node *' to parameter of type 'struct a_tree *' [-Wincompatible-pointer-types]
+  855 |       return cn_bool_and(struct_a_tree_equality(a_2147->odd, a_2148->odd), cn_bool_and(struct_a_tree_equality(a_2147->even, a_2148->even), convert_to_cn_bool(1)));
+      |                                                 ^~~~~~~~~~~
+./mutual_rec3.test.c:239:54: note: passing argument to parameter here
+  239 | static cn_bool* struct_a_tree_equality(struct a_tree*, struct a_tree*);
+      |                                                      ^
+./mutual_rec3.test.c:855:62: warning: incompatible pointer types passing 'struct a_node *' to parameter of type 'struct a_tree *' [-Wincompatible-pointer-types]
+  855 |       return cn_bool_and(struct_a_tree_equality(a_2147->odd, a_2148->odd), cn_bool_and(struct_a_tree_equality(a_2147->even, a_2148->even), convert_to_cn_bool(1)));
+      |                                                              ^~~~~~~~~~~
+./mutual_rec3.test.c:239:70: note: passing argument to parameter here
+  239 | static cn_bool* struct_a_tree_equality(struct a_tree*, struct a_tree*);
+      |                                                                      ^
+./mutual_rec3.test.c:855:111: warning: incompatible pointer types passing 'struct a_node *' to parameter of type 'struct a_tree *' [-Wincompatible-pointer-types]
+  855 |       return cn_bool_and(struct_a_tree_equality(a_2147->odd, a_2148->odd), cn_bool_and(struct_a_tree_equality(a_2147->even, a_2148->even), convert_to_cn_bool(1)));
+      |                                                                                                               ^~~~~~~~~~~~
+./mutual_rec3.test.c:239:54: note: passing argument to parameter here
+  239 | static cn_bool* struct_a_tree_equality(struct a_tree*, struct a_tree*);
+      |                                                      ^
+./mutual_rec3.test.c:855:125: warning: incompatible pointer types passing 'struct a_node *' to parameter of type 'struct a_tree *' [-Wincompatible-pointer-types]
+  855 |       return cn_bool_and(struct_a_tree_equality(a_2147->odd, a_2148->odd), cn_bool_and(struct_a_tree_equality(a_2147->even, a_2148->even), convert_to_cn_bool(1)));
+      |                                                                                                                             ^~~~~~~~~~~~
+./mutual_rec3.test.c:239:70: note: passing argument to parameter here
+  239 | static cn_bool* struct_a_tree_equality(struct a_tree*, struct a_tree*);
+      |                                                                      ^
+./mutual_rec3.test.c:875:49: warning: incompatible pointer types passing 'struct b_node *' to parameter of type 'struct b_tree *' [-Wincompatible-pointer-types]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                 ^~~~~~~~~~~~~
+./mutual_rec3.test.c:840:55: note: passing argument to parameter 'x' here
+  840 | static cn_bool* struct_b_tree_equality(struct b_tree* x, struct b_tree* y)
+      |                                                       ^
+./mutual_rec3.test.c:875:64: warning: incompatible pointer types passing 'struct b_node *' to parameter of type 'struct b_tree *' [-Wincompatible-pointer-types]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                ^~~~~~~~~~~~~
+./mutual_rec3.test.c:840:73: note: passing argument to parameter 'y' here
+  840 | static cn_bool* struct_b_tree_equality(struct b_tree* x, struct b_tree* y)
+      |                                                                         ^
+./mutual_rec3.test.c:875:115: warning: incompatible pointer types passing 'struct b_node *' to parameter of type 'struct b_tree *' [-Wincompatible-pointer-types]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                                                                   ^~~~~~~~~~~~
+./mutual_rec3.test.c:840:55: note: passing argument to parameter 'x' here
+  840 | static cn_bool* struct_b_tree_equality(struct b_tree* x, struct b_tree* y)
+      |                                                       ^
+./mutual_rec3.test.c:875:129: warning: incompatible pointer types passing 'struct b_node *' to parameter of type 'struct b_tree *' [-Wincompatible-pointer-types]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                                                                                 ^~~~~~~~~~~~
+./mutual_rec3.test.c:840:73: note: passing argument to parameter 'y' here
+  840 | static cn_bool* struct_b_tree_equality(struct b_tree* x, struct b_tree* y)
+      |                                                                         ^
+./mutual_rec3.test.c:875:177: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                                                                                                                                 ^~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
+  523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+  489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
+      |                                           ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+  494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+  240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
+      |                                 ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
+  243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
+      |                                                  ^
+./mutual_rec3.test.c:875:188: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                                                                                                                                            ^~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i2' here
+  523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+  489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
+      |                                           ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+  494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+  240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
+      |                                 ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:60: note: expanded from macro 'CN_GEN_EQUALITY_'
+  243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
+      |                                                            ^
+./mutual_rec3.test.c:875:233: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
+  875 |       return cn_bool_and(struct_b_tree_equality(a_2116->right, a_2117->right), cn_bool_and(struct_b_tree_equality(a_2116->left, a_2117->left), cn_bool_and(cn_bits_i32_equality(a_2116->v, a_2117->v), cn_bool_and(cn_bits_i32_equality(a_2116->k, a_2117->k), convert_to_cn_bool(1)))));
+      |                                                                                                                                                                                                                                         ^~~~~~~~~
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
+  523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+  489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
+      |                                           ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+  494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+  240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
+      |                                 ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
+  243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
+      |                                                  ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+36 warnings and 20 errors generated.

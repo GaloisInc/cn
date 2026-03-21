@@ -1,0 +1,8 @@
+return code: 1
+./fun_ptr_extern.test.c:474:34: error: use of undeclared identifier 'f1'
+  474 |   cn_assert(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), spec_mode);
+      |                                  ^
+./fun_ptr_extern.test.c:474:49: error: use of undeclared identifier 'f2'
+  474 |   cn_assert(cn_bool_or(ptr_eq(f, f1), ptr_eq(f, f2)), spec_mode);
+      |                                                 ^
+2 errors generated.

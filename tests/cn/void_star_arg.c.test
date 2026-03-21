@@ -1,3 +1,4 @@
-return code: 2
-/tmp/run_tests.sh: line 20: syntax error near unexpected token `then'
-/tmp/run_tests.sh: line 20: ` cc -c -o "./get_from_arr.exec.o" "./get_from_arr.exec.c" -g "-I${RUNTIME_PREFIX}/include/" ${CFLAGS} ${CPPFLAGS} ; then'
+return code: 0
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

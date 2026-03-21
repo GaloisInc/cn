@@ -20,6 +20,7 @@ class Prog:
         self.run_cmd = not opts.dry_run
         self.timeout = config['timeout']
         self.name = config['name']
+        self.accept_baselines = opts.accept
 
     def run(self, test_rel_path):
         cmd = time_cmd([self.prog] + self.args + [test_rel_path])
@@ -34,7 +35,11 @@ class Prog:
         try:
             completed = self.run(test_rel_path);
             lines = completed.stdout.splitlines(True)
-            time = float(lines[-3].split()[1])
+            try:
+                time = float(lines[-3].split()[1])
+            except (ValueError, IndexError):
+                # If timing parse fails, use 0.0 as fallback
+                time = 0.0
             return { 'time': time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines[:-3] }
         except subprocess.TimeoutExpired:
             return { 'time': float(self.timeout), 'lines': ["TIMEOUT\n"] }
@@ -53,6 +58,10 @@ class Prog:
                 output = self.output(test_rel_path)
                 diff = list(difflib.unified_diff(expect.readlines(), output['lines'], expect_path, expect_path))
                 time = output['time']
+                # If accept_baselines flag is set and there's a diff, update the baseline
+                if self.accept_baselines and diff:
+                    with open(expect_path, 'w') as expect_file:
+                        expect_file.writelines(output['lines'])
                 return { 'diff': diff, 'time': time }
             except AttributeError: # dry run
                 return { 'diff': False, 'time': .0 }
@@ -128,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', help='Don\'t show tests completed so far on std out.', action='store_true')
     parser.add_argument('--bench', help='Output a JSON file with benchmarks, including total time.', action='store_true')
     parser.add_argument('--max-workers', help='Specify max number of workers for process pool (default is number of CPUs).', type=int)
+    parser.add_argument('--accept', help='Automatically accept and update all changed baselines.', action='store_true')
     parser.set_defaults(func=main)
 
 # parse args and call func (as set using set_defaults)

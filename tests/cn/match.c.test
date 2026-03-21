@@ -1,2 +1,36 @@
-return code: 137
-/tmp/run_tests.sh: line 37: 56561 Killed: 9               ./tests.out --smt-skewing sized
+return code: 1
+./match.test.c:445:33: warning: incompatible pointer types passing 'struct tree *' to parameter of type 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wincompatible-pointer-types]
+  445 |       return cn_bits_i32_add(k, v);
+      |                                 ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i2' here
+  523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+  489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
+      |                                           ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:501:3: note: expanded from macro 'CN_GEN_ALL_'
+  501 |   CN_GEN_ADD(UCTYPE, CTYPE, CNTYPE)                                                      \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:292:58: note: expanded from macro 'CN_GEN_ADD'
+  292 |   static inline CNTYPE* CNTYPE##_add(CNTYPE* i1, CNTYPE* i2) {                           \
+      |                                                          ^
+1 warning generated.
+./match.exec.c:210:33: warning: incompatible pointer types passing 'struct tree *' to parameter of type 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wincompatible-pointer-types]
+  210 |       return cn_bits_i32_add(k, v);
+      |                                 ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i2' here
+  523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
+      | ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+  489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
+      |                                           ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:501:3: note: expanded from macro 'CN_GEN_ALL_'
+  501 |   CN_GEN_ADD(UCTYPE, CTYPE, CNTYPE)                                                      \
+      |   ^
+/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:292:58: note: expanded from macro 'CN_GEN_ADD'
+  292 |   static inline CNTYPE* CNTYPE##_add(CNTYPE* i1, CNTYPE* i2) {                           \
+      |                                                          ^
+1 warning generated.
+
+Testing Summary:
+cases: 1, passed: 0, failed: 1, errored: 0, skipped: 0

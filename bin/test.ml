@@ -43,6 +43,7 @@ let run_tests
       logging_level
       trace_granularity
       progress_level
+      quiet
       until_timeout
       exit_fast
       max_stack_depth
@@ -164,7 +165,15 @@ let run_tests
           seed;
           logging_level;
           trace_granularity;
-          progress_level;
+          progress_level =
+            (if quiet then
+               Some
+                 (snd
+                    (List.find
+                       (fun (s, _) -> String.equal s "silent")
+                       TestGeneration.Options.progress_level))
+             else
+               progress_level);
           until_timeout;
           exit_fast;
           max_stack_depth;
@@ -253,6 +262,7 @@ let run_tests
         match build_tool with
         | Bash ->
           let build_script = Filename.concat output_dir "run_tests.sh" in
+          Unix.chmod build_script 0o755;
           Unix.execv build_script (Array.of_list [ build_script ])
         | Make ->
           Unix.chdir output_dir;
@@ -458,6 +468,11 @@ module Flags = struct
           (some (enum TestGeneration.Options.progress_level))
           TestGeneration.default_cfg.progress_level
       & info [ "progress-level" ] ~doc)
+
+
+  let quiet =
+    let doc = "Suppress all progress output (equivalent to --progress-level=silent)" in
+    Arg.(value & flag & info [ "quiet"; "q" ] ~doc)
 
 
   let until_timeout =
@@ -828,6 +843,7 @@ let cmd =
     $ Flags.logging_level
     $ Flags.trace_granularity
     $ Flags.progress_level
+    $ Flags.quiet
     $ Flags.until_timeout
     $ Flags.exit_fast
     $ Flags.max_stack_depth

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-USAGE="Usage: $0 [verify|test|seq-test] [cn|cn-test-gen|cn-seq-test-gen|all]"
+USAGE="Usage: $0 [verify|test|seq-test] [cn|cn-test-gen|cn-seq-test-gen|all] [--regen]"
 
 COMMAND=${1:-}
 DIR=${2:-all}
+REGEN=${3:-}
 
 if [ -z "$COMMAND" ]; then
     echo "$USAGE"
@@ -22,7 +23,15 @@ run_test() {
     fi
 
     echo "▶ Running: cn $cmd on $dir"
-    ./diff-prog.py cn "$config_file" 2>&1 | tail -5
+
+    # If --regen flag, pass --accept to diff-prog.py to update baselines
+    local accept_flag=""
+    if [ "$REGEN" = "--regen" ]; then
+        echo "  Regenerating baselines (--accept)..."
+        accept_flag="--accept --max-workers=1"
+    fi
+
+    ./diff-prog.py cn "$config_file" $accept_flag 2>&1 | tail -5
     echo ""
 }
 
