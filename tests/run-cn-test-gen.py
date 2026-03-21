@@ -32,6 +32,21 @@ def _kill_active_procs():
                 pass
 
 
+def get_test_flags(test_file, command):
+    """Extract test-specific flags from first line comment like: // cn test --skip=foo"""
+    try:
+        with open(test_file, 'r') as f:
+            first_line = f.readline().strip()
+            # Check for format: // cn <command> <flags>
+            if first_line.startswith('// cn '):
+                parts = first_line[6:].split(None, 1)  # Split "cn test --skip=foo" into ["test", "--skip=foo"]
+                if len(parts) >= 1 and parts[0] == command:
+                    return parts[1] if len(parts) > 1 else ''
+    except (IOError, OSError):
+        pass
+    return ''
+
+
 def get_test_type(test_file, config):
     """Determine the expected test result type based on filename and config."""
     test_file = Path(test_file).name
@@ -63,6 +78,11 @@ def separator():
 def run_cn_test(cn_path, test_file, config):
     """Run CN test with given configuration and return (return_code, elapsed_time, test_output)."""
     start_time = time.time()
+
+    # Check for test-specific flags in the file's first line
+    test_flags = get_test_flags(test_file, 'test')
+    if test_flags:
+        config = f"{config} {test_flags}"
 
     cmd = [cn_path, 'test', str(test_file)] + config.split()
     try:

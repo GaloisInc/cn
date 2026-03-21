@@ -499,7 +499,6 @@ let compile_req
       let e = A.(mk_expr (AilEcall (mk_expr (AilEident (pred_sym name)), es))) in
       (b, s, e)
     | Q { name; pointer; q = q_sym, q_bt; q_loc; step; permission; iargs } ->
-      assert (List.is_empty iargs);
       let q_it = IT.sym_ (q_sym, q_bt, q_loc) in
       let e_perm =
         let b_perm, s_perm, e_perm = compile_it filename sigma prog5 permission in
