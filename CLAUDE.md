@@ -26,9 +26,31 @@ cn --help            # See all options
 ```
 
 ### Testing
-- Main test runner: `tests/run-cn.sh`
 - Test suites in `tests/cn/`, `tests/cn-test-gen/`, `tests/cn-seq-test-gen/`
 - See `doc/TESTING.md` for details on CN's testing capabilities
+
+### Running Different Commands on Test Suites
+
+To run any CN command on any test directory:
+
+```bash
+cd tests
+
+# Run a specific command on a specific directory
+./run-all-commands.sh verify cn
+./run-all-commands.sh test cn-test-gen
+./run-all-commands.sh seq-test cn-seq-test-gen
+
+# Run a command on all test directories
+./run-all-commands.sh verify all
+./run-all-commands.sh test all
+
+# Or use diff-prog.py directly with JSON configs
+./diff-prog.py cn cn/test.json              # Run cn test on verify tests
+./diff-prog.py cn cn-test-gen/src/verify.json  # Run cn verify on test-gen tests
+```
+
+**Note:** Some tests may fail when run with incompatible commands (e.g., test-gen specs are too complex for verify baseline comparison). This is expected.
 
 ## Architecture
 

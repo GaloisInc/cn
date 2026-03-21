@@ -1,0 +1,3 @@
+return code: 2
+[1mUninterpreted CN functions not supported at runtime. Please provide a concrete function definition for[0m:
+'make_map(i : integer) : map<integer, integer>' at <cn/pred_def04.c:15:0, cn/pred_def04.c:15:54>

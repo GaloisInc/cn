@@ -1,0 +1,16 @@
+return code: 1
+cn-test-gen/src/tutorial_queue.pass.c:158:16: warning: deprecated keyword 'Owned', use 'RW' instead
+      take B = Owned<struct queue_cell>(back);
+               ^~~~~ 
+[1/3]: empty_queue -- fail
+[2/3]: push_queue -- fail
+[3/3]: pop_queue -- fail
+cn-test-gen/src/tutorial_queue.pass.c:114:21: error: Call to function with no spec: cn_malloc
+  struct queue *p = cn_malloc(sizeof(struct queue));
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/tutorial_queue.pass.c:139:26: error: Call to function with no spec: cn_malloc
+  struct queue_cell *c = cn_malloc(sizeof(struct queue_cell));
+                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/tutorial_queue.pass.c:181:5: error: Call to function with no spec: cn_free_sized
+    cn_free_sized(h, sizeof(struct queue_cell));
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

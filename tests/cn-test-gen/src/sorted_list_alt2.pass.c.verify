@@ -1,0 +1,13 @@
+return code: 1
+cn-test-gen/src/sorted_list_alt2.pass.c:42:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+[1/2]: sum -- fail
+[2/2]: insert -- fail
+cn-test-gen/src/sorted_list_alt2.pass.c:66:3: error: Left-over unused resource 'ListSegmentAux(xs, NULL, NoneI32 {})(unpack_ListSegment0_L)'
+  while (xs) {
+  ^~~~~~~~~~~~ 
+State file: file:///tmp/state__sorted_list_alt2.pass.c__sum.html
+cn-test-gen/src/sorted_list_alt2.pass.c:106:38: error: Call to function with no spec: cn_malloc
+  struct List *node = (struct List *)cn_malloc(sizeof(struct List));
+                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

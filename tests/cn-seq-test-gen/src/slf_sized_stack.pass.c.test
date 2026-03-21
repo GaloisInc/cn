@@ -1,0 +1,6 @@
+return code: 2
+cn-seq-test-gen/src/slf_sized_stack.pass.c:105:14: warning: deprecated keyword 'Owned', use 'RW' instead
+    take S = Owned<struct sized_stack>(p);
+             ^~~~~ 
+/tmp/run_tests.sh: line 31: unexpected EOF while looking for matching `"'
+/tmp/run_tests.sh: line 41: syntax error: unexpected end of file

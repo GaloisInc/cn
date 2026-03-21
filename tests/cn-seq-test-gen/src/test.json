@@ -1,0 +1,6 @@
+{
+  "name": "test",
+  "args": ["test", "--output-dir=/tmp"],
+  "filter": "^(.*\\.c)$",
+  "timeout": 120
+}

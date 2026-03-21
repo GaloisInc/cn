@@ -1,0 +1,34 @@
+return code: 125
+cn/memcpy.c:15:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+  int i;
+                  ^
+cn/memcpy.c:17:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+  /*@ inv take dstInv = each (i32 j; 0i32 <= j && j < n)
+                  ^
+cn/memcpy.c:19:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+          take srcInv = each (i32 j; 0i32 <= j && j < n)
+                 ^
+cn/memcpy.c:21:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+          srcInv == srcStart;
+                 ^
+cn/memcpy.c:29:16: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+    /*@ instantiate good<char>, (i32)i; @*/
+               ^
+cn/memcpy.c:31:16: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+  }
+               ^
+cn/memcpy.c:40:25: warning: 'focus' prefers a 'u64', but '(i32)read_i0' has type 'i32'.
+}
+                        ^~~~~~ 
+cn: internal error, uncaught exception:
+    Failure("Cannot test a file with a `main` function")
+    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+    Called from Cn__SeqTests.run_seq in file "lib/seqTests/seqTests.ml", line 607, characters 4-56
+    Called from Dune__exe__SeqTest.run_seq_tests.(fun) in file "bin/seqTest.ml", line 102, characters 13-74
+    Called from Cerb_colour.without_colour in file "util/cerb_colour.ml", line 47, characters 10-13
+    Called from Dune__exe__SeqTest.run_seq_tests.(fun) in file "bin/seqTest.ml", lines 69-106, characters 6-10
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", line 197, characters 15-69
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", lines 186-214, characters 6-15
+    Re-raised at Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", line 222, characters 4-69
+    Called from Cmdliner_term.app.(fun) in file "cmdliner_term.ml", line 24, characters 19-24
+    Called from Cmdliner_eval.run_parser in file "cmdliner_eval.ml", line 35, characters 37-44

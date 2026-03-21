@@ -1,0 +1,5 @@
+return code: 0
+cn-test-gen/src/member_shift.pass.c:9:14: warning: deprecated keyword 'Owned', use 'RW' instead
+    take l = Owned(member_shift<struct x>(p, w));
+             ^~~~~ 
+[1/1]: f -- pass

@@ -1,0 +1,8 @@
+return code: 1
+cn-test-gen/src/bin_tree.pass.c:18:22: warning: deprecated keyword 'Owned', use 'RW' instead
+            take n = Owned<struct int_tree>(p);
+                     ^~~~~ 
+[1/1]: deepCopyRecursive -- fail
+cn-test-gen/src/bin_tree.pass.c:40:26: error: Call to function with no spec: cn_malloc
+    struct int_tree* q = cn_malloc(sizeof(struct int_tree));
+                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

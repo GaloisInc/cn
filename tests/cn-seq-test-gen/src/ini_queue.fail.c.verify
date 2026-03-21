@@ -1,0 +1,45 @@
+return code: 1
+cn-seq-test-gen/src/ini_queue.fail.c:106:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take q = Owned<struct queue>(p);
+           ^~~~~ 
+cn-seq-test-gen/src/ini_queue.fail.c:141:7: warning: deprecated keyword 'extract', use 'focus' instead
+  /*@ extract Owned<int>, q->inp; @*/
+      ^~~~~~~ 
+cn-seq-test-gen/src/ini_queue.fail.c:107:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take buf = each (i32 i; 0i32 <= i && i < q.size) { Owned<int>(q.buf + i) };
+       ^
+cn-seq-test-gen/src/ini_queue.fail.c:141:27: warning: 'focus' prefers a 'u64', but 'deref_read_&q00.inp' has type 'i32'.
+  /*@ extract Owned<int>, q->inp; @*/
+                          ~^~~~~ 
+cn-seq-test-gen/src/ini_queue.fail.c:155:27: warning: 'focus' prefers a 'u64', but 'deref_read_&q10.outp' has type 'i32'.
+  /*@ extract Owned<int>, q->outp; @*/
+                          ~^~~~~~ 
+[1/4]: new -- fail
+[2/4]: put -- fail
+[3/4]: get -- fail
+[4/4]: queueSize -- fail
+cn-seq-test-gen/src/ini_queue.fail.c:126:25: error: Mismatched types.
+  int* buff = cn_malloc(bufsize * sizeof(int));
+                        ~~~~~~~~^~~~~~~~~~~~~ 
+Expected value of type 'u64' but found value of type 'u32'
+cn-seq-test-gen/src/ini_queue.fail.c:133:1: error: Unprovable constraint
+void put(struct queue* q, int n)
+~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn-seq-test-gen/src/ini_queue.fail.c:137:13:
+            queue_out.content == expected_content;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__put.html
+cn-seq-test-gen/src/ini_queue.fail.c:158:3: error: Unprovable constraint
+  return ans;
+  ^~~~~~~~~~~ 
+Constraint from cn-seq-test-gen/src/ini_queue.fail.c:150:13:
+            return == hd(queue.content);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__get.html
+cn-seq-test-gen/src/ini_queue.fail.c:168:3: error: Unprovable constraint
+  return (q->inp - q->outp + q->size) % q->size;
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn-seq-test-gen/src/ini_queue.fail.c:165:13:
+            return == length(queue.content);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__queueSize.html

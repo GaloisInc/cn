@@ -1,0 +1,12 @@
+return code: 2
+cn/get_from_array.c:22:5: warning: experimental keyword 'cn_function' (use of experimental features is discouraged)
+predicate (map<i32, i32>) Global_Array (pointer p)
+    ^~~~~~~~~~~ 
+cn/get_from_array.c:29:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+
+       ^
+cn/get_from_array.c:44:23: warning: 'focus' prefers a 'u64', but '(i32)idx' has type 'i32'.
+
+                      ^~~~~~~~~ 
+[1mUninterpreted CN functions not supported at runtime. Please provide a concrete function definition for[0m:
+'global_array_width() : i32' at <cn/get_from_array.c:20:4, cn/get_from_array.c:20:40>

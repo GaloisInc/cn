@@ -1,0 +1,3 @@
+return code: 2
+/tmp/run_tests.sh: line 27: unexpected EOF while looking for matching `''
+/tmp/run_tests.sh: line 45: syntax error: unexpected end of file

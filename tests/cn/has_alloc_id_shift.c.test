@@ -1,0 +1,19 @@
+return code: 1
+cn: internal error, uncaught exception:
+    Failure("File \"lib/fulminate/cn_to_ail.ml\", line 1437, characters 30-37: TODO HasAllocId")
+    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_logical_constraint in file "lib/fulminate/cn_to_ail.ml" (inlined), line 3340, characters 2-81
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_lat_2 in file "lib/fulminate/cn_to_ail.ml", line 4374, characters 19-85
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post_aux in file "lib/fulminate/cn_to_ail.ml", lines 4584-4593, characters 6-11
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post_aux in file "lib/fulminate/cn_to_ail.ml", lines 4509-4520, characters 6-16
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post in file "lib/fulminate/cn_to_ail.ml", lines 4627-4638, characters 6-16
+    Called from Cn__Fulminate__Internal.generate_c_specs_from_cn_internal in file "lib/fulminate/internal.ml", lines 90-100, characters 4-30
+    Called from Cn__Fulminate__Internal.generate_c_specs_internal in file "lib/fulminate/internal.ml", lines 127-136, characters 6-13
+    Called from Stdlib__List.map in file "list.ml", line 86, characters 15-19
+    Called from Stdlib__List.map in file "list.ml", line 88, characters 14-21
+    Called from Cn__Fulminate__Internal.generate_c_specs in file "lib/fulminate/internal.ml", line 216, characters 14-59
+    Called from Cn__Fulminate.main in file "lib/fulminate/fulminate.ml", lines 827-836, characters 4-11
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", lines 217-236, characters 9-24
+    
+Issues can be made at https://github.com/rems-project/cerberus/issues.
+Prefix your issue with "[CN-Exec]". Check that there isn't already one for this error.

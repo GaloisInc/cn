@@ -1,0 +1,21 @@
+return code: 2
+cn/tree16/as_mutual_dt/tree16.c:49:22: warning: annotation on array_shift suggests nodes_ptr has type struct node** but it has type struct node*[16]*.
+predicate [rec] (datatype tree) Indirect_Tree (pointer p) {
+                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/tree16/as_mutual_dt/tree16.c:48:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+
+         ^
+cn/tree16/as_mutual_dt/tree16.c:116:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+             take V = RW(v);
+                  ^
+cn/tree16/as_mutual_dt/tree16.c:126:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+  || ((return == 1i32) && (in_tree (T2.t, arc)) && ((tree_v (T2.t, arc)) == V2)); @*/
+                 ^
+cn/tree16/as_mutual_dt/tree16.c:145:22: warning: 'focus' prefers a 'u64', but 'read_i1' has type 'i32'.
+  if (r)
+                     ^
+cn/tree16/as_mutual_dt/tree16.c:147:28: warning: 'focus' prefers a 'u64', but 'read_idx0' has type 'i32'.
+  else
+                           ^
+[1mUninterpreted CN functions not supported at runtime. Please provide a concrete function definition for[0m:
+'array_to_tree_list(arr : map<i32, datatype tree>) (len : i32) : datatype tree_list' at <cn/tree16/as_mutual_dt/tree16.c:34:0, cn/tree16/as_mutual_dt/tree16.c:34:87>

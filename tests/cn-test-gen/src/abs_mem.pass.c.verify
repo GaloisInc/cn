@@ -1,0 +1,5 @@
+return code: 0
+cn-test-gen/src/abs_mem.pass.c:2:23: warning: deprecated keyword 'Owned', use 'RW' instead
+/*@ requires take x = Owned<int>(p);
+                      ^~~~~ 
+[1/1]: abs_mem -- pass

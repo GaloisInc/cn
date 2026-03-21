@@ -1,0 +1,21 @@
+return code: 1
+cn-test-gen/src/dll.pass.c:146:18: warning: deprecated keyword 'Owned', use 'RW' instead
+        take P = Owned<struct dllist>(p);
+                 ^~~~~ 
+[1/5]: slnil -- pass
+[2/5]: slcons -- fail
+[3/5]: singleton -- fail
+[4/5]: add -- fail
+[5/5]: list_remove -- fail
+cn-test-gen/src/dll.pass.c:63:22: error: Call to function with no spec: cn_malloc
+  struct sllist *p = cn_malloc(sizeof(struct sllist));
+                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/dll.pass.c:190:23: error: Call to function with no spec: cn_malloc
+   struct dllist *n = cn_malloc(sizeof(struct dllist));
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/dll.pass.c:212:33: error: Call to function with no spec: cn_malloc
+    struct dllist *new_dllist = cn_malloc(sizeof(struct dllist));
+                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/dll.pass.c:270:35: error: Call to function with no spec: cn_malloc
+    struct dllist_and_int *pair = cn_malloc(sizeof(struct dllist_and_int));
+                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

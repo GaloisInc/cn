@@ -1,0 +1,5 @@
+return code: 1
+[1/1]: free_foo -- fail
+cn-test-gen/src/void_pred.pass.c:25:3: error: Call to function with no spec: cn_free_sized
+  cn_free_sized(p, sizeof(struct foo));
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

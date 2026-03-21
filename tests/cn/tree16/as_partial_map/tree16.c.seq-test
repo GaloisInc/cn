@@ -1,0 +1,27 @@
+return code: 2
+cn/tree16/as_partial_map/tree16.c:60:22: warning: annotation on array_shift suggests nodes_ptr has type struct node** but it has type struct node*[16]*.
+}
+                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/tree16/as_partial_map/tree16.c:27:5: warning: experimental keyword 'cn_function' (use of experimental features is discouraged)
+/*@
+    ^~~~~~~~~~~ 
+cn/tree16/as_partial_map/tree16.c:59:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  }
+         ^
+cn/tree16/as_partial_map/tree16.c:79:8: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+  return {arc: mk_arc(Xs, i, len), xs: Xs};
+       ^
+cn/tree16/as_partial_map/tree16.c:140:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+             each (i32 j; (0i32 <= j) && (j < path_len))
+                  ^
+cn/tree16/as_partial_map/tree16.c:149:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+            take V2 = RW(v);
+                 ^
+cn/tree16/as_partial_map/tree16.c:169:22: warning: 'focus' prefers a 'u64', but 'read_i2' has type 'i32'.
+  /*@ focus Indirect_Tree, idx; @*/
+                     ^
+cn/tree16/as_partial_map/tree16.c:172:28: warning: 'focus' prefers a 'u64', but 'read_idx0' has type 'i32'.
+  return r;
+                           ^
+[1mUninterpreted CN functions not supported at runtime. Please provide a concrete function definition for[0m:
+'num_nodes() : i32' at <cn/tree16/as_partial_map/tree16.c:24:0, cn/tree16/as_partial_map/tree16.c:24:27>

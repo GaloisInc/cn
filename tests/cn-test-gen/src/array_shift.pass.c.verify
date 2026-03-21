@@ -1,0 +1,5 @@
+return code: 0
+cn-test-gen/src/array_shift.pass.c:4:20: warning: deprecated keyword 'Owned', use 'RW' instead
+        take x_1 = Owned<int>(p);
+                   ^~~~~ 
+[1/1]: f -- pass

@@ -1,0 +1,5 @@
+return code: 0
+cn-test-gen/src/avl.pass.c:186:14: warning: deprecated keyword 'Owned', use 'RW' instead
+    take n = Owned<struct AVLNode>(root);
+             ^~~~~ 
+[1/1]: get_height -- pass

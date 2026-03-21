@@ -1,0 +1,4 @@
+return code: 0
+cn-test-gen/src/range.fail.c:5:13: warning: deprecated keyword 'Owned', use 'RW' instead
+            Owned(array_shift<int>(arr, i))
+            ^~~~~ 

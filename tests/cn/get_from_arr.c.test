@@ -1,0 +1,24 @@
+return code: 2
+cn/get_from_arr.c:7:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+/*@ requires take IA = each (i32 j; 0i32 <= j && j < 10i32)
+                  ^
+cn/get_from_arr.c:9:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+    ensures take IA2 = each (i32 j; 0i32 <= j && j < 10i32)
+                 ^
+cn/get_from_arr.c:14:23: warning: 'focus' prefers a 'u64', but '4'i32' has type 'i32'.
+  /*@ focus RW<char>, 4i32; @*/
+                      ^
+cn/get_from_arr.c:7:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+/*@ requires take IA = each (i32 j; 0i32 <= j && j < 10i32)
+                  ^
+cn/get_from_arr.c:9:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+    ensures take IA2 = each (i32 j; 0i32 <= j && j < 10i32)
+                 ^
+cn/get_from_arr.c:7:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+/*@ requires take IA = each (i32 j; 0i32 <= j && j < 10i32)
+                  ^
+cn/get_from_arr.c:9:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+    ensures take IA2 = each (i32 j; 0i32 <= j && j < 10i32)
+                 ^
+/tmp/run_tests.sh: line 30: unexpected EOF while looking for matching `"'
+/tmp/run_tests.sh: line 40: syntax error: unexpected end of file

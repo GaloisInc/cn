@@ -1,0 +1,9 @@
+return code: 1
+cn-test-gen/src/sorted_list.sum.pass.c:25:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+[1/1]: sum -- fail
+cn-test-gen/src/sorted_list.sum.pass.c:46:3: error: Left-over unused resource 'ListSegment(xs, NULL)(l1)'
+  while (xs) {
+  ^~~~~~~~~~~~ 
+State file: file:///tmp/state__sorted_list.sum.pass.c__sum.html

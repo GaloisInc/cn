@@ -1,0 +1,34 @@
+return code: 0
+cn-test-gen/src/memcpy.pass.c:4:36: warning: deprecated keyword 'Owned', use 'RW' instead
+                                  {Owned(array_shift(dst, j))};
+                                   ^~~~~ 
+cn-test-gen/src/memcpy.pass.c:28:13: warning: deprecated keyword 'extract', use 'focus' instead
+        /*@ extract Owned<char>, (i32)i; @*/
+            ^~~~~~~ 
+cn-test-gen/src/memcpy.pass.c:3:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+/*@ requires take dstStart = each (i32 j; 0i32 <= j && j < n)
+                  ^
+cn-test-gen/src/memcpy.pass.c:5:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+             take srcStart = each (i32 j; 0i32 <= j && j < n)
+                  ^
+cn-test-gen/src/memcpy.pass.c:7:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+    ensures take dstEnd = each (i32 j; 0i32 <= j && j < n)
+                 ^
+cn-test-gen/src/memcpy.pass.c:9:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+            take srcEnd = each (i32 j; 0i32 <= j && j < n)
+                 ^
+cn-test-gen/src/memcpy.pass.c:17:22: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+        /*@ inv take dstInv = each (i32 j; 0i32 <= j && j < n)
+                     ^
+cn-test-gen/src/memcpy.pass.c:19:22: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
+                take srcInv = each (i32 j; 0i32 <= j && j < n)
+                     ^
+cn-test-gen/src/memcpy.pass.c:28:34: warning: 'focus' prefers a 'u64', but '(
+                                                                              i32
+                                                                            )read_&i0' has type 'i32'.
+        /*@ extract Owned<char>, (i32)i; @*/
+                                 ^~~~~~ 
+cn-test-gen/src/memcpy.pass.c:29:13: warning: nothing instantiated
+        /*@ instantiate good<char>, (i32)i; @*/
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+[1/1]: naive_memcpy -- pass

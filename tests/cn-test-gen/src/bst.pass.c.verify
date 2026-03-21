@@ -1,0 +1,36 @@
+return code: 1
+cn-test-gen/src/bst.pass.c:445:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take node = Owned<struct MapNode>(cur);
+                ^~~~~ 
+[1/5]: newNode -- fail
+[2/5]: findParent -- fail
+[3/5]: map_insert -- fail
+[4/5]: deleteSmallest -- fail
+[5/5]: deleteKey -- fail
+cn-test-gen/src/bst.pass.c:343:43: error: Call to function with no spec: cn_malloc
+  struct MapNode *node = (struct MapNode*)cn_malloc(sizeof(struct MapNode));
+                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-test-gen/src/bst.pass.c:376:3: error: Left-over unused resource 'RW<struct MapNode*>(node)(tree_ptr)'
+  while (cur)
+  ^~~~~~~~~~~ 
+State file: file:///tmp/state__bst.pass.c__findParent.html
+cn-test-gen/src/bst.pass.c:405:5: error: Pointer `call_findParent1_cur_ptr` needs to be live for member shift
+    search->value = value;
+    ~~~~~~^~~~~~~ 
+Need an Alloc or RW in context with same allocation id
+State file: file:///tmp/state__bst.pass.c__map_insert.html
+cn-test-gen/src/bst.pass.c:467:13: error: Unprovable constraint
+  if (!cur) return 0;
+            ^~~~~~~~~ 
+Constraint from cn-test-gen/src/bst.pass.c:462:5:
+    new_tree == res.tree;
+    ^~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__bst.pass.c__deleteSmallest.html
+cn-test-gen/src/bst.pass.c:531:17: error: Missing resource for returning
+  if (!found) { return; }
+                ^~~~~~~ 
+Resource needed: BST(root_ptr)
+      cn-test-gen/src/bst.pass.c:524:8: (arg new_tree)
+  which requires: RangedBST(root_ptr)
+      cn-test-gen/src/bst.pass.c:237:8: (arg result)
+State file: file:///tmp/state__bst.pass.c__deleteKey.html

@@ -1,0 +1,7 @@
+return code: 1
+cn/cn_inline.c:21:5: warning: experimental keyword 'cn_function' (use of experimental features is discouraged)
+    case small:
+    ^~~~~~~~~~~ 
+cn/cn_inline.c:24:3: error: function has goto-labels in control-flow
+      /* shouldn't happen */
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~ 

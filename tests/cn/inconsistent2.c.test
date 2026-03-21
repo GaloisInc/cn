@@ -1,0 +1,29 @@
+return code: 1
+cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take f1 = each(i32 i; 0i32 <= i && i <= 0i32) { False(p + i, i) };
+                  ^
+cn/inconsistent2.c:12:20: warning: 'focus' prefers a 'u64', but '0'i32' has type 'i32'.
+  /*@ focus False, 0i32; @*/
+                   ^
+cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take f1 = each(i32 i; 0i32 <= i && i <= 0i32) { False(p + i, i) };
+                  ^
+cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take f1 = each(i32 i; 0i32 <= i && i <= 0i32) { False(p + i, i) };
+                  ^
+cn: internal error, uncaught exception:
+    File "lib/bugExplanation/replicators.ml", line 502, characters 6-12: Assertion failed
+    Raised at Cn__BugExplanation__Replicators.compile_req.aux in file "lib/bugExplanation/replicators.ml", line 502, characters 6-34
+    Called from Cn__BugExplanation__Replicators.compile_lat.aux in file "lib/bugExplanation/replicators.ml", line 572, characters 22-62
+    Called from Cn__BugExplanation__Replicators.compile_spec in file "lib/bugExplanation/replicators.ml", line 742, characters 17-53
+    Called from Cn__Option.map in file "lib/option.ml", line 5, characters 36-41
+    Called from Stdlib__List.filter_map in file "list.ml", line 280, characters 12-15
+    Called from Cn__BugExplanation__Replicators.synthesize in file "lib/bugExplanation/replicators.ml", lines 938-943, characters 4-28
+    Called from Cn__TestGeneration.compile_replicators in file "lib/testGeneration/testGeneration.ml", line 104, characters 4-68
+    Called from Cn__TestGeneration.compile_test_file in file "lib/testGeneration/testGeneration.ml", line 294, characters 28-76
+    Called from Cn__TestGeneration.save_tests in file "lib/testGeneration/testGeneration.ml", lines 388-394, characters 7-14
+    Called from Cn__TestGeneration.run in file "lib/testGeneration/testGeneration.ml", lines 490-497, characters 2-9
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", lines 240-248, characters 9-17
+    
+Issues can be made at https://github.com/rems-project/cerberus/issues.
+Prefix your issue with "[CN-Test-Gen]". Check that there isn't already one for this error.

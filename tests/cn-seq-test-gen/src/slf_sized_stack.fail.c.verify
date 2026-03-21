@@ -1,0 +1,37 @@
+return code: 1
+cn-seq-test-gen/src/slf_sized_stack.fail.c:105:14: warning: deprecated keyword 'Owned', use 'RW' instead
+    take S = Owned<struct sized_stack>(p);
+             ^~~~~ 
+[1/8]: IntList_nil -- pass
+[2/8]: IntList_cons -- fail
+[3/8]: IntList_length -- fail
+[4/8]: create -- fail
+[5/8]: sizeOf -- pass
+[6/8]: push -- fail
+[7/8]: pop -- fail
+[8/8]: top -- pass
+cn-seq-test-gen/src/slf_sized_stack.fail.c:63:43: error: Call to function with no spec: cn_malloc
+  struct int_list *p = (struct int_list *)cn_malloc(sizeof(struct int_list));
+                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-seq-test-gen/src/slf_sized_stack.fail.c:90:5: error: Unprovable constraint
+    return 1; // bug
+    ^~~~~~~~~ 
+Constraint from cn-seq-test-gen/src/slf_sized_stack.fail.c:85:13:
+            return == length(L1);
+            ^~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__slf_sized_stack.fail.c__IntList_length.html
+cn-seq-test-gen/src/slf_sized_stack.fail.c:117:49: error: Call to function with no spec: cn_malloc
+  struct sized_stack *p = (struct sized_stack *)cn_malloc(sizeof(struct sized_stack));
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn-seq-test-gen/src/slf_sized_stack.fail.c:132:1: error: Unprovable constraint
+void push (struct sized_stack *p, int x)
+~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn-seq-test-gen/src/slf_sized_stack.fail.c:108:5:
+    assert(s == length(d));
+    ^~~~~~~~~~~~~~~~~~~~~~~ 
+Resource needed: SizedStack(p)
+      cn-seq-test-gen/src/slf_sized_stack.fail.c:134:18: (arg S_)
+State file: file:///tmp/state__slf_sized_stack.fail.c__push.html
+cn-seq-test-gen/src/slf_sized_stack.fail.c:154:5: error: Call to function with no spec: cn_free_sized
+    cn_free_sized(data, sizeof(struct int_list));
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

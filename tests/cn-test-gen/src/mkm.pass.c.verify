@@ -1,0 +1,6 @@
+return code: 2
+cn-test-gen/src/mkm.pass.c:9:10: fatal error: 'sys/socket.h' file not found
+    9 | #include <sys/socket.h>
+      |          ^~~~~~~~~~~~~~
+1 error generated.
+

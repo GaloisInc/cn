@@ -1,0 +1,9 @@
+return code: 125
+cn: internal error, uncaught exception:
+    Unix.Unix_error(Unix.ENOEXEC, "execv", "/tmp/run_tests.sh")
+    Raised by primitive operation at Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", line 256, characters 10-66
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", line 197, characters 15-69
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", lines 186-214, characters 6-15
+    Re-raised at Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", line 222, characters 4-69
+    Called from Cmdliner_term.app.(fun) in file "cmdliner_term.ml", line 24, characters 19-24
+    Called from Cmdliner_eval.run_parser in file "cmdliner_eval.ml", line 35, characters 37-44

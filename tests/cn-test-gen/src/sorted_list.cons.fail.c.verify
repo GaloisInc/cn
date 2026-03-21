@@ -1,0 +1,8 @@
+return code: 1
+cn-test-gen/src/sorted_list.cons.fail.c:26:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+[1/1]: cons -- fail
+cn-test-gen/src/sorted_list.cons.fail.c:48:38: error: Call to function with no spec: cn_malloc
+  struct List *node = (struct List*) cn_malloc(sizeof(struct List));
+                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

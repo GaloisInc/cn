@@ -1,0 +1,8 @@
+return code: 1
+cn-test-gen/src/sorted_list_alt.insert.flaky.c:42:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+[1/1]: insert -- fail
+cn-test-gen/src/sorted_list_alt.insert.flaky.c:85:38: error: Call to function with no spec: cn_malloc
+  struct List *node = (struct List *)cn_malloc(sizeof(struct List));
+                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

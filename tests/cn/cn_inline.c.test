@@ -1,0 +1,7 @@
+return code: 1
+cn/cn_inline.c:13:5: warning: experimental keyword 'cn_function' (use of experimental features is discouraged)
+/*@ cn_function lookup_size_shift_cn;
+    ^~~~~~~~~~~ 
+cn/cn_inline.c:16:3: error: function has goto-labels in control-flow
+  switch (sz) {
+  ^~~~~~~~~~~~~ 

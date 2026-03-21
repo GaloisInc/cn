@@ -1,0 +1,6 @@
+{
+  "name": "seq-test",
+  "args": ["seq-test", "--output-dir=/tmp"],
+  "filter": "^(.*(?<!error)\\.c)$",
+  "timeout": 120
+}

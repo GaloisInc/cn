@@ -1,0 +1,11 @@
+return code: 0
+cn-test-gen/src/array2d.buggy.c:6:10: warning: 'each' prefers a 'u64', but 'j' has type 'u32'.
+    take V = each(u32 j; j < 10u32) {
+         ^
+cn-test-gen/src/array2d.buggy.c:16:10: warning: 'each' prefers a 'u64', but 'i' has type 'u32'.
+    take ain = each(u32 i; i < 10u32) {
+         ^
+cn-test-gen/src/array2d.buggy.c:20:10: warning: 'each' prefers a 'u64', but 'i' has type 'u32'.
+    take aout = each(u32 i; i < 10u32) {
+         ^
+[1/1]: foo -- pass

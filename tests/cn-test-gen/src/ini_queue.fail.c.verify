@@ -1,0 +1,51 @@
+return code: 1
+cn-test-gen/src/ini_queue.fail.c:106:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take q = Owned<struct queue>(p);
+           ^~~~~ 
+cn-test-gen/src/ini_queue.fail.c:162:7: warning: deprecated keyword 'extract', use 'focus' instead
+  /*@ extract Owned<int>, q->inp; @*/
+      ^~~~~~~ 
+cn-test-gen/src/ini_queue.fail.c:107:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take buf = each (i32 i; 0i32 <= i && i < q.size) { Owned<int>(q.buf + i) };
+       ^
+cn-test-gen/src/ini_queue.fail.c:121:16: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  ensures take rv = each (i32 i; 0i32 <= i && i < size) { Owned<int>(return + i) };
+               ^
+cn-test-gen/src/ini_queue.fail.c:162:27: warning: 'focus' prefers a 'u64', but 'deref_read_&q00.inp' has type 'i32'.
+  /*@ extract Owned<int>, q->inp; @*/
+                          ~^~~~~ 
+cn-test-gen/src/ini_queue.fail.c:176:27: warning: 'focus' prefers a 'u64', but 'deref_read_&q10.outp' has type 'i32'.
+  /*@ extract Owned<int>, q->outp; @*/
+                          ~^~~~~~ 
+[1/4]: new -- fail
+[2/4]: put -- fail
+[3/4]: get -- fail
+[4/4]: queueSize -- fail
+cn-test-gen/src/ini_queue.fail.c:151:3: error: Unprovable constraint
+  return qptr;
+  ^~~~~~~~~~~~ 
+Constraint from cn-test-gen/src/ini_queue.fail.c:143:15:
+              queue_out.content == Seq_Nil {};
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__new.html
+cn-test-gen/src/ini_queue.fail.c:154:1: error: Unprovable constraint
+void put(struct queue* q, int n)
+~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn-test-gen/src/ini_queue.fail.c:158:13:
+            queue_out.content == expected_content;
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__put.html
+cn-test-gen/src/ini_queue.fail.c:179:3: error: Unprovable constraint
+  return ans;
+  ^~~~~~~~~~~ 
+Constraint from cn-test-gen/src/ini_queue.fail.c:171:13:
+            return == hd(queue.content);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__get.html
+cn-test-gen/src/ini_queue.fail.c:189:3: error: Unprovable constraint
+  return (q->inp - q->outp + q->size) % q->size;
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn-test-gen/src/ini_queue.fail.c:186:13:
+            return == length(queue.content);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__ini_queue.fail.c__queueSize.html

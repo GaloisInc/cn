@@ -1,0 +1,6 @@
+return code: 2
+cn/alloc_token.c:15:14: warning: annotation on W suggests base has type signed int* but it has type char*.
+    take i = W<int>(base);
+             ^~~~~~ 
+[1m'Alloc' not currently supported at runtime[0m:
+Used at <cn/alloc_token.c:10:9>

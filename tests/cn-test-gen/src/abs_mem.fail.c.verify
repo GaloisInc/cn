@@ -1,0 +1,12 @@
+return code: 1
+cn-test-gen/src/abs_mem.fail.c:2:23: warning: deprecated keyword 'Owned', use 'RW' instead
+/*@ requires take x = Owned<int>(p);
+                      ^~~~~ 
+[1/1]: abs_mem -- fail
+cn-test-gen/src/abs_mem.fail.c:14:5: error: Unprovable constraint
+    return x;
+    ^~~~~~~~~ 
+Constraint from cn-test-gen/src/abs_mem.fail.c:6:13:
+            return == ((x >= 0i32) ? x : (0i32-x));
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+State file: file:///tmp/state__abs_mem.fail.c__abs_mem.html

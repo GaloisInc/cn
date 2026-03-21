@@ -1,0 +1,5 @@
+return code: 0
+[1/4]: test_constructor_record -- pass
+[2/4]: test_basic_constructor -- pass
+[3/4]: test_simple_record -- pass
+[4/4]: f -- pass
