@@ -1715,7 +1715,7 @@ let rec cn_to_ail_expr_aux
                    term
                    PassBack
                in
-               let build_case (constr_sym, members_with_types) =
+               let build_case case_index (constr_sym, members_with_types) =
                  let cases' = List.filter_map (expand_datatype constr_sym) cases in
                  let suffix = "_" ^ string_of_int count in
                  let lc_sym =
@@ -1772,9 +1772,8 @@ let rec cn_to_ail_expr_aux
                      attr_args = []
                    }
                  in
-                 let ail_case =
-                   A.(AilScase (Nat_big_num.zero (* placeholder *), mk_stmt stat_block))
-                 in
+                 let case_value = Nat_big_num.of_int case_index in
+                 let ail_case = A.(AilScase (case_value, mk_stmt stat_block)) in
                  A.
                    { loc = Cerb_location.unknown;
                      desug_info = { is_forloop_body = false; desug_case = None };
@@ -1788,7 +1787,7 @@ let rec cn_to_ail_expr_aux
                    (mk_expr (AilEcall (mk_expr (AilEident (Sym.fresh "abort")), [])))
                in
                let ail_case_stmts =
-                 List.map build_case dt.cn_dt_cases
+                 List.mapi build_case dt.cn_dt_cases
                  @ [ mk_stmt (AilSdefault (mk_stmt unreachable)) ]
                in
                let switch =
@@ -2137,7 +2136,7 @@ let generate_datatype_equality_function (filename : string) (cn_datatype : _ cn_
       let remaining = generate_equality_expr ms sym1 sym2 in
       IT.(IT (Binop (And, eq_it, remaining), BT.Bool, Cerb_location.unknown))
   in
-  let create_case (constructor, members) =
+  let create_case case_index (constructor, members) =
     let enum_str =
       Sym.pp_string (generate_sym_with_suffix ~suffix:"" ~uppercase:true constructor)
     in
@@ -2183,8 +2182,9 @@ let generate_datatype_equality_function (filename : string) (cn_datatype : _ cn_
     let equality_expr = generate_equality_expr members x_constr_sym y_constr_sym in
     let _, _, e = cn_to_ail_expr filename [] [] None equality_expr PassBack in
     let return_stat = mk_stmt A.(AilSreturn e) in
+    let case_value = Nat_big_num.of_int case_index in
     let ail_case =
-      A.(AilScase (Nat_big_num.zero, mk_stmt (AilSblock (bs, ss @ [ return_stat ]))))
+      A.(AilScase (case_value, mk_stmt (AilSblock (bs, ss @ [ return_stat ]))))
     in
     A.
       { loc = Cerb_location.unknown;
@@ -2197,7 +2197,7 @@ let generate_datatype_equality_function (filename : string) (cn_datatype : _ cn_
     A.(
       AilSswitch
         ( mk_expr (AilEmemberofptr (mk_expr (AilEident param1_sym), id_tag)),
-          mk_stmt (AilSblock ([], List.map create_case cn_datatype.cn_dt_cases)) ))
+          mk_stmt (AilSblock ([], List.mapi create_case cn_datatype.cn_dt_cases)) ))
   in
   let tag_if_stmt =
     A.(AilSif (mk_expr tag_check_cond, mk_stmt return_false, mk_stmt switch_stmt))

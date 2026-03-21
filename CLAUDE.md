@@ -1,0 +1,130 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+CN is a tool for verifying C code using separation logic refinement types. It's written in OCaml and builds on the Cerberus C semantics. CN can verify that C code is free of undefined behavior and meets user-written specifications, and can also translate specifications into runtime checks.
+
+## Building and Testing
+
+### Building
+```bash
+make install          # Build and install CN (required after any code changes)
+make cn              # Build CN without installing
+make cn-coq          # Build Coq components
+make format          # Format OCaml and C code
+```
+
+Always rebuild with `make install` after making code changes before running tests.
+
+### Running CN
+```bash
+cn verify FILE.c     # Verify a C file
+cn test FILE.c       # Generate and run tests (uses Fulminate/Bennet)
+cn --help            # See all options
+```
+
+### Testing
+- Main test runner: `tests/run-cn.sh`
+- Test suites in `tests/cn/`, `tests/cn-test-gen/`, `tests/cn-seq-test-gen/`
+- See `doc/TESTING.md` for details on CN's testing capabilities
+
+## Architecture
+
+### Pipeline Overview
+C code flows through these stages:
+1. **Lexer/Parser** → Cabs (C Abstract Syntax)
+2. **Desugaring** → Ail (intermediate language based on Clang)
+3. **Translation** → Core
+4. **Core to Mucore** (`lib/core_to_mucore.ml`) → Mucore (what CN typechecks)
+
+CN annotations (`/*@ ... @*/`) are parsed at different entry points:
+- `cn_statement`: proof guidance, debugging
+- `function_spec`: pre/post conditions
+- `loop_spec`: loop invariants
+- `cn_toplevel`: declarations
+
+### Key Source Files
+- `bin/main.ml` - Entry point
+- `lib/wellTyped.ml` - Specification well-formedness checking and pexpr inference
+- `lib/check.ml` - C code type checking
+- `lib/typing.ml{i}` - Type checking monad
+- `lib/solver.ml` - SMT solver interface
+- `lib/typeErrors.ml` - CN error messages
+- `lib/report.ml` - HTML report generation
+
+### Key Types
+- `lib/baseTypes.ml` - Base types
+- `lib/terms.ml` - Terms
+- `lib/logicalArgumentTypes.ml` - Logical argument types (Define, Resource, Constraint)
+- `lib/resourceTypes.ml` - Predicate signatures
+- `lib/resourcePredicates.ml` - Predicate definitions
+- `lib/mucore.ml{i}` - Mucore AST definitions
+
+### Code Pattern: Adding Pexpr Cases
+
+When adding support for a new pexpr constructor in `lib/wellTyped.ml`, follow this pattern:
+
+1. In `infer_pexpr` (around line 1615), add a case that:
+   - Infers types of sub-expressions using `infer_pexpr`
+   - Validates type constraints (e.g., for struct member access, check the base type is a struct)
+   - Uses `get_struct_member_type` or similar to get field types
+   - Returns `(base_type, constructor_with_typed_subexprs)`
+
+Example (PEmemberof):
+```ocaml
+| PEmemberof (tag, member, pe) ->
+  let@ pe = infer_pexpr pe in
+  let@ field_ct = get_struct_member_type loc tag member in
+  return (Memory.bt_of_sct field_ct, PEmemberof (tag, member, pe))
+```
+
+Don't just call `todo()` - implement proper type inference to avoid crashes on valid C code.
+
+## Development Workflow
+
+### Contributing
+- All work starts with a GitHub issue
+- Fork the repo and keep it up-to-date: `git pull --rebase upstream main`
+- Open PRs early (even in draft) to run CI
+- Use trunk-based development
+- See `doc/CONTRIBUTING.md` for full guidelines
+- Use the ocaml LSP. If it's not working ask the user for help configuring it.
+
+### Code Style
+- OCaml: Formatted with `ocamlformat` (version 0.27.0)
+- C: Formatted with `clang-format` (LLVM style, version 19)
+- Run `make format` or `dune build @fmt` to check/apply formatting
+
+### Commits
+- Keep commits small and self-contained
+- Write clear commit messages explaining "why" not just "what"
+- Each commit should build successfully (supports `git bisect`)
+
+## Test Cases
+
+### Test Directories
+
+CN has different test suites with different conventions:
+
+#### tests/cn/
+- Tests for `cn verify` command
+- Uses `tests/diff-prog.py` with `tests/cn/verify.json` config
+- Expected output stored in `file.c.verify` files
+- Run with: `./tests/diff-prog.py cn tests/cn/verify.json`
+- To generate/update .verify file: Run diff-prog.py and it will create missing .verify files automatically
+
+#### tests/cn-test-gen/
+- Tests for `cn test` command (test generation)
+- Uses `tests/run-cn-test-gen.py` script
+- No .verify files - uses filename suffix to determine expected behavior:
+  - `.pass.c` - should pass (exit code 0)
+  - `.fail.c` - should fail (non-zero exit code)
+  - `.buggy.c` - skipped
+  - `.flaky.c` - may pass or fail
+- Run with: `cd tests && ./run-cn-test-gen.py`
+
+#### tests/cn_vip_testsuite/
+- VIP testsuite tests
+- Uses various JSON configs for different test modes
