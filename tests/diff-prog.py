@@ -35,9 +35,9 @@ class Prog:
         try:
             completed, elapsed_time = self.run(test_rel_path);
             lines = completed.stdout.splitlines(True)
-            return { 'time': elapsed_time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines }
+            return { 'time': elapsed_time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines, 'return_code': completed.returncode }
         except subprocess.TimeoutExpired:
-            return { 'time': float(self.timeout), 'lines': ["TIMEOUT\n"] }
+            return { 'time': float(self.timeout), 'lines': ["TIMEOUT\n"], 'return_code': 124 }
 
     def get_diff(self, test_rel_path):
         expect_path = test_rel_path + '.' + self.name
@@ -47,19 +47,22 @@ class Prog:
                 with open(expect_path, 'w') as expect:
                     expect.writelines(output['lines'])
             finally:
-                return { 'diff': False, 'time': .0 }
+                return { 'diff': False, 'time': .0, 'return_code': output.get('return_code', 0) }
         with open(expect_path, 'r') as expect:
             try:
                 output = self.output(test_rel_path)
                 diff = list(difflib.unified_diff(expect.readlines(), output['lines'], expect_path, expect_path))
                 time = output['time']
-                # If accept_baselines flag is set and there's a diff, update the baseline
-                if self.accept_baselines and diff:
+                return_code = output.get('return_code', 0)
+                # If accept_baselines flag is set, always update the baseline
+                if self.accept_baselines:
                     with open(expect_path, 'w') as expect_file:
                         expect_file.writelines(output['lines'])
-                return { 'diff': diff, 'time': time }
+                    # Clear diff since we just accepted it
+                    diff = []
+                return { 'diff': diff, 'time': time, 'return_code': return_code }
             except AttributeError: # dry run
-                return { 'diff': False, 'time': .0 }
+                return { 'diff': False, 'time': .0, 'return_code': 0 }
 
 def test_files(test_dir, matcher):
     if not os.path.isdir(test_dir):
@@ -92,13 +95,16 @@ def run_tests(prog, test_rel_paths, quiet, max_workers):
         for test_rel_path, outcome in zip(test_rel_paths, executor.map(prog.get_diff, test_rel_paths), strict=True):
             time = outcome['time']
             diff = outcome['diff']
+            return_code = outcome.get('return_code', 0)
             timings.append(format_timing(test_rel_path, time))
             if not prog.run_cmd:
                 continue
             pass_fail = '\033[32m[ PASSED ]\033[m'
-            if diff:
+            # Test fails if there's a diff OR if return code is non-zero
+            if diff or return_code != 0:
                 failed_tests += 1
-                sys.stderr.writelines(diff)
+                if diff:
+                    sys.stderr.writelines(diff)
                 pass_fail = '\033[31m[ FAILED ]\033[m'
             if not quiet:
                 print('%s %s' % (pass_fail, test_rel_path))
