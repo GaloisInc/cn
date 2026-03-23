@@ -539,7 +539,19 @@ let gen_bump_alloc_bs_and_ss () =
   (frame_id_binding, start_stat_, end_stat_)
 
 
-let gen_bool_while_loop sym bt start_expr while_cond ?(if_cond_opt = None) (bs, ss, e) =
+let gen_bool_while_loop
+      sym
+      bt
+      start_expr
+      while_cond
+      ?(if_cond_opt :
+          (A.bindings
+          * CF.GenTypes.genTypeCategory A.statement_ list
+          * CF.GenTypes.genTypeCategory A.expression)
+            option =
+        None)
+      (bs, ss, e)
+  =
   (*
      Input:
      each (bt sym; start_expr <= sym && while_cond) {t}
@@ -573,16 +585,20 @@ let gen_bool_while_loop sym bt start_expr while_cond ?(if_cond_opt = None) (bs, 
   let while_cond_with_conversion = wrap_with_convert_from_cn_bool while_cond in
   let loop_body =
     match if_cond_opt with
-    | Some if_cond_expr ->
-      List.map
-        mk_stmt
-        [ A.(
-            AilSif
-              ( wrap_with_convert_from_cn_bool if_cond_expr,
-                mk_stmt (AilSblock ([], List.map mk_stmt (ss @ [ b_assign ]))),
-                mk_stmt (AilSblock ([], [ mk_stmt AilSskip ])) ));
-          incr_stat
-        ]
+    | Some (cond_bs, cond_ss, cond_expr) ->
+      let if_stat =
+        A.(
+          AilSif
+            ( wrap_with_convert_from_cn_bool cond_expr,
+              mk_stmt (AilSblock ([], List.map mk_stmt (ss @ [ b_assign ]))),
+              mk_stmt (AilSblock ([], [ mk_stmt AilSskip ])) ))
+      in
+      (match (cond_bs, cond_ss) with
+       | [], [] -> [ mk_stmt if_stat; mk_stmt incr_stat ]
+       | _ ->
+         [ mk_stmt (A.AilSblock (cond_bs, List.map mk_stmt (cond_ss @ [ if_stat ])));
+           mk_stmt incr_stat
+         ])
     | None -> List.map mk_stmt (ss @ [ b_assign; incr_stat ])
   in
   let while_loop =
@@ -3086,13 +3102,10 @@ let cn_to_ail_resource
     let _, _, while_cond_expr =
       cn_to_ail_expr filename dts globals spec_mode_opt while_loop_cond PassBack
     in
-    let _, _, if_cond_expr =
+    let cond_bs, cond_ss, if_cond_expr =
       cn_to_ail_expr filename dts globals spec_mode_opt q.permission PassBack
     in
     let cn_integer_ptr_ctype = bt_to_ail_ctype i_bt in
-    let b2, s2, _e2 =
-      cn_to_ail_expr filename dts globals spec_mode_opt q.permission PassBack
-    in
     let b3, s3, _e3 =
       cn_to_ail_expr
         filename
@@ -3193,7 +3206,9 @@ let cn_to_ail_resource
           A.(
             AilSwhile
               ( wrap_with_convert_from_cn_bool while_cond_expr,
-                mk_stmt (AilSblock ([], List.map mk_stmt [ if_stat; increment_stat ])),
+                mk_stmt
+                  (AilSblock
+                     (cond_bs, List.map mk_stmt (cond_ss @ [ if_stat; increment_stat ]))),
                 0 ))
         in
         let ail_block =
@@ -3249,7 +3264,10 @@ let cn_to_ail_resource
           A.(
             AilSwhile
               ( wrap_with_convert_from_cn_bool while_cond_expr,
-                mk_stmt A.(AilSblock ([], List.map mk_stmt [ if_stat; increment_stat ])),
+                mk_stmt
+                  A.(
+                    AilSblock
+                      (cond_bs, List.map mk_stmt (cond_ss @ [ if_stat; increment_stat ]))),
                 0 ))
         in
         let ail_block =
@@ -3257,7 +3275,7 @@ let cn_to_ail_resource
         in
         ([ sym_binding ], [ sym_decl; ail_block ])
     in
-    (b1 @ b2 @ b3 @ bs' @ bs, s1 @ s2 @ s3 @ ss @ ss')
+    (b1 @ b3 @ bs' @ bs, s1 @ s3 @ ss @ ss')
 
 
 let cn_to_ail_logical_constraint_aux
@@ -3309,7 +3327,7 @@ let cn_to_ail_logical_constraint_aux
        let _, _, while_cond_expr =
          cn_to_ail_expr filename dts globals spec_mode_opt while_loop_cond PassBack
        in
-       let _, _, if_cond_expr =
+       let cond_bs, cond_ss, if_cond_expr =
          cn_to_ail_expr filename dts globals spec_mode_opt cond_it PassBack
        in
        let t_translated = cn_to_ail_expr filename dts globals spec_mode_opt t PassBack in
@@ -3319,7 +3337,7 @@ let cn_to_ail_logical_constraint_aux
            bt
            (rm_expr e_start)
            while_cond_expr
-           ~if_cond_opt:(Some if_cond_expr)
+           ~if_cond_opt:(Some (cond_bs, cond_ss, if_cond_expr))
            t_translated
        in
        dest d spec_mode_opt (bs, ss, e))
@@ -4987,13 +5005,10 @@ let cn_to_ail_assume_resource
     let _, _, while_cond_expr =
       cn_to_ail_expr filename dts globals spec_mode_opt while_loop_cond PassBack
     in
-    let _, _, if_cond_expr =
+    let cond_bs, cond_ss, if_cond_expr =
       cn_to_ail_expr filename dts globals spec_mode_opt q.permission PassBack
     in
     let cn_integer_ptr_ctype = bt_to_ail_ctype i_bt in
-    let b2, s2, _e2 =
-      cn_to_ail_expr filename dts globals spec_mode_opt q.permission PassBack
-    in
     let b3, s3, _e3 =
       cn_to_ail_expr
         filename
@@ -5092,7 +5107,9 @@ let cn_to_ail_assume_resource
           A.(
             AilSwhile
               ( wrap_with_convert_from_cn_bool while_cond_expr,
-                mk_stmt (AilSblock ([], List.map mk_stmt [ if_stat; increment_stat ])),
+                mk_stmt
+                  (AilSblock
+                     (cond_bs, List.map mk_stmt (cond_ss @ [ if_stat; increment_stat ]))),
                 0 ))
         in
         let ail_block =
@@ -5148,7 +5165,10 @@ let cn_to_ail_assume_resource
           A.(
             AilSwhile
               ( wrap_with_convert_from_cn_bool while_cond_expr,
-                mk_stmt A.(AilSblock ([], List.map mk_stmt [ if_stat; increment_stat ])),
+                mk_stmt
+                  A.(
+                    AilSblock
+                      (cond_bs, List.map mk_stmt (cond_ss @ [ if_stat; increment_stat ]))),
                 0 ))
         in
         let ail_block =
@@ -5156,7 +5176,7 @@ let cn_to_ail_assume_resource
         in
         ([ sym_binding ], [ sym_decl; ail_block ])
     in
-    (b1 @ b2 @ b3 @ bs' @ bs, s1 @ s2 @ s3 @ ss @ ss')
+    (b1 @ b3 @ bs' @ bs, s1 @ s3 @ ss @ ss')
 
 
 let rec cn_to_ail_assume_lat filename dts pred_sym_opt globals preds spec_mode_opt

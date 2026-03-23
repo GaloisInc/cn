@@ -1,7 +1,7 @@
 // cn test --skip=test_qpred_iargs
 /*@
 predicate u32 CheckValue(pointer p, i32 idx, pointer q) {
-  take x = each(u32 j; 0u32 <= j && j < 2u32 && (u32)idx < 1u32 ? false : false) { RW<int>(array_shift<int>(q,j)) };
+  take x = each(u32 j; 0u32 <= j && j < 2u32) { RW<int>(array_shift<int>(q,j)) };
   assert (x[0u32] == idx);
   return (u32)idx;
 }
