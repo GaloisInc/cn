@@ -1,6 +1,6 @@
 {
-  "name": "verify",
-  "args": ["verify", "--output-dir=/tmp"],
-  "filter": "^(.*\\.c)$",
-  "timeout": 60
+    "name": "verify",
+    "args": ["verify"],
+    "filter": "^(.*\\.c)$",
+    "timeout": 60
 }
