@@ -12,8 +12,8 @@ cn: internal error, uncaught exception:
     Called from Stdlib__List.map in file "list.ml", line 86, characters 15-19
     Called from Stdlib__List.map in file "list.ml", line 88, characters 14-21
     Called from Cn__Fulminate__Internal.generate_c_specs in file "lib/fulminate/internal.ml", line 216, characters 14-59
-    Called from Cn__Fulminate.main in file "lib/fulminate/fulminate.ml", lines 827-836, characters 4-11
-    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", lines 222-241, characters 9-24
+    Called from Cn__Fulminate.main in file "lib/fulminate/fulminate.ml", lines 831-840, characters 4-11
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", lines 226-245, characters 9-24
     
 Issues can be made at https://github.com/rems-project/cerberus/issues.
 Prefix your issue with "[CN-Exec]". Check that there isn't already one for this error.

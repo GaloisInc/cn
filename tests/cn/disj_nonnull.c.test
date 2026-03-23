@@ -1,15 +1,4 @@
-return code: 1
-./disj_nonnull.exec.c:160:11: error: use of undeclared identifier 'x'
-  160 |   return &x;
-      |           ^
-./disj_nonnull.exec.c:165:12: error: use of undeclared identifier 'x'
-  165 |   memcpy((&x), ptr, sizeof(signed int));
-      |            ^
-./disj_nonnull.exec.c:170:11: error: use of undeclared identifier 'y'
-  170 |   return &y;
-      |           ^
-./disj_nonnull.exec.c:175:12: error: use of undeclared identifier 'y'
-  175 |   memcpy((&y), ptr, sizeof(signed int));
-      |            ^
-4 errors generated.
-Failed to compile 'disj_nonnull.exec.c' in /tmp.
+return code: 0
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

@@ -31,7 +31,7 @@ run_test() {
         accept_flag="--accept --max-workers=1"
     fi
 
-    ./diff-prog.py cn "$config_file" $accept_flag 2>&1 | tail -5
+    ./diff-prog.py cn "$config_file" $accept_flag 2>&1
     echo ""
 }
 

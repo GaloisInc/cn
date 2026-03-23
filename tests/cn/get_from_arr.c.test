@@ -1,4 +1,4 @@
-return code: 0
+return code: 1
 cn/get_from_arr.c:7:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
 /*@ requires take IA = each (i32 j; 0i32 <= j && j < 10i32)
                   ^
@@ -20,6 +20,9 @@ cn/get_from_arr.c:7:19: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
 cn/get_from_arr.c:9:18: warning: 'each' prefers a 'u64', but 'j' has type 'i32'.
     ensures take IA2 = each (i32 j; 0i32 <= j && j < 10i32)
                  ^
-
-Testing Summary:
-cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0
+In file included from ./get_from_arr.test.c:165:
+./get_from_arr.gen.h:1:44: error: 'cn_test_get_static_get_from_arr_a_531' declared as array of functions of type 'char *()'
+    1 | char* cn_test_get_static_get_from_arr_a_531[6]();
+      |                                            ^
+1 error generated.
+Failed to compile 'get_from_arr.test.c' in /tmp.
