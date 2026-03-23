@@ -45,12 +45,37 @@ cd tests
 ./run-all-commands.sh verify all
 ./run-all-commands.sh test all
 
+# Regenerate test baselines when test generation changes
+./run-all-commands.sh test all --regen
+
 # Or use diff-prog.py directly with JSON configs
 ./diff-prog.py cn cn/test.json              # Run cn test on verify tests
 ./diff-prog.py cn cn-test-gen/src/verify.json  # Run cn verify on test-gen tests
 ```
 
-**Note:** Some tests may fail when run with incompatible commands (e.g., test-gen specs are too complex for verify baseline comparison). This is expected.
+**Note:**
+- Some tests may fail when run with incompatible commands (e.g., test-gen specs are too complex for verify baseline comparison). This is expected.
+- Do NOT use `run-cn-test-gen.py` directly
+  - it's a very long-running script that tests each case with 8 different parameter sets. 
+  - Use `run-all-commands.sh test all ` instead.
+
+### Debugging and Scratch Space
+
+When debugging test generation or inspecting generated code:
+
+- Use `claude_scratch/` directory for temporary work and analysis
+- Create subdirectories within `claude_scratch/` for different debugging sessions
+- The `claude_scratch/` directory is gitignored and safe for temporary files
+- Use `cn test --output-dir` to save generated test files to a specific location
+
+Example:
+```bash
+# Generate test with output saved to scratch directory
+cn test tests/cn-test-gen/src/example.c --output-dir claude_scratch/my-debug-session
+
+# Save test output log
+cn test tests/cn-test-gen/src/example.c 2>&1 | tee claude_scratch/test-output.log
+```
 
 ## Architecture
 
@@ -136,8 +161,7 @@ CN has different test suites with different conventions:
 - Tests for `cn verify` command
 - Uses `tests/diff-prog.py` with `tests/cn/verify.json` config
 - Expected output stored in `file.c.verify` files
-- Run with: `./tests/diff-prog.py cn tests/cn/verify.json`
-- To generate/update .verify file: Run diff-prog.py and it will create missing .verify files automatically
+- Run with: `cd tests && ./run-all-commands.sh verify`
 
 #### tests/cn-test-gen/
 - Tests for `cn test` command (test generation)
@@ -147,7 +171,7 @@ CN has different test suites with different conventions:
   - `.fail.c` - should fail (non-zero exit code)
   - `.buggy.c` - skipped
   - `.flaky.c` - may pass or fail
-- Run with: `cd tests && ./run-cn-test-gen.py`
+- Run with: `cd tests && ./run-all-commands.sh test`
 
 #### tests/cn_vip_testsuite/
 - VIP testsuite tests
