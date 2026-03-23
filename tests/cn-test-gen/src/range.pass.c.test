@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/range.pass.c:5:13: warning: deprecated keyword 'Owned', use 'RW' instead
+            Owned(array_shift<int>(arr, i))
+            ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

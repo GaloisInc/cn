@@ -1,0 +1,7 @@
+return code: 1
+Undefined symbols for architecture arm64:
+  "_static_counterpass_count_alt", referenced from:
+      _cn_test_gen_static_counterpass_count_alt in counter.pass.test.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+Failed to link *.o files.

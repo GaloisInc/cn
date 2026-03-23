@@ -189,57 +189,57 @@ In file included from ./mutual_rec1.test.c:289:
 ./mutual_rec1.test.c:982:177: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
   982 |       return cn_bool_and(struct_b_tree_equality(a_2236->right, a_2237->right), cn_bool_and(struct_b_tree_equality(a_2236->left, a_2237->left), cn_bool_and(cn_bits_i32_equality(a_2236->v, a_2237->v), cn_bool_and(cn_bits_i32_equality(a_2236->k, a_2237->k), convert_to_cn_bool(1)))));
       |                                                                                                                                                                                 ^~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
   523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
       | ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
   489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
       |                                           ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
   494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
       |   ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
   240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
       |                                 ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
   243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
       |                                                  ^
 ./mutual_rec1.test.c:982:188: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
   982 |       return cn_bool_and(struct_b_tree_equality(a_2236->right, a_2237->right), cn_bool_and(struct_b_tree_equality(a_2236->left, a_2237->left), cn_bool_and(cn_bits_i32_equality(a_2236->v, a_2237->v), cn_bool_and(cn_bits_i32_equality(a_2236->k, a_2237->k), convert_to_cn_bool(1)))));
       |                                                                                                                                                                                            ^~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i2' here
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i2' here
   523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
       | ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
   489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
       |                                           ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
   494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
       |   ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
   240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
       |                                 ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:60: note: expanded from macro 'CN_GEN_EQUALITY_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:243:60: note: expanded from macro 'CN_GEN_EQUALITY_'
   243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
       |                                                            ^
 ./mutual_rec1.test.c:982:233: error: incompatible integer to pointer conversion passing 'int' to parameter of type 'void *' [-Wint-conversion]
   982 |       return cn_bool_and(struct_b_tree_equality(a_2236->right, a_2237->right), cn_bool_and(struct_b_tree_equality(a_2236->left, a_2237->left), cn_bool_and(cn_bits_i32_equality(a_2236->v, a_2237->v), cn_bool_and(cn_bits_i32_equality(a_2236->k, a_2237->k), convert_to_cn_bool(1)))));
       |                                                                                                                                                                                                                                         ^~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:523:1: note: passing argument to parameter 'i1' here
   523 | CN_GEN_ALL(uint32_t, int32_t, cn_bits_i32)
       | ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:489:43: note: expanded from macro 'CN_GEN_ALL'
   489 | #define CN_GEN_ALL(UCTYPE, CTYPE, CNTYPE) CN_GEN_ALL_(UCTYPE, CTYPE, CNTYPE)
       |                                           ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:494:3: note: expanded from macro 'CN_GEN_ALL_'
   494 |   CN_GEN_EQUALITY(CNTYPE)                                                                \
       |   ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:240:33: note: expanded from macro 'CN_GEN_EQUALITY'
   240 | #define CN_GEN_EQUALITY(CNTYPE) CN_GEN_EQUALITY_(CNTYPE)
       |                                 ^
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:243:50: note: expanded from macro 'CN_GEN_EQUALITY_'
   243 |   static inline cn_bool* CNTYPE##_equality(void* i1, void* i2) {                         \
       |                                                  ^
 fatal error: too many errors emitted, stopping now [-ferror-limit=]
 36 warnings and 20 errors generated.
-Failed to compile 'mutual_rec1.test.c' in /tmp.
+Failed to compile 'mutual_rec1.test.c'.

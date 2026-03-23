@@ -6,4 +6,4 @@ return code: 1
   363 |   a_989->x2 = cast_cn_pointer_to_cn_bits_u32(extern_f);
       |                                              ^
 2 errors generated.
-Failed to compile 'fun_addrs_cn_stmt.test.c' in /tmp.
+Failed to compile 'fun_addrs_cn_stmt.test.c'.

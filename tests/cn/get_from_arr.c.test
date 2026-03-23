@@ -25,4 +25,4 @@ In file included from ./get_from_arr.test.c:165:
     1 | char* cn_test_get_static_get_from_arr_a_531[6]();
       |                                            ^
 1 error generated.
-Failed to compile 'get_from_arr.test.c' in /tmp.
+Failed to compile 'get_from_arr.test.c'.

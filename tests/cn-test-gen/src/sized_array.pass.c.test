@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/sized_array.pass.c:8:28: warning: deprecated keyword 'Owned', use 'RW' instead
+requires take Client_in  = Owned<struct foo>(c);
+                           ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

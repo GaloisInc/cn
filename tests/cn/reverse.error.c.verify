@@ -1,17 +1,17 @@
 return code: 1
 [1/2]: reverse -- fail
 [2/2]: main -- fail
-tests/cn/reverse.error.c:106:7: error: Unprovable constraint
+cn/reverse.error.c:106:7: error: Unprovable constraint
       return cur;
       ^~~~~~~~~~~ 
-Constraint from tests/cn/reverse.error.c:89:14:
+Constraint from cn/reverse.error.c:89:14:
              L_ == rev(L);
              ^~~~~~~~~~~~~ 
-State file: file:///tmp/state__reverse.error.c__reverse.html
-tests/cn/reverse.error.c:124:3: error: Missing resource for de-allocating
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__reverse.error.c__reverse.html
+cn/reverse.error.c:124:3: error: Missing resource for de-allocating
   return 0;
   ^~~~~~~~~ 
 Resource needed: W<struct node>(&n3)
   which requires: W<signed int>(&&n3->head)
       other location (File "lib/resourceInference.ml", line 247, characters 33-40)  (arg head)
-State file: file:///tmp/state__reverse.error.c__main.html
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__reverse.error.c__main.html

@@ -1,0 +1,8 @@
+return code: 0
+./switch_case_no_braces.pass.exec.c:72:3: warning: expression result unused [-Wunused-value]
+   72 |   0;
+      |   ^
+1 warning generated.
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

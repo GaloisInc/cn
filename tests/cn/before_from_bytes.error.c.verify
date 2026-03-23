@@ -1,13 +1,13 @@
 return code: 1
-tests/cn/before_from_bytes.error.c:6:9: warning: experimental keyword 'to_bytes' (use of experimental features is discouraged)
+cn/before_from_bytes.error.c:6:9: warning: experimental keyword 'to_bytes' (use of experimental features is discouraged)
     /*@ to_bytes RW<int>(p); @*/
         ^~~~~~~~ 
-tests/cn/before_from_bytes.error.c:7:9: warning: focus: index added, no effect on existing resources (yet).
+cn/before_from_bytes.error.c:7:9: warning: focus: index added, no effect on existing resources (yet).
     /*@ focus RW<char>, 2u64; @*/
         ^~~~~~~~~~~~~~~~~~~~~ 
 [1/1]: main -- fail
-tests/cn/before_from_bytes.error.c:8:5: error: Missing resource for writing
+cn/before_from_bytes.error.c:8:5: error: Missing resource for writing
     p_char[2] = 0xff;
     ~~~~~~~~~~^~~~~~ 
 Resource needed: W<char>(&&x[(u64)2'i32])
-State file: file:///tmp/state__before_from_bytes.error.c__main.html
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__before_from_bytes.error.c__main.html

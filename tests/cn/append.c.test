@@ -3,29 +3,29 @@ In file included from ./append.test.c:241:
 ./append.gen.h:36:23: warning: a function declaration without a prototype is deprecated in all versions of C and is treated as a zero-parameter prototype in C23, conflicting with a previous declaration [-Wdeprecated-non-prototype]
    36 | struct a_1278_record* bennet_split();
       |                       ^
-/Users/guso/.opam/default/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: conflicting prototype is here
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: conflicting prototype is here
    78 | void bennet_split(size_t n, size_t* arr[], size_t len);
       |      ^
 In file included from ./append.test.c:241:
 ./append.gen.h:36:23: error: conflicting types for 'bennet_split'
    36 | struct a_1278_record* bennet_split();
       |                       ^
-/Users/guso/.opam/default/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: previous declaration is here
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: previous declaration is here
    78 | void bennet_split(size_t n, size_t* arr[], size_t len);
       |      ^
 In file included from ./append.test.c:241:
 ./append.gen.h:90:23: error: conflicting types for 'bennet_split'
    90 | struct a_1278_record* bennet_split()
       |                       ^
-/Users/guso/.opam/default/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: previous declaration is here
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: previous declaration is here
    78 | void bennet_split(size_t n, size_t* arr[], size_t len);
       |      ^
 In file included from ./append.test.c:241:
 ./append.gen.h:141:50: error: too few arguments to function call, expected 3, have 0
   141 |   struct a_1278_record* cn_result = bennet_split();
       |                                     ~~~~~~~~~~~~ ^
-/Users/guso/.opam/default/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: 'bennet_split' declared here
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/internals/rand.h:78:6: note: 'bennet_split' declared here
    78 | void bennet_split(size_t n, size_t* arr[], size_t len);
       |      ^            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning and 3 errors generated.
-Failed to compile 'append.test.c' in /tmp.
+Failed to compile 'append.test.c'.

@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/tutorial_queue.pass.c:158:16: warning: deprecated keyword 'Owned', use 'RW' instead
+      take B = Owned<struct queue_cell>(back);
+               ^~~~~ 
+
+Testing Summary:
+cases: 4, passed: 4, failed: 0, errored: 0, skipped: 0

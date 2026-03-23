@@ -6,4 +6,4 @@ return code: 1
    87 |   CN_STORE(r, f(25));
       |               ^
 2 errors generated.
-Failed to compile 'f.exec.c' in /tmp.
+Failed to compile 'f.exec.c'.

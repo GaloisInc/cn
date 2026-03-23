@@ -1,14 +1,8 @@
 return code: 1
 cn: internal error, uncaught exception:
-    Failure("unreachable @ File \"lib/testGeneration/bennet/stage7/convert.ml\", line 729, characters 35-42 with type: map<u64, u8>")
-    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Cn__TestGeneration__Bennet__Stage7__Convert.Make.transform_term in file "lib/testGeneration/bennet/stage7/convert.ml", line 699, characters 35-81
-    Called from Cn__TestGeneration__Bennet__Stage7__Convert.Make.transform_gen_def in file "lib/testGeneration/bennet/stage7/convert.ml", line 1379, characters 21-70
-    Called from Stdlib__List.map in file "list.ml", line 83, characters 15-19
-    Called from Cn__TestGeneration__Bennet__Stage7__Convert.Make.transform in file "lib/testGeneration/bennet/stage7/convert.ml", line 1499, characters 6-52
-    Called from Cn__TestGeneration.save_generators in file "lib/testGeneration/testGeneration.ml", line 368, characters 15-81
-    Called from Cn__TestGeneration.run in file "lib/testGeneration/testGeneration.ml", line 489, characters 2-75
-    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", lines 249-257, characters 9-17
+    Failure("unreachable @ File \"lib/testGeneration/bennet/stage7/convert.ml\", <POS> with type: map<u64, u8>")
+    Raised at Str.search_forward in file "str.ml", <POS>
+    Called from Str.opt_search_forward in file "str.ml", <POS>
     
 Issues can be made at https://github.com/rems-project/cerberus/issues.
 Prefix your issue with "[CN-Test-Gen]". Check that there isn't already one for this error.

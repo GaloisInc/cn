@@ -1,0 +1,8 @@
+return code: 1
+[1/1]: foo -- fail
+cn-test-gen/src/problems/predicate.c:5:1: error: Missing resource for returning
+void foo(int *q)
+~~~~~^~~~~~~~~~~ 
+Resource needed: X(q)
+      cn-test-gen/src/problems/predicate.c:7:16: (arg O)
+State file: file:///tmp/state__predicate.c__foo.html

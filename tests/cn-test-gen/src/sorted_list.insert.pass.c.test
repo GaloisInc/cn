@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/sorted_list.insert.pass.c:43:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

@@ -1,0 +1,3 @@
+return code: 1
+error: Cannot generate tests for uninterpreted predicate X.
+Predicate 'X' has no definition.

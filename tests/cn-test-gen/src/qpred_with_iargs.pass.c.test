@@ -1,0 +1,25 @@
+return code: 1
+cn-test-gen/src/qpred_with_iargs.pass.c:4:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take x = Owned<int>(p);
+           ^~~~~ 
+cn-test-gen/src/qpred_with_iargs.pass.c:11:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take items = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                  ^
+cn-test-gen/src/qpred_with_iargs.pass.c:12:18: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    ensures take items2 = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                 ^
+cn-test-gen/src/qpred_with_iargs.pass.c:11:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take items = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                  ^
+cn-test-gen/src/qpred_with_iargs.pass.c:12:18: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    ensures take items2 = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                 ^
+cn-test-gen/src/qpred_with_iargs.pass.c:11:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take items = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                  ^
+cn-test-gen/src/qpred_with_iargs.pass.c:12:18: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    ensures take items2 = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                 ^
+
+Testing Summary:
+cases: 2, passed: 1, failed: 0, errored: 1, skipped: 0

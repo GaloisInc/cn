@@ -1,0 +1,43 @@
+return code: 0
+cn-test-gen/src/bounds.pass.c:4:55: warning: deprecated keyword 'Owned', use 'RW' instead
+  take a1 = each(u64 i; 0u64 <= i && i < (u64)size) { Owned<int>(array_shift<int>(p,i)) };
+                                                      ^~~~~ 
+cn-test-gen/src/bounds.pass.c:22:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:24:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:31:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:33:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:22:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:24:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:31:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:33:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:22:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:24:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; -1i32 < i && i < size) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:31:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a1 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+cn-test-gen/src/bounds.pass.c:33:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take a2 = each(i32 i; i == 1i32 || i == 2i32 || i == 5i32) { Owned<int>(array_shift<int>(p,i)) };
+       ^
+
+Testing Summary:
+cases: 4, passed: 4, failed: 0, errored: 0, skipped: 0

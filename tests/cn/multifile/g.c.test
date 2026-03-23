@@ -4,4 +4,4 @@ Undefined symbols for architecture arm64:
       _cn_test_gen_g in g.test.o
 ld: symbol(s) not found for architecture arm64
 clang: error: linker command failed with exit code 1 (use -v to see invocation)
-Failed to link *.o files in /tmp.
+Failed to link *.o files.

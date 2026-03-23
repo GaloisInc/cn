@@ -1,7 +1,7 @@
 return code: 1
 [1/1]: main -- fail
-tests/cn/before_to_bytes.error.c:6:5: error: Missing resource for writing
+cn/before_to_bytes.error.c:6:5: error: Missing resource for writing
     p_char[2] = 0xff;
     ~~~~~~~~~~^~~~~~ 
 Resource needed: W<char>(&&x[(u64)2'i32])
-State file: file:///tmp/state__before_to_bytes.error.c__main.html
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__before_to_bytes.error.c__main.html

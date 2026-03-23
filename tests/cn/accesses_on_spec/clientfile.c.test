@@ -15,4 +15,4 @@ return code: 1
   101 |   memcpy((&myval), ptr, sizeof(signed int));
       |            ^
 7 errors generated.
-Failed to compile 'clientfile.exec.c' in /tmp.
+Failed to compile 'clientfile.exec.c'.

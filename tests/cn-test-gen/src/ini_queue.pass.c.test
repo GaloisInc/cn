@@ -1,0 +1,28 @@
+return code: 0
+cn-test-gen/src/ini_queue.pass.c:106:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take q = Owned<struct queue>(p);
+           ^~~~~ 
+cn-test-gen/src/ini_queue.pass.c:163:9: warning: deprecated keyword 'extract', use 'focus' instead
+    /*@ extract Owned<int>, q->inp; @*/
+        ^~~~~~~ 
+cn-test-gen/src/ini_queue.pass.c:107:8: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  take buf = each (i32 i; 0i32 <= i && i < q.size) { Owned<int>(q.buf + i) };
+       ^
+cn-test-gen/src/ini_queue.pass.c:121:16: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  ensures take rv = each (i32 i; 0i32 <= i && i < size) { Owned<int>(return + i) };
+               ^
+cn-test-gen/src/ini_queue.pass.c:163:29: warning: 'focus' prefers a 'u64', but 'deref_read_q00.inp' has type 'i32'.
+    /*@ extract Owned<int>, q->inp; @*/
+                            ~^~~~~ 
+cn-test-gen/src/ini_queue.pass.c:177:29: warning: 'focus' prefers a 'u64', but 'deref_read_q10.outp' has type 'i32'.
+    /*@ extract Owned<int>, q->outp; @*/
+                            ~^~~~~~ 
+cn-test-gen/src/ini_queue.pass.c:121:16: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  ensures take rv = each (i32 i; 0i32 <= i && i < size) { Owned<int>(return + i) };
+               ^
+cn-test-gen/src/ini_queue.pass.c:121:16: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+  ensures take rv = each (i32 i; 0i32 <= i && i < size) { Owned<int>(return + i) };
+               ^
+
+Testing Summary:
+cases: 6, passed: 6, failed: 0, errored: 0, skipped: 0

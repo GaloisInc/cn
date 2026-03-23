@@ -12,25 +12,25 @@ cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'
 /*@ requires take f1 = each(i32 i; 0i32 <= i && i <= 0i32) { False(p + i, i) };
                   ^
 ./inconsistent2.test.c:220:53: error: passing 'void' to parameter of incompatible type 'void *'
-  220 |   CN_ANALYZE_SHAPE_EACH_END(a_1023, i, cn_bits_i32, cn_analyze_shape_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
+  220 |   CN_ANALYZE_SHAPE_EACH_END(a_1016, i, cn_bits_i32, cn_analyze_shape_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
       |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-replicate/shape.h:26:51: note: expanded from macro 'CN_ANALYZE_SHAPE_EACH_END'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-replicate/shape.h:26:51: note: expanded from macro 'CN_ANALYZE_SHAPE_EACH_END'
    26 |   cn_map_set(map, cast_##i_ty##_to_cn_integer(i), val);                                  \
       |                                                   ^~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:211:54: note: passing argument to parameter 'value' here
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:211:54: note: passing argument to parameter 'value' here
   211 | cn_map* cn_map_set(cn_map* m, cn_integer* key, void* value);
       |                                                      ^
 ./inconsistent2.test.c:265:48: error: passing 'void' to parameter of incompatible type 'void *'
-  265 |   CN_REPLICATE_EACH_END(a_976, i, cn_bits_i32, cn_replicate_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
+  265 |   CN_REPLICATE_EACH_END(a_969, i, cn_bits_i32, cn_replicate_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
       |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-replicate/shape.h:70:43: note: expanded from macro 'CN_REPLICATE_EACH_END'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-replicate/shape.h:70:43: note: expanded from macro 'CN_REPLICATE_EACH_END'
    70 |   CN_ANALYZE_SHAPE_EACH_END(map, i, i_ty, val, max)
       |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-replicate/shape.h:26:51: note: expanded from macro 'CN_ANALYZE_SHAPE_EACH_END'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-replicate/shape.h:26:51: note: expanded from macro 'CN_ANALYZE_SHAPE_EACH_END'
    26 |   cn_map_set(map, cast_##i_ty##_to_cn_integer(i), val);                                  \
       |                                                   ^~~
-/Users/guso/.opam/default/lib/cn/runtime/include/cn-executable/utils.h:211:54: note: passing argument to parameter 'value' here
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:211:54: note: passing argument to parameter 'value' here
   211 | cn_map* cn_map_set(cn_map* m, cn_integer* key, void* value);
       |                                                      ^
 2 errors generated.
-Failed to compile 'inconsistent2.test.c' in /tmp.
+Failed to compile 'inconsistent2.test.c'.

@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/bin_tree.pass.c:18:22: warning: deprecated keyword 'Owned', use 'RW' instead
+            take n = Owned<struct int_tree>(p);
+                     ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

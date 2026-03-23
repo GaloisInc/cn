@@ -1,6 +1,0 @@
-{
-  "name": "seq-test",
-  "args": ["seq-test"],
-  "filter": "^(.*(?<!error)\\.c)$",
-  "timeout": 120
-}

@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/slf_sized_stack.pass.c:105:14: warning: deprecated keyword 'Owned', use 'RW' instead
+    take S = Owned<struct sized_stack>(p);
+             ^~~~~ 
+
+Testing Summary:
+cases: 8, passed: 8, failed: 0, errored: 0, skipped: 0

@@ -1,0 +1,7 @@
+return code: 1
+cn-test-gen/src/sorted_list_alt.insert.flaky.c:42:17: warning: deprecated keyword 'Owned', use 'RW' instead
+    take head = Owned<struct List>(from);
+                ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 0, failed: 1, errored: 0, skipped: 0

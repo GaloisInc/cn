@@ -12,4 +12,4 @@ return code: 1
   100 |   memcpy((&myval), ptr, sizeof(signed int));
       |            ^
 6 errors generated.
-Failed to compile 'libfile.exec.c' in /tmp.
+Failed to compile 'libfile.exec.c'.

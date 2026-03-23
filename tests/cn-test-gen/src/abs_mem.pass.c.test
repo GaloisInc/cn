@@ -1,0 +1,7 @@
+return code: 0
+cn-test-gen/src/abs_mem.pass.c:2:23: warning: deprecated keyword 'Owned', use 'RW' instead
+/*@ requires take x = Owned<int>(p);
+                      ^~~~~ 
+
+Testing Summary:
+cases: 1, passed: 1, failed: 0, errored: 0, skipped: 0

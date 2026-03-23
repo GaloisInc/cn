@@ -1,9 +1,9 @@
 return code: 1
 [1/1]: different_size -- fail
-tests/cn/mod_return_size.error.c:9:5: error: Unprovable constraint
+cn/mod_return_size.error.c:9:5: error: Unprovable constraint
     return x % y;
     ^~~~~~~~~~~~~ 
-Constraint from tests/cn/mod_return_size.error.c:7:13:
+Constraint from cn/mod_return_size.error.c:7:13:
     ensures return == x % (i32)y; @*/
             ^~~~~~~~~~~~~~~~~~~~~ 
-State file: file:///tmp/state__mod_return_size.error.c__different_size.html
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__mod_return_size.error.c__different_size.html
