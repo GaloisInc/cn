@@ -40,7 +40,7 @@ let run_seq_tests
   in
   let filename = Common.there_can_only_be_one filename in
   let output_dir =
-    Common.mk_dir_if_not_exist_maybe_tmp ~mktemp:false SeqTest output_dir
+    Common.mk_dir_if_not_exist_maybe_tmp ~mktemp:false ~print_steps SeqTest output_dir
   in
   let basefile = Filename.basename filename in
   let pp_file = Filename.temp_file "cn_" basefile in

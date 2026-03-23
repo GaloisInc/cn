@@ -157,7 +157,7 @@ let generate_executable_specs
         print_endline "Cannot use '--tmp' and '--output-dir' together.";
         exit 1);
       let output_dir =
-        Common.mk_dir_if_not_exist_maybe_tmp ~mktemp Instrument output_dir
+        Common.mk_dir_if_not_exist_maybe_tmp ~mktemp ~print_steps Instrument output_dir
       in
       Cerb_colour.without_colour
         (fun () ->

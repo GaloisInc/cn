@@ -346,7 +346,8 @@ let mk_dir_if_not_exist_maybe_tmp ~mktemp ?(print_steps = false) (cmd : subcomma
           in
           create_unique_dir ()
         in
-        print_endline ("Using temporary directory: " ^ dir);
+        if print_steps then
+          print_endline ("Using temporary directory: " ^ dir);
         dir)
       else
         "."
