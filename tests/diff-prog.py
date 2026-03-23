@@ -8,6 +8,28 @@ def eprint(*args, then_exit=True, **kwargs):
     if then_exit:
         exit(1)
 
+def get_opam_prefix():
+    """Get the opam installation prefix for normalizing paths"""
+    try:
+        result = subprocess.run(['opam', 'var', 'prefix'],
+                              capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+# Cache the opam prefix at module load time
+OPAM_PREFIX = get_opam_prefix()
+
+def normalize_paths(text):
+    """Normalize non-deterministic paths and line numbers in output"""
+    if OPAM_PREFIX:
+        # Replace opam prefix path (e.g., /Users/guso/.opam/default)
+        text = text.replace(OPAM_PREFIX, '<OPAM_PREFIX>')
+    # Replace various line number patterns with <POS> placeholder
+    text = re.sub(r'line \d+, characters \d+-\d+', '<POS>', text)
+    text = re.sub(r'lines \d+-\d+, characters \d+-\d+', '<POS>', text)
+    return text
+
 class Prog:
 
     def __init__(self, opts, config):
@@ -33,9 +55,12 @@ class Prog:
 
     def output(self, test_rel_path):
         try:
-            completed, elapsed_time = self.run(test_rel_path);
-            lines = completed.stdout.splitlines(True)
-            return { 'time': elapsed_time, 'lines' : [("return code: %d\n" % completed.returncode)] + lines, 'return_code': completed.returncode }
+            completed, elapsed_time = self.run(test_rel_path)
+            output_text = completed.stdout
+            # Normalize paths before splitting into lines
+            output_text = normalize_paths(output_text)
+            lines = output_text.splitlines(True)
+            return { 'time': elapsed_time, 'lines': [("return code: %d\n" % completed.returncode)] + lines, 'return_code': completed.returncode }
         except subprocess.TimeoutExpired:
             return { 'time': float(self.timeout), 'lines': ["TIMEOUT\n"], 'return_code': 124 }
 

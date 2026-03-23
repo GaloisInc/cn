@@ -5,5 +5,5 @@ void f() { (0, b).a; }
                ^ 
 Resource needed: RW<struct __cerbty_unnamed_tag_518>(&b)
   which requires: RW<signed int>(&&b->a)
-      other location (File "lib/resourceInference.ml", line 247, characters 33-40)  (arg a)
+      other location (File "lib/resourceInference.ml", <POS>)  (arg a)
 State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__comma_operator_struct_field.error.c__f.html
