@@ -1,0 +1,19 @@
+return code: 1
+cn-test-gen/src/qpred_with_iargs.fail.c:4:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take x = Owned<int>(p);
+           ^~~~~ 
+cn-test-gen/src/qpred_with_iargs.fail.c:11:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+/*@ requires take items = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                  ^
+cn-test-gen/src/qpred_with_iargs.fail.c:12:18: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    ensures take items2 = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr + i, i) };
+                 ^
+[1/2]: test_qpred_iargs -- pass
+[2/2]: foo -- fail
+cn-test-gen/src/qpred_with_iargs.fail.c:22:3: error: Missing resource for calling function test_qpred_iargs
+  test_qpred_iargs(arr);
+  ^~~~~~~~~~~~~~~~~~~~~ 
+Resource needed: each(i32 i; 0'i32 <= i && i < 3'i32)
+{CheckValue(&arr + i @ signed int, i)}
+      cn-test-gen/src/qpred_with_iargs.fail.c:11:19: (arg items)
+State file: file:///tmp/state__qpred_with_iargs.fail.c__foo.html

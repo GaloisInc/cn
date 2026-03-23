@@ -711,8 +711,12 @@ let filter_selected_fns
       (fun (i : Extract.instrumentation) -> is_sym_selected i.fn)
       instrumentation
   in
+  (* Keep declarations for selected functions AND global variables (those in object_definitions) *)
+  let object_syms = List.map fst sigm.object_definitions |> Sym.Set.of_list in
   let filtered_ail_prog_decls =
-    List.filter (fun (decl_sym, _) -> is_sym_selected decl_sym) sigm.declarations
+    List.filter
+      (fun (decl_sym, _) -> is_sym_selected decl_sym || Sym.Set.mem decl_sym object_syms)
+      sigm.declarations
   in
   let filtered_ail_prog_defs =
     List.filter (fun (def_sym, _) -> is_sym_selected def_sym) sigm.function_definitions
@@ -978,12 +982,14 @@ let main
       sigma
   in
   (* 7. Filter sigma for pretty-printing: only keep declarations that have
-     corresponding function definitions (drops stdlib declarations like
+     corresponding function definitions or object definitions (drops stdlib declarations like
      calloc, qsort etc. that use size_t which isn't defined in our output) *)
   let print_sigma =
     let defined_syms = List.map fst sigma.function_definitions |> Sym.Set.of_list in
+    let object_syms = List.map fst sigma.object_definitions |> Sym.Set.of_list in
+    let keep_syms = Sym.Set.union defined_syms object_syms in
     let filtered_decls =
-      List.filter (fun (sym, _) -> Sym.Set.mem sym defined_syms) sigma.declarations
+      List.filter (fun (sym, _) -> Sym.Set.mem sym keep_syms) sigma.declarations
     in
     { sigma with declarations = filtered_decls }
   in

@@ -1,0 +1,25 @@
+return code: 1
+cn-test-gen/src/qpred_nested_iargs.pass.c:4:8: warning: 'each' prefers a 'u64', but 'j' has type 'u32'.
+  take x = each(u32 j; 0u32 <= j && j < 2u32 && (u32)idx < 1u32 ? false : false) { RW<int>(array_shift<int>(q,j)) };
+       ^
+cn-test-gen/src/qpred_nested_iargs.pass.c:13:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    take Iptrs = each(i32 i; 0i32 <= i && i < 3i32) { RW<int*>(arr+i) };
+         ^
+cn-test-gen/src/qpred_nested_iargs.pass.c:14:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    take Iints = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr+i, i, Iptrs[i]) };
+         ^
+cn-test-gen/src/qpred_nested_iargs.pass.c:16:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    take Optrs = each(i32 i; 0i32 <= i && i < 3i32) { RW<int*>(arr+i) };
+         ^
+cn-test-gen/src/qpred_nested_iargs.pass.c:17:10: warning: 'each' prefers a 'u64', but 'i' has type 'i32'.
+    take Oints = each(i32 i; 0i32 <= i && i < 3i32) { CheckValue(arr+i, i, Optrs[i]) };
+         ^
+[1/2]: test_qpred_iargs -- pass
+[2/2]: foo -- fail
+cn-test-gen/src/qpred_nested_iargs.pass.c:30:3: error: Missing resource for calling function test_qpred_iargs
+  test_qpred_iargs(arr);
+  ^~~~~~~~~~~~~~~~~~~~~ 
+Resource needed: each(i32 i; 0'i32 <= i && i < 3'i32)
+{RW<signed int*>(&arr + i @ signed int*)}
+      cn-test-gen/src/qpred_nested_iargs.pass.c:13:10: (arg Iptrs)
+State file: file:///tmp/state__qpred_nested_iargs.pass.c__foo.html
