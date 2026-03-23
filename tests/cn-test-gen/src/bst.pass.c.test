@@ -1,18 +1,7 @@
-return code: 1
+return code: 0
 cn-test-gen/src/bst.pass.c:445:17: warning: deprecated keyword 'Owned', use 'RW' instead
     take node = Owned<struct MapNode>(cur);
                 ^~~~~ 
-./bst.pass.test.c:1936:42: warning: incompatible pointer types passing 'struct BST *' to parameter of type 'struct MapNode_cn *' [-Wincompatible-pointer-types]
- 1936 |       a_3464->u.node->data = getNodeData(node);
-      |                                          ^~~~
-./bst.pass.test.c:322:69: note: passing argument to parameter here
-  322 | static struct defaultNodeData_record* getNodeData(struct MapNode_cn*);
-      |                                                                     ^
-./bst.pass.test.c:1937:30: warning: incompatible pointer types assigning to 'struct BST *' from 'struct MapNode_cn *' [-Wincompatible-pointer-types]
- 1937 |       a_3464->u.node->larger = larger;
-      |                              ^ ~~~~~~
-./bst.pass.test.c:1940:27: error: no member named 'key' in 'struct BST'
- 1940 |       return setKey(node->key, tree, bst);
-      |                     ~~~~  ^
-2 warnings and 1 error generated.
-Failed to compile 'bst.pass.test.c'.
+
+Testing Summary:
+cases: 5, passed: 5, failed: 0, errored: 0, skipped: 0

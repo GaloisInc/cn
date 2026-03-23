@@ -1642,7 +1642,10 @@ let rec cn_to_ail_expr_aux
       | T.(Pat (PWild, _p_bt, _p_loc) as pat) :: ps' -> Some (pat :: ps', e)
       | T.(Pat (PConstructor (c_nm, members), _, _)) :: ps' ->
         if Sym.equal c c_nm then (
-          let member_patterns = List.map snd members in
+          let sorted_members =
+            List.sort (fun (id, _) (id', _) -> Id.compare id id') members
+          in
+          let member_patterns = List.map snd sorted_members in
           Some (member_patterns @ ps', e))
         else
           None
@@ -1753,7 +1756,12 @@ let rec cn_to_ail_expr_aux
                    mk_stmt
                      A.(AilSdeclaration [ (count_sym, Some (mk_expr rhs_memberof)) ])
                  in
-                 let ids, ts = List.split (List.rev members_with_types) in
+                 let sorted_members =
+                   List.sort
+                     (fun (id, _) (id', _) -> Id.compare id id')
+                     members_with_types
+                 in
+                 let ids, ts = List.split sorted_members in
                  let bts = List.map cn_base_type_to_bt ts in
                  let new_constr_it =
                    IT.IT (Sym count_sym, BT.Struct lc_sym, Cerb_location.unknown)
@@ -2057,7 +2065,9 @@ let cn_to_ail_datatype ?(first = false) (cn_datatype : _ cn_datatype)
   let bt_cases =
     cn_datatype.cn_dt_cases
     |> List.map (fun (sym, ms) ->
-      (sym, List.map (fun (id, cn_t) -> (id, cn_base_type_to_bt cn_t)) ms))
+      ( sym,
+        List.map (fun (id, cn_t) -> (id, cn_base_type_to_bt cn_t)) ms
+        |> List.sort (fun (id, _) (id', _) -> Id.compare id id') ))
   in
   let structs = List.map (fun c -> generate_struct_definition c) bt_cases in
   let structs =

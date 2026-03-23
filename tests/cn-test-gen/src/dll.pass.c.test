@@ -1,19 +1,7 @@
-return code: 139
+return code: 0
 cn-test-gen/src/dll.pass.c:146:18: warning: deprecated keyword 'Owned', use 'RW' instead
         take P = Owned<struct dllist>(p);
                  ^~~~~ 
-./dll.pass.test.c:1458:14: warning: incompatible pointer types returning 'struct List *' from a function with result type 'struct dllist_cn *' [-Wincompatible-pointer-types]
- 1458 |       return n;
-      |              ^
-./dll.pass.test.c:1479:14: warning: incompatible pointer types returning 'struct dllist_cn *' from a function with result type 'struct List *' [-Wincompatible-pointer-types]
- 1479 |       return l;
-      |              ^
-2 warnings generated.
-./dll.pass.exec.c:920:14: warning: incompatible pointer types returning 'struct List *' from a function with result type 'struct dllist_cn *' [-Wincompatible-pointer-types]
-  920 |       return n;
-      |              ^
-./dll.pass.exec.c:941:14: warning: incompatible pointer types returning 'struct dllist_cn *' from a function with result type 'struct List *' [-Wincompatible-pointer-types]
-  941 |       return l;
-      |              ^
-2 warnings generated.
-/var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/bennet.3838/run_tests.sh: line 37:  4599 Segmentation fault: 11  ./tests.out --progress-level silent --smt-skewing sized
+
+Testing Summary:
+cases: 5, passed: 5, failed: 0, errored: 0, skipped: 0

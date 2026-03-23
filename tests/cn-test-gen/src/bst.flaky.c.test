@@ -2,17 +2,6 @@ return code: 1
 cn-test-gen/src/bst.flaky.c:203:16: warning: deprecated keyword 'Owned', use 'RW' instead
    take node = Owned<struct MapNode>(root);
                ^~~~~ 
-./bst.flaky.test.c:1609:42: warning: incompatible pointer types passing 'struct BST *' to parameter of type 'struct MapNode_cn *' [-Wincompatible-pointer-types]
- 1609 |       a_2725->u.node->data = getNodeData(node);
-      |                                          ^~~~
-./bst.flaky.test.c:311:65: note: passing argument to parameter here
-  311 | static struct getNodeData_record* getNodeData(struct MapNode_cn*);
-      |                                                                 ^
-./bst.flaky.test.c:1610:30: warning: incompatible pointer types assigning to 'struct BST *' from 'struct MapNode_cn *' [-Wincompatible-pointer-types]
- 1610 |       a_2725->u.node->larger = larger;
-      |                              ^ ~~~~~~
-./bst.flaky.test.c:1613:27: error: no member named 'key' in 'struct BST'
- 1613 |       return setKey(node->key, tree, bst);
-      |                     ~~~~  ^
-2 warnings and 1 error generated.
-Failed to compile 'bst.flaky.test.c'.
+
+Testing Summary:
+cases: 3, passed: 2, failed: 1, errored: 0, skipped: 0
