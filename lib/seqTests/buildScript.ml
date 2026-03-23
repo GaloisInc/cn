@@ -63,7 +63,7 @@ let compile ~filename_base =
            ]
            @ cc_flags ()))
        ("Compiled '" ^ filename_base ^ ".test.c'.")
-       ("Failed to compile '" ^ filename_base ^ ".test.c' in ${TEST_DIR}.")
+       ("Failed to compile '" ^ filename_base ^ ".test.c'.")
   ^^ (twice hardline
       ^^ attempt
            (String.concat
@@ -78,7 +78,7 @@ let compile ~filename_base =
                ]
                @ cc_flags ()))
            ("Compiled '" ^ filename_base ^ ".exec.c'.")
-           ("Failed to compile '" ^ filename_base ^ ".exec.c' in ${TEST_DIR}."))
+           ("Failed to compile '" ^ filename_base ^ ".exec.c'."))
   ^^ hardline
 
 
@@ -104,7 +104,7 @@ let link ~filename_base =
            ]
            @ cc_flags ()))
        "Linked C *.o files."
-       "Failed to link *.o files in ${TEST_DIR}."
+       "Failed to link *.o files."
   ^^ hardline
 
 
