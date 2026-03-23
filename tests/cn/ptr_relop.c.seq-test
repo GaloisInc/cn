@@ -1,9 +1,0 @@
-return code: 2
-cn/ptr_relop.c:16:14: warning: annotation on RW suggests &p[-2'i64] has type signed int[11]* but it has type char*.
-  return q < p;
-             ^~~~~~~~~~~ 
-cn/ptr_relop.c:19:15: warning: annotation on RW suggests &p[-2'i64] has type signed int[11]* but it has type char*.
-// Here, only one ownership is required to establish the that the allocation is
-              ^~~~~~~~~~~ 
-[1m'Alloc' not currently supported at runtime[0m:
-Used at <cn/ptr_relop.c:70:9>

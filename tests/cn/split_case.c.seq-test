@@ -1,3 +1,0 @@
-return code: 2
-[1mUninterpreted CN functions not supported at runtime. Please provide a concrete function definition for[0m:
-'default_list_head() : struct list_head' at <cn/split_case.c:17:0, cn/split_case.c:17:48>

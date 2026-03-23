@@ -1,9 +1,0 @@
-return code: 139
-/tmp/run_tests_intermediate.sh: line 20: syntax error near unexpected token `then'
-/tmp/run_tests_intermediate.sh: line 20: `CFLAGS} ${CPPFLAGS} -c -o "./implies_precedence.exec.o" "./implies_precedence.exec.c" -g "-I${RUNTIME_PREFIX}/include/" -Wno-attributes ; then'
-============================================
-
-FATAL ERROR:
-Failure occured while seq-testing cn/division_precedence.c
-
-============================================

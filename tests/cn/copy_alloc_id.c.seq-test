@@ -1,3 +1,0 @@
-return code: 2
-[1m'Alloc' not currently supported at runtime[0m:
-Used at <cn/copy_alloc_id.c:28:9>
