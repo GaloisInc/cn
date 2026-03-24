@@ -90,7 +90,7 @@ let sprintf_to_buf (buf_sym : Sym.t) (fmt : string list) (args : string list) =
               Some
                 (mk_expr
                    (AilEcall
-                      ( mk_expr (AilEident (Sym.fresh "cn_bump_malloc")),
+                      ( mk_expr (AilEident (Sym.fresh "malloc")),
                         [ mk_expr (AilEident buf_len_sym) ] ))) )
           ];
         AilSexpr
@@ -106,8 +106,7 @@ let sprintf_to_buf (buf_sym : Sym.t) (fmt : string list) (args : string list) =
       @ List.map
           (fun e_arg ->
              AilSexpr
-               (mk_expr
-                  (AilEcall (mk_expr (AilEident (Sym.fresh "cn_bump_free")), [ e_arg ]))))
+               (mk_expr (AilEcall (mk_expr (AilEident (Sym.fresh "free")), [ e_arg ]))))
           e_args)
   in
   ([ b_buf; b_buf_len ], s)
@@ -689,6 +688,18 @@ let compile_spec
       List.map (fun ((x, bt), ct) -> (x, (bt, ct))) (List.combine arg_names arg_cts)
     | _ -> failwith ("unreachable @ " ^ __LOC__)
   in
+  (* Create fresh symbols for parameters to avoid shadowing stdlib functions *)
+  let fresh_param_map =
+    args
+    |> List.map (fun (orig_sym, _) ->
+      let fresh_sym = Sym.fresh ("cn_param_" ^ Sym.pp_string orig_sym) in
+      (orig_sym, fresh_sym))
+  in
+  let fresh_args =
+    args
+    |> List.map (fun (orig_sym, bt_ct) ->
+      (List.assoc Sym.equal orig_sym fresh_param_map, bt_ct))
+  in
   let globals =
     let global_syms =
       let args = args |> List.map fst in
@@ -723,7 +734,7 @@ let compile_spec
                Some
                  (mk_expr
                     (CtA.wrap_with_convert_to
-                       (A.AilEident x)
+                       (A.AilEident (List.assoc Sym.equal x fresh_param_map))
                        (fst (List.assoc Sym.equal x args)))) )
            ])
       new_args
@@ -744,9 +755,16 @@ let compile_spec
     let bs, ss =
       (args |> List.map_snd snd |> List.map (fun x -> (false, x)))
       @ (globals |> List.map (fun (x, ct) -> (true, (x, Sctypes.to_ctype ct))))
-      |> List.map (fun (global, (arg, ct)) ->
-        let arg_str_sym = Sym.fresh (Sym.pp_string arg ^ "_str") in
-        let arg_cast_str_sym = Sym.fresh (Sym.pp_string arg ^ "_cast_str") in
+      |> List.map (fun (global, (orig_arg, ct)) ->
+        (* Use fresh symbols for parameters, keep original for globals *)
+        let arg =
+          if global then
+            orig_arg
+          else
+            List.assoc Sym.equal orig_arg fresh_param_map
+        in
+        let arg_str_sym = Sym.fresh (Sym.pp_string orig_arg ^ "_str") in
+        let arg_cast_str_sym = Sym.fresh (Sym.pp_string orig_arg ^ "_cast_str") in
         let bt =
           Memory.bt_of_sct (Sctypes.of_ctype_unsafe (Locations.other __LOC__) ct)
         in
@@ -802,7 +820,7 @@ let compile_spec
                                ( None,
                                  [ ( Locations.other __LOC__,
                                      [ (if global then "" else type_str ^ " ")
-                                       ^ Sym.pp_string arg
+                                       ^ Sym.pp_string orig_arg
                                      ] )
                                  ] ));
                           mk_expr (AilEident arg_cast_str_sym)
@@ -843,7 +861,7 @@ let compile_spec
         Decl_function
           ( false,
             (C.no_qualifiers, C.void),
-            List.map (fun (_, (_, ct)) -> (C.no_qualifiers, ct, false)) args,
+            List.map (fun (_, (_, ct)) -> (C.no_qualifiers, ct, false)) fresh_args,
             false,
             false,
             false ) ) )
@@ -853,7 +871,7 @@ let compile_spec
       ( Locations.other __LOC__,
         0,
         Attrs [],
-        List.map fst args,
+        List.map fst fresh_args,
         A.(mk_stmt (AilSblock (bs1 @ bs2 @ bs3, List.map mk_stmt (ss1 @ ss2 @ ss3)))) ) )
   in
   (decl, def)
