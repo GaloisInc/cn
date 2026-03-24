@@ -1,6 +1,6 @@
 return code: 0
-./switch_case_no_braces.pass.exec.c:72:3: warning: expression result unused [-Wunused-value]
-   72 |   0;
+./switch_case_no_braces.pass.exec.c:75:3: warning: expression result unused [-Wunused-value]
+   75 |   0;
       |   ^
 1 warning generated.
 

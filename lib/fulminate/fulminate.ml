@@ -1001,6 +1001,7 @@ let main
   (* 8. Write output *)
   let oc = Stdlib.open_out out_filename in
   output_to_oc oc [ "#define __CN_INSTRUMENT\n"; "#include <cn-executable/utils.h>\n" ];
+  output_to_oc oc [ "#ifndef NULL\n"; "#define NULL ((void*)0)\n"; "#endif\n" ];
   output_to_oc oc cn_header_decls_list;
   output_to_oc
     oc

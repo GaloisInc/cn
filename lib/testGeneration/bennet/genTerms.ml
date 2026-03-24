@@ -755,6 +755,9 @@ module Make (GT : T) = struct
       | IT (ArrayShift { base = ptr; _ }, _, _)
       | IT (MemberShift (ptr, _, _), _, _) ->
         pointer_of ptr
+      | IT (StructMember (it', _), bt, _) | IT (RecordMember (it', _), bt, _) ->
+        let sym, _ = pointer_of it' in
+        (sym, bt)
       | IT (Sym x, bt, _) | IT (Cast (_, IT (Sym x, bt, _)), _, _) -> (x, bt)
       | _ ->
         let pointers =

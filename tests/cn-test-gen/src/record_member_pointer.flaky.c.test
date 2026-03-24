@@ -1,0 +1,15 @@
+return code: 1
+In file included from ./record_member_pointer.flaky.test.c:195:
+./record_member_pointer.flaky.gen.h:49:35: warning: incompatible pointer types initializing 'cn_pointer *' (aka 'struct cn_pointer *') with an expression of type 'struct __cerbty_unnamed_tag_519_cn *' [-Wincompatible-pointer-types]
+   49 |   BENNET_ASSIGN(v, ({ cn_pointer* a_884 = ({ v; }); a_884; }), uintptr_t, a_875, char, convert_from_cn_bits_u8(a_878), a_814, v, j, NULL);
+      |                                   ^       ~~~~~~~~
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/dsl.h:90:35: note: expanded from macro 'BENNET_ASSIGN'
+   90 |     if (bennet_assign(ptr_ty, id, ptr, addr, &value_redir, sizeof(val_ty), vars)) {      \
+      |                                   ^~~
+<OPAM_PREFIX>/lib/cn/runtime/include/bennet/dsl/assign.h:10:35: note: expanded from macro 'bennet_assign'
+   10 |   (bennet_assign_##pointer_ty(id, base_ptr, addr, value, bytes, vars))
+      |                                   ^~~~~~~~
+1 warning generated.
+
+Testing Summary:
+cases: 1, passed: 0, failed: 1, errored: 0, skipped: 0
