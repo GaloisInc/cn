@@ -1,9 +1,9 @@
 return code: 1
-./f.exec.c:74:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
-   74 |   CN_STORE(r, f(12));
+./f.exec.c:77:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   77 |   CN_STORE(r, f(12));
       |               ^
-./f.exec.c:87:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
-   87 |   CN_STORE(r, f(25));
+./f.exec.c:90:15: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   90 |   CN_STORE(r, f(25));
       |               ^
 2 errors generated.
 Failed to compile 'f.exec.c'.

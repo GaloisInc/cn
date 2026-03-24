@@ -821,7 +821,7 @@ let main
     filter_using_skip_and_only skip_and_only (prog5, sigm, full_instrumentation)
   in
   let static_funcs =
-    filtered_instrumentation
+    full_instrumentation
     |> List.filter (fun (inst : Extract.instrumentation) -> inst.is_static)
     |> List.map (fun (inst : Extract.instrumentation) -> inst.fn)
     |> Sym.Set.of_list
@@ -968,15 +968,16 @@ let main
   let sigma =
     Sym.Set.fold
       (fun fn_sym sigma ->
-         match List.assoc_opt Sym.equal fn_sym sigma.A.declarations with
+         match List.assoc_opt Sym.equal fn_sym sigm.A.declarations with
          | Some decl ->
            let wrapper_decl, wrapper_def =
              generate_static_wrapper filename fn_sym (fn_sym, decl)
            in
-           { sigma with
-             declarations = sigma.declarations @ [ wrapper_decl ];
-             function_definitions = sigma.function_definitions @ [ wrapper_def ]
-           }
+           A.
+             { sigma with
+               declarations = sigma.A.declarations @ [ wrapper_decl ];
+               function_definitions = sigma.A.function_definitions @ [ wrapper_def ]
+             }
          | None -> sigma)
       static_funcs
       sigma
@@ -995,8 +996,7 @@ let main
   in
   let instrumented_source =
     Pp.plain
-      CF.Pp_ail.(
-        with_executable_spec (pp_program ~show_include:false) (None, print_sigma))
+      CF.Pp_ail.(with_executable_spec (pp_program ~show_include:true) (None, print_sigma))
   in
   (* 8. Write output *)
   let oc = Stdlib.open_out out_filename in

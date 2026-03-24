@@ -4,8 +4,14 @@ cn/ghost_arguments.c:4:3: warning: experimental keyword 'cn_ghost' (use of exper
   ^~~~~~~~ 
 cn: internal error, uncaught exception:
     Failure("Could not find C type for global k in function foo")
-    Raised at Str.search_forward in file "str.ml", <POS>
-    Called from Str.opt_search_forward in file "str.ml", <POS>
+    Raised at Stdlib.failwith in file "stdlib.ml", <POS>
+    Called from Stdlib__List.filter_map in file "list.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__Stage7__Convert.Make.transform.(fun) in file "lib/testGeneration/bennet/stage7/convert.ml", <POS>
+    Called from Stdlib__List.filter_map in file "list.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__Stage7__Convert.Make.transform in file "lib/testGeneration/bennet/stage7/convert.ml", <POS>
+    Called from Cn__TestGeneration.save_generators in file "lib/testGeneration/testGeneration.ml", <POS>
+    Called from Cn__TestGeneration.run in file "lib/testGeneration/testGeneration.ml", <POS>
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", <POS>
     
 Issues can be made at https://github.com/rems-project/cerberus/issues.
 Prefix your issue with "[CN-Test-Gen]". Check that there isn't already one for this error.

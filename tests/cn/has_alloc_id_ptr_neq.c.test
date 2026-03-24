@@ -1,8 +1,20 @@
 return code: 1
 cn: internal error, uncaught exception:
     Failure("File \"lib/fulminate/cn_to_ail.ml\", <POS>: TODO HasAllocId")
-    Raised at Str.search_forward in file "str.ml", <POS>
-    Called from Str.opt_search_forward in file "str.ml", <POS>
+    Raised at Stdlib.failwith in file "stdlib.ml", <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_logical_constraint in file "lib/fulminate/cn_to_ail.ml" (inlined), <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_lat_2 in file "lib/fulminate/cn_to_ail.ml", <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post_aux in file "lib/fulminate/cn_to_ail.ml", <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post_aux in file "lib/fulminate/cn_to_ail.ml", <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post_aux in file "lib/fulminate/cn_to_ail.ml", <POS>
+    Called from Cn__Fulminate__Cn_to_ail.cn_to_ail_pre_post in file "lib/fulminate/cn_to_ail.ml", <POS>
+    Called from Cn__Fulminate__Internal.generate_c_specs_from_cn_internal in file "lib/fulminate/internal.ml", <POS>
+    Called from Cn__Fulminate__Internal.generate_c_specs_internal in file "lib/fulminate/internal.ml", <POS>
+    Called from Stdlib__List.map in file "list.ml", <POS>
+    Called from Stdlib__List.map in file "list.ml", <POS>
+    Called from Cn__Fulminate__Internal.generate_c_specs in file "lib/fulminate/internal.ml", <POS>
+    Called from Cn__Fulminate.main in file "lib/fulminate/fulminate.ml", <POS>
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", <POS>
     
 Issues can be made at https://github.com/rems-project/cerberus/issues.
 Prefix your issue with "[CN-Exec]". Check that there isn't already one for this error.
