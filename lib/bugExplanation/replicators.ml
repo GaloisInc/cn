@@ -90,7 +90,7 @@ let sprintf_to_buf (buf_sym : Sym.t) (fmt : string list) (args : string list) =
               Some
                 (mk_expr
                    (AilEcall
-                      ( mk_expr (AilEident (Sym.fresh "malloc")),
+                      ( mk_expr (AilEident (Sym.fresh "cn_bump_malloc")),
                         [ mk_expr (AilEident buf_len_sym) ] ))) )
           ];
         AilSexpr
@@ -106,7 +106,8 @@ let sprintf_to_buf (buf_sym : Sym.t) (fmt : string list) (args : string list) =
       @ List.map
           (fun e_arg ->
              AilSexpr
-               (mk_expr (AilEcall (mk_expr (AilEident (Sym.fresh "free")), [ e_arg ]))))
+               (mk_expr
+                  (AilEcall (mk_expr (AilEident (Sym.fresh "cn_bump_free")), [ e_arg ]))))
           e_args)
   in
   ([ b_buf; b_buf_len ], s)
