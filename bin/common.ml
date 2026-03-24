@@ -303,23 +303,8 @@ let mk_dir_if_not_exist_maybe_tmp ~mktemp ?(print_steps = false) (cmd : subcomma
     | None ->
       if mktemp then (
         let dir =
-          let tmp_dir = Filename.get_temp_dir_name () in
-          let rec create_unique_dir () =
-            let dir_name =
-              Filename.concat
-                tmp_dir
-                (String.lowercase_ascii (tool_name cmd)
-                 ^ "."
-                 ^ Printf.sprintf "%04X" (Random.int 65536))
-            in
-            if Sys.file_exists dir_name then
-              create_unique_dir () (* Retry if it exists *)
-            else (
-              Sys.mkdir dir_name 0o777;
-              (* Create the directory with permissions 777 *)
-              dir_name)
-          in
-          create_unique_dir ()
+          let prefix = String.lowercase_ascii (tool_name cmd) ^ "." in
+          Filename.temp_dir prefix ""
         in
         print_endline ("Using temporary directory: " ^ dir);
         dir)
