@@ -75,3 +75,45 @@ format:
 	$(Q)dune fmt || exit 0
 	@echo "[CLANG] format"
 	$(Q)find runtime/libcn/ -iname '*.h' -o -iname '*.c' -o -iname '*.hpp' -o -iname '*.cpp' | xargs clang-format -i
+
+# Test targets - run from project root
+.PHONY: test-verify test-test test-seq-test
+test-verify:
+	@echo "[TEST] Running cn verify tests"
+	$(Q)cd tests && ./run-all-commands.sh verify all
+
+test-test:
+	@echo "[TEST] Running cn test tests"
+	$(Q)cd tests && ./run-all-commands.sh test all
+
+test-seq-test:
+	@echo "[TEST] Running cn seq-test tests"
+	$(Q)cd tests && ./run-all-commands.sh seq-test all
+
+# Individual test directory targets
+.PHONY: test-verify-cn test-verify-cn-test-gen test-verify-cn-seq-test-gen
+test-verify-cn:
+	@echo "[TEST] Running cn verify on cn/ tests"
+	$(Q)cd tests && ./run-all-commands.sh verify cn
+
+test-verify-cn-test-gen:
+	@echo "[TEST] Running cn verify on cn-test-gen/ tests"
+	$(Q)cd tests && ./run-all-commands.sh verify cn-test-gen
+
+test-verify-cn-seq-test-gen:
+	@echo "[TEST] Running cn verify on cn-seq-test-gen/ tests"
+	$(Q)cd tests && ./run-all-commands.sh verify cn-seq-test-gen
+
+# Regenerate baselines
+.PHONY: test-regen-verify test-regen-test test-regen-seq-test
+test-regen-verify:
+	@echo "[TEST] Regenerating verify baselines"
+	$(Q)cd tests && ./run-all-commands.sh verify all --regen
+
+test-regen-test:
+	@echo "[TEST] Regenerating test baselines"
+	$(Q)cd tests && ./run-all-commands.sh test all --regen
+
+test-regen-seq-test:
+	@echo "[TEST] Regenerating seq-test baselines"
+	$(Q)cd tests && ./run-all-commands.sh seq-test all --regen

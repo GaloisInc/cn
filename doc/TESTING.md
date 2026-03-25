@@ -48,3 +48,80 @@ In terms of unit tests, one can simply define a function that performs the desir
 This function will get detected by `cn test` and turned into a constant test.
 Any assertions that one would make about the result would have to be captured by the post-condition.
 In the future, existing infrastructure like `cn_assert` might be adapted for general use.
+
+## Test Baselines and Verification
+
+CN uses a baseline comparison system for regression testing. Test outputs are compared against expected baseline files.
+
+### Baseline File Format
+
+Baseline files (`.verify`, `.test`, etc.) contain the expected output including:
+1. Return code on first line: `return code: N`
+2. All stdout/stderr output from the CN command
+3. Path normalization applied (opam paths replaced with `<OPAM_PREFIX>`)
+
+**Example baseline file** (`tests/cn/example.c.verify`):
+```
+return code: 0
+[1/1]: example_function -- pass
+```
+
+### Running Tests
+
+From project root:
+```bash
+make test-verify           # Run all cn verify tests
+make test-verify-cn        # Run verify tests on cn/ directory only
+make test-test             # Run all cn test tests
+```
+
+From tests/ directory:
+```bash
+./run-all-commands.sh verify cn              # Run verify on cn/
+./run-all-commands.sh test cn-test-gen       # Run test on cn-test-gen/
+./run-all-commands.sh verify all             # Run verify on all dirs
+```
+
+### Regenerating Baselines
+
+After making changes that affect output format:
+
+**Option 1: Regenerate all baselines** (use with caution)
+```bash
+make test-regen-verify     # From project root
+# or
+cd tests && ./run-all-commands.sh verify all --regen
+```
+
+**Option 2: Regenerate single baseline**
+```bash
+cd tests
+./regenerate-baseline.sh verify cn/example.c
+```
+
+**Option 3: Manual baseline creation**
+```bash
+cd tests
+{ echo "return code: 0"; cn verify cn/example.c 2>&1; } > cn/example.c.verify
+```
+Note: This only works for successful tests (return code 0).
+
+### Adding New Tests
+
+1. Create test file: `tests/cn/new_test.c`
+2. Run once to generate initial baseline:
+   ```bash
+   cd tests
+   ./regenerate-baseline.sh verify cn/new_test.c
+   ```
+3. Review the generated baseline in `tests/cn/new_test.c.verify`
+4. Commit both the test and baseline files
+
+### Troubleshooting
+
+**"FAILED" but output looks correct:**
+- Check if baseline file is missing `return code:` prefix
+- Regenerate with `./regenerate-baseline.sh`
+
+**Tests fail when run from project root:**
+- Use Makefile targets: `make test-verify` instead of calling scripts directly
