@@ -279,7 +279,7 @@ let compile_sct_aux (prog5 : unit Mucore.file) (sct : Sctypes.t)
       (match Pmap.find tag prog5.tagDefs with
        | StructDef pieces ->
          let members =
-           pieces
+           pieces.pieces
            |> List.filter_map (fun ({ member_or_padding; _ } : Memory.struct_piece) ->
              member_or_padding)
          in
@@ -920,7 +920,7 @@ let synthesize
               (match Pmap.find tag prog5.tagDefs with
                | StructDef pieces ->
                  let member_scts =
-                   pieces
+                   pieces.pieces
                    |> List.filter_map
                         (fun ({ member_or_padding; _ } : Memory.struct_piece) ->
                            member_or_padding)

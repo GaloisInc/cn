@@ -788,16 +788,17 @@ module Pp_standard_typ = struct
 
 
   let pp_st (membrs_, flexible_opt) =
-    let membrs =
-      match flexible_opt with
-      | None -> membrs_
-      | _ -> failwith "have to implement that again"
-    in
-    let _ty, tags = ("struct", membrs) in
     let pp_tag (Symbol.Identifier (_, name), (_, _, _, ct)) =
       !^name ^^ Pp.colon ^^^ pp_ct ct
     in
-    Pp.nest 2 (Pp.break 1 ^^ Pp.separate_map (Pp.break 1) pp_tag tags)
+    let member_docs = Pp.separate_map (Pp.break 1) pp_tag membrs_ in
+    let fam_doc =
+      match flexible_opt with
+      | None -> Pp.empty
+      | Some (Ctype.FlexibleArrayMember (_, Identifier (_, name), _, elem_ct)) ->
+        Pp.break 1 ^^ !^name ^^ Pp.colon ^^^ pp_ct elem_ct ^^ !^"[]"
+    in
+    Pp.nest 2 (Pp.break 1 ^^ member_docs ^^ fam_doc)
 
 
   let pp_rt ret_bt = pp_core_base_type ret_bt

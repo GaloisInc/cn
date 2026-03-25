@@ -50,7 +50,16 @@ Record struct_member : Type := mk_struct_member {
   member : Id.t * SCtypes.t
 }.
 
-Definition struct_layout := list struct_piece.
+Record fam_info : Type := mk_fam_info {
+  fam_member : Id.t;
+  fam_element_type : SCtypes.t;
+  fam_offset : Z
+}.
+
+Record struct_layout : Type := mk_struct_layout {
+  layout_pieces : list struct_piece;
+  layout_fam : option fam_info
+}.
 
 Inductive memory_order : Type :=
   | NA : memory_order        (* Non-atomic *)

@@ -94,7 +94,7 @@ module type Lifted = sig
 
   val get_struct_decl : Locations.t -> Sym.t -> Memory.struct_layout t
 
-  val get_member_type : Locations.t -> Id.t -> Memory.struct_piece list -> Sctypes.ctype t
+  val get_member_type : Locations.t -> Id.t -> Memory.struct_layout -> Sctypes.ctype t
 
   val get_datatype : Locations.t -> Sym.t -> BaseTypes.dt_info t
 
@@ -132,7 +132,13 @@ module Lift (M : ErrorReader) : Lifted with type 'a t := 'a M.t = struct
     let member_types = Memory.member_types layout in
     match List.assoc_opt Id.equal member member_types with
     | Some membertyp -> M.return membertyp
-    | None -> M.fail loc (Unexpected_member (List.map fst member_types, member))
+    | None ->
+      (* Check if this is a flexible array member *)
+      (match layout.Memory.fam with
+       | Some fam_info when Id.equal member fam_info.Memory.member ->
+         (* FAM member access returns pointer to element type *)
+         M.return (Sctypes.Pointer fam_info.Memory.element_type)
+       | _ -> M.fail loc (Unexpected_member (List.map fst member_types, member)))
 
 
   let get_datatype loc tag =
@@ -143,22 +149,32 @@ module Lift (M : ErrorReader) : Lifted with type 'a t := 'a M.t = struct
     lift get_datatype_constr loc tag (fun _ -> Unknown_datatype_constr tag)
 end
 
-let pp_struct_layout (tag, layout) =
-  item
-    ("struct " ^ plain (Sym.pp tag) ^ " (raw)")
-    (separate_map
-       hardline
-       (fun Memory.{ offset; size; member_or_padding } ->
-          item "offset" (Pp.int offset)
-          ^^ comma
-          ^^^ item "size" (Pp.int size)
-          ^^ comma
-          ^^^ item
-                "content"
-                (match member_or_padding with
-                 | Some (member, sct) -> typ (Id.pp member) (Sctypes.pp sct)
-                 | None -> parens (!^"padding" ^^^ Pp.int size)))
-       layout)
+let pp_struct_layout (tag, (layout : Memory.struct_layout)) =
+  let pieces_doc =
+    separate_map
+      hardline
+      (fun Memory.{ offset; size; member_or_padding } ->
+         item "offset" (Pp.int offset)
+         ^^ comma
+         ^^^ item "size" (Pp.int size)
+         ^^ comma
+         ^^^ item
+               "content"
+               (match member_or_padding with
+                | Some (member, sct) -> typ (Id.pp member) (Sctypes.pp sct)
+                | None -> parens (!^"padding" ^^^ Pp.int size)))
+      layout.Memory.pieces
+  in
+  let fam_doc =
+    match layout.Memory.fam with
+    | None -> Pp.empty
+    | Some Memory.{ member; element_type; offset } ->
+      hardline
+      ^^ item "offset" (Pp.int offset)
+      ^^ comma
+      ^^^ item "content" (typ (Id.pp member) (Sctypes.pp element_type ^^ !^"[]"))
+  in
+  item ("struct " ^ plain (Sym.pp tag) ^ " (raw)") (pieces_doc ^^ fam_doc)
 
 
 let pp_struct_decls decls = Pp.list pp_struct_layout (Sym.Map.bindings decls)

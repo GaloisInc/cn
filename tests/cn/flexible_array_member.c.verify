@@ -1,0 +1,3 @@
+return code: 0
+[1/2]: test_fixed_member -- pass
+[2/2]: test_fam_member -- pass

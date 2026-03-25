@@ -492,7 +492,7 @@ and get_value gs ctys bt (sexp : SMT.sexp) =
   | Struct tag ->
     let _con, vals = SMT.to_con sexp in
     let decl = Sym.Map.find tag gs.struct_decls in
-    let fields = List.filter_map (fun x -> x.Memory.member_or_padding) decl in
+    let fields = List.filter_map (fun x -> x.Memory.member_or_padding) decl.pieces in
     let mk_field (l, t) v = (l, get_ivalue gs ctys (Memory.bt_of_sct t) v) in
     Struct (tag, List.map2 mk_field fields vals)
   | Datatype tag ->
@@ -1058,7 +1058,7 @@ module CN_Structs = struct
         (SMT.declare_datatype
            (CN_Names.struct_name name)
            []
-           [ (CN_Names.struct_con_name name, List.filter_map mk_piece decl) ]))
+           [ (CN_Names.struct_con_name name, List.filter_map mk_piece decl.pieces) ]))
 
 
   let declare s =

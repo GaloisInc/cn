@@ -24,10 +24,10 @@ module Make (AD : Domain.T) = struct
     (* Generate struct declaration data for cn_structs_declare *)
     let struct_decl_data =
       List.map
-        (fun (tag, pieces) ->
+        (fun (tag, (pieces : Memory.struct_layout)) ->
            let tag_name = Sym.pp_string_no_nums tag in
            let members =
-             pieces
+             pieces.Memory.pieces
              |> List.filter_map (fun ({ member_or_padding; _ } : Memory.struct_piece) ->
                member_or_padding)
            in

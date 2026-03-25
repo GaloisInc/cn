@@ -75,38 +75,59 @@ type struct_member =
     member : Id.t * Sctypes.t
   }
 
-type struct_layout = struct_piece list
+type fam_info =
+  { member : Id.t;
+    element_type : Sctypes.t;
+    offset : int
+  }
+
+type struct_layout =
+  { pieces : struct_piece list;
+    fam : fam_info option
+  }
 
 type struct_decl = struct_layout
 
 type struct_decls = struct_layout Sym.Map.t
 
-let members =
-  List.filter_map (fun { member_or_padding; _ } -> Option.map fst member_or_padding)
+let members layout =
+  List.filter_map
+    (fun { member_or_padding; _ } -> Option.map fst member_or_padding)
+    layout.pieces
 
 
-let member_types = List.filter_map (fun { member_or_padding; _ } -> member_or_padding)
+let member_types layout =
+  List.filter_map (fun { member_or_padding; _ } -> member_or_padding) layout.pieces
+
 
 let member_number layout member =
-  let rec aux i layout =
-    match layout with
+  let rec aux i pieces =
+    match pieces with
     | [] -> None
-    | sp :: layout ->
+    | sp :: pieces ->
       (match sp.member_or_padding with
        | Some (member', _) when Id.equal member member' -> Some i
-       | Some (_, _) -> aux (i + 1) layout
-       | None -> aux i layout)
+       | Some (_, _) -> aux (i + 1) pieces
+       | None -> aux i pieces)
   in
-  aux 0 layout
+  aux 0 layout.pieces
 
 
 let member_offset (layout : struct_layout) member : int option =
-  List.find_map
-    (fun sp ->
-       match sp.member_or_padding with
-       | Some (member', _) when Id.equal member member' -> Some sp.offset
-       | _ -> None)
-    layout
+  let regular_member =
+    List.find_map
+      (fun sp ->
+         match sp.member_or_padding with
+         | Some (member', _) when Id.equal member member' -> Some sp.offset
+         | _ -> None)
+      layout.pieces
+  in
+  match regular_member with
+  | Some offset -> Some offset
+  | None ->
+    (match layout.fam with
+     | Some fam_info when Id.equal member fam_info.member -> Some fam_info.offset
+     | _ -> None)
 
 
 (* tries to implement all_values_representable_in from runtime std.core *)

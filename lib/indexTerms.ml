@@ -994,6 +994,7 @@ let value_check mode (struct_layouts : Memory.struct_decls) ct about loc =
       eachI_ (0, (i_s, ix_bt), n - 1) (aux item_ct (map_get_ about i loc)) loc
     | Pointer pointee_ct -> value_check_pointer mode ~pointee_ct about loc
     | Struct tag ->
+      let layout = Sym.Map.find tag struct_layouts in
       and_
         (List.filter_map
            (fun piece ->
@@ -1003,7 +1004,7 @@ let value_check mode (struct_layouts : Memory.struct_decls) ct about loc =
                 let member_it = member_ ~member_bt (about, member) loc in
                 Some (aux mct member_it)
               | None -> None)
-           (Sym.Map.find tag struct_layouts))
+           layout.pieces)
         loc
     | Function _ -> Cerb_debug.error "todo: function types"
   in

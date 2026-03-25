@@ -2128,7 +2128,20 @@ let pp_struct_piece (p : Memory.struct_piece) =
     ]
 
 
-let pp_struct_layout (l : Memory.struct_layout) = pp_list pp_struct_piece l
+let pp_fam_info (f : Memory.fam_info) =
+  pp_record
+    [ ("Cn.Memory.fam_member", pp_identifier f.member);
+      ("Cn.Memory.fam_element_type", pp_sctype f.element_type);
+      ("Cn.Memory.fam_offset", pp_int f.offset)
+    ]
+
+
+let pp_struct_layout (l : Memory.struct_layout) =
+  pp_record
+    [ ("Cn.Memory.layout_pieces", pp_list pp_struct_piece l.pieces);
+      ("Cn.Memory.layout_fam", pp_option pp_fam_info l.fam)
+    ]
+
 
 let pp_struct_decls (s : Memory.struct_decls) = pp_sym_map pp_struct_layout s
 

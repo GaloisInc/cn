@@ -264,7 +264,7 @@ let struct_layout_field_bts xs =
 
 let get_struct_xs struct_decls tag =
   match Sym.Map.find_opt tag struct_decls with
-  | Some def -> struct_layout_field_bts def
+  | Some (def : Memory.struct_layout) -> struct_layout_field_bts def.Memory.pieces
   | None -> fail "undefined struct" (Sym.pp tag)
 
 

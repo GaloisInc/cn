@@ -165,7 +165,7 @@ let add_records_to_map_from_struct (tag_def : Mucore.tag_definition) =
            populate
              (BT.of_sct Memory.is_signed_integer_type Memory.size_of_integer_type sct)
          | None -> ())
-      sl
+      sl.pieces
   | UnionDef -> ()
 
 

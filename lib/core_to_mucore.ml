@@ -1385,7 +1385,7 @@ let normalise_globs_list ~inherit_loc env gs =
     gs
 
 
-let make_struct_decl loc fields (tag : Sym.t) =
+let make_struct_decl loc fields (tag : Sym.t) fam_opt =
   let open Memory in
   let tagDefs = CF.Tags.tagDefs () in
   let member_offset member =
@@ -1419,15 +1419,21 @@ let make_struct_decl loc fields (tag : Sym.t) =
       let rest = aux members (offset + size) in
       padding @ member @ rest
   in
-  aux fields 0
+  let pieces = aux fields 0 in
+  let fam =
+    match fam_opt with
+    | None -> None
+    | Some (Ctype.FlexibleArrayMember (_, member_id, _quals, elem_ct)) ->
+      let elem_sct = convert_ct loc elem_ct in
+      Some { member = member_id; element_type = elem_sct; offset = final_position }
+  in
+  { pieces; fam }
 
 
 let normalise_tag_definition tag (loc, def) =
   match def with
-  | Ctype.StructDef (_fields, Some (FlexibleArrayMember (_, Identifier (loc, _), _, _)))
-    ->
-    unsupported loc !^"flexible array members"
-  | StructDef (fields, None) -> return (Mu.StructDef (make_struct_decl loc fields tag))
+  | Ctype.StructDef (fields, fam_opt) ->
+    return (Mu.StructDef (make_struct_decl loc fields tag fam_opt))
   | UnionDef _l ->
     if !Sym.experimental_unions then
       return Mu.UnionDef

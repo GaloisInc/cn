@@ -85,7 +85,7 @@ let packing_ft ~full loc global provable ret =
                 ( LRT.Resource
                     ((padding_s, (request, IT.get_bt padding)), (loc, None), lrt),
                   value ))
-           layout
+           layout.pieces
            (LRT.I, [])
        in
        let at = LAT.of_lrt lrt (LAT.I (IT.struct_ (tag, value) loc)) in
@@ -134,7 +134,7 @@ let unpack_owned loc global (ct, init) pointer (O o) =
                  O (IT.default_ (Memory.bt_of_sct padding_ct) loc) )
              in
              mresource :: res)
-        layout
+        layout.pieces
         []
     in
     Some res

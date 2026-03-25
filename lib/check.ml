@@ -2467,7 +2467,7 @@ let check_tagdefs tagDefs =
                   let@ () = WellTyped.check_ct (Loc.other __LOC__) ct in
                   return (IdSet.add name have)
                 | None -> return have)
-             layout
+             layout.pieces
              IdSet.empty
          in
          return ())

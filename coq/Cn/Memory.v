@@ -18,7 +18,17 @@ Record struct_member := mk_struct_member {
   memory_struct_member : Id.t * SCtypes.ctype (* rnamed from `struct_member` to avoid name clash with `struct_member` in MuCore.v*)
 }.
 
-Definition struct_layout := list struct_piece.
+Record fam_info := mk_fam_info {
+  fam_member : Id.t;
+  fam_element_type : SCtypes.ctype;
+  fam_offset : Z
+}.
+
+Record struct_layout := mk_struct_layout {
+  layout_pieces : list struct_piece;
+  layout_fam : option fam_info
+}.
+
 Definition struct_decl := struct_layout.
 Definition struct_decls := SymMap.t struct_decl.
 

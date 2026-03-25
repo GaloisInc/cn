@@ -36,7 +36,7 @@ module Make (AD : Domain.T) = struct
         let members =
           match Pmap.find tag prog5.tagDefs with
           | StructDef pieces ->
-            pieces
+            pieces.pieces
             |> List.filter_map (fun ({ member_or_padding; _ } : Memory.struct_piece) ->
               member_or_padding)
             |> List.map (fun (member, ct) -> (Sym.fresh_anon (), (member, ct)))
@@ -79,7 +79,7 @@ module Make (AD : Domain.T) = struct
         let members =
           match Pmap.find tag prog5.tagDefs with
           | StructDef pieces ->
-            pieces
+            pieces.pieces
             |> List.filter_map (fun ({ member_or_padding; _ } : Memory.struct_piece) ->
               member_or_padding)
             |> List.map (fun (member, ct) -> (Sym.fresh_anon (), (member, ct)))
