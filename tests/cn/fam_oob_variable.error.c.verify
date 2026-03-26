@@ -1,0 +1,16 @@
+return code: 1
+cn/fam_buffer.h:13:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_buffer.h:31:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_oob_variable.error.c:13:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, i; @*/
+        ^~~~~~~~~~~~~~~~~ 
+[1/1]: get_unchecked -- fail
+cn/fam_oob_variable.error.c:14:12: error: `&(&buf->data)[i]` out of bounds
+    return buf->data[i];
+           ^~~~~~~~~~~~ 
+(UB missing short message): UB_CERB004_unspecified__pointer_add
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_oob_variable.error.c__get_unchecked.html

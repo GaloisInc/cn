@@ -196,16 +196,6 @@ module IndexTerms = struct
       match f it with None -> it | Some it3 -> accessor_reduce f it3)
 
 
-  let cast_reduce bt it =
-    let loc = IT.get_loc it in
-    match (bt, IT.is_const it) with
-    | _, _ when BT.equal (IT.get_bt it) bt -> it
-    | BT.Bits (sign, sz), Some (Terms.Bits ((sign2, sz2), z), _) ->
-      let z = BT.normalise_to_range (sign, sz) (BT.normalise_to_range (sign2, sz2) z) in
-      num_lit_ z bt loc
-    | _ -> IT (Cast (bt, it), bt, loc)
-
-
   let num_lit_norm bt z =
     match bt with
     | BT.Bits (sign, sz) -> IT.num_lit_ (BT.normalise_to_range (sign, sz) z) bt
@@ -252,6 +242,38 @@ module IndexTerms = struct
          | IT (Binop (Add, c, d), _, _), _, _, _, _ when IT.equal c b ->
            (* (c + d) - b when c = b *)
            d
+         | IT (Binop (Add, c, d), _, _), IT (Binop (Add, e, f), _, _), _, _, _
+           when IT.equal c e ->
+           (* (c + d) - (c + f) => d - f *)
+           aux (sub_ (d, f) the_loc)
+         | IT (Binop (Mul, a1, x), _, _), IT (Binop (Mul, a2, y), _, _), _, _, _ ->
+           (* a*x - a*y => a*(x-y) *)
+           (match (IT.get_num_z a1, IT.get_num_z a2) with
+            | Some z1, Some z2 when Z.equal z1 z2 ->
+              aux (mul_ (a1, sub_ (x, y) the_loc) the_loc)
+            | _ -> IT (Binop (Sub, a, b), the_bt, the_loc))
+         (* Pointer difference: cast(array_shift(p, j)) - cast(array_shift(p, i)) = (j-i)*sizeof *)
+         | ( IT
+               ( Cast
+                   (cast_bt1, IT (ArrayShift { base = base1; ct = ct1; index = j }, _, _)),
+                 _,
+                 _ ),
+             IT
+               ( Cast
+                   (cast_bt2, IT (ArrayShift { base = base2; ct = ct2; index = i }, _, _)),
+                 _,
+                 _ ),
+             _,
+             _,
+             _ )
+           when IT.equal base1 base2
+                && Sctypes.equal ct1 ct2
+                && BT.equal cast_bt1 cast_bt2 ->
+           (* ((i64)(p + j*sizeof)) - ((i64)(p + i*sizeof)) = (j - i) * sizeof *)
+           let el_size = int_lit_ (Memory.size_of_ctype ct1) cast_bt1 the_loc in
+           let index_diff = sub_ (j, i) the_loc in
+           let index_diff_casted = cast_ cast_bt1 index_diff the_loc in
+           aux (mul_ (el_size, index_diff_casted) the_loc)
          | _, _, _, _, _ -> IT (Binop (Sub, a, b), the_bt, the_loc))
       | Binop (Mul, a, b) ->
         let a = aux a in
@@ -274,6 +296,12 @@ module IndexTerms = struct
          | IT (Const (Z a), _, _), _ when Z.equal a Z.zero -> int_ 0 the_loc
          | _, IT (Const (Z b), _, _) when Z.equal b Z.one -> a
          | IT (Binop (Mul, b', c), _, _), _ when IT.equal b' b -> c
+         (* Handle div(cast(b*c), b) => cast(c) -- for pointer subtraction *)
+         (* Check numeric equality since b' might be u64 and b might be i64 *)
+         | IT (Cast (cast_bt, IT (Binop (Mul, b', c), _, _)), _, _), _ ->
+           (match (IT.get_num_z b', IT.get_num_z b) with
+            | Some z1, Some z2 when Z.equal z1 z2 -> aux (cast_ cast_bt c the_loc)
+            | _ -> IT (Binop (Div, a, b), the_bt, the_loc))
          | _ -> IT (Binop (Div, a, b), the_bt, the_loc))
       | Binop (Exp, a, b) ->
         let a = aux a in
@@ -566,7 +594,17 @@ module IndexTerms = struct
             | _ -> IT (WrapI (ity, t), the_bt, the_loc)))
       | Cast (cbt, a) ->
         let a = aux a in
-        cast_reduce cbt a
+        (match (cbt, a) with
+         | _, _ when BT.equal (IT.get_bt a) cbt -> a
+         | BT.Bits (sign, sz), _ ->
+           (match IT.is_const a with
+            | Some (Terms.Bits ((sign2, sz2), z), _) ->
+              let z =
+                BT.normalise_to_range (sign, sz) (BT.normalise_to_range (sign2, sz2) z)
+              in
+              num_lit_ z cbt the_loc
+            | _ -> IT (Cast (cbt, a), cbt, the_loc))
+         | _ -> IT (Cast (cbt, a), cbt, the_loc))
       | MemberShift (t, tag, member) ->
         IT (MemberShift (aux t, tag, member), the_bt, the_loc)
       | ArrayShift { base; ct; index } ->
@@ -583,6 +621,10 @@ module IndexTerms = struct
          | Some z when Z.equal Z.zero z -> base
          | _ -> IT (ArrayShift { base; ct; index }, the_bt, the_loc))
       | SizeOf ct -> int_lit_ (Memory.size_of_ctype ct) Memory.size_bt the_loc
+      | OffsetOf (tag, member) ->
+        let decl = Sym.Map.find tag simp_ctxt.global.struct_decls in
+        let v = Option.get (Memory.member_offset decl member) in
+        int_lit_ v the_bt the_loc
       | Representable (ct, t) -> IT (Representable (ct, aux t), the_bt, the_loc)
       | Good (ct, t) -> IT (Good (ct, aux t), the_bt, the_loc)
       | Aligned a -> IT (Aligned { t = aux a.t; align = aux a.align }, the_bt, the_loc)

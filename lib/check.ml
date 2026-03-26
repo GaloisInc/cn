@@ -941,7 +941,25 @@ let rec check_pexpr path_cs (pe : BT.t Mu.pexpr) : IT.t m =
                 Generic (!^"unsupported c-type in sig of:" ^^^ Sym.pp sym)
                 [@alert "-deprecated"]
             })))
-  | PEmemberof _ -> Cerb_debug.error "todo: PEmemberof"
+  | PEmemberof (tag, member, pe) ->
+    (* Member access for struct_ptr->member or struct_val.member. *)
+    let@ () = WellTyped.ensure_base_type loc ~expect:(Loc ()) (Mu.bt_of_pexpr pe) in
+    let@ struct_ptr = check_pexpr path_cs pe in
+    let@ member_ct = Global.get_struct_member_type loc tag member in
+    let member_bt = Memory.bt_of_sct member_ct in
+    let@ () = WellTyped.ensure_base_type loc ~expect member_bt in
+    (* FAMs have array type - compute as byte offset from struct base, not struct member *)
+    (match member_ct with
+     | Array (_, None) ->
+       (* FAM: compute struct_ptr + offsetof(member) via char* arithmetic *)
+       let@ decl = Global.get_struct_decl loc tag in
+       let offset = Option.get (Memory.member_offset decl member) in
+       let offset_term = int_lit_ offset Memory.uintptr_bt loc in
+       (* Shift by bytes using char as element type *)
+       return (arrayShift_ ~base:struct_ptr ~index:offset_term Sctypes.char_ct loc)
+     | _ ->
+       (* Regular field: use memberShift *)
+       return (memberShift_ (struct_ptr, tag, member) loc))
   | PEwrapI (ity, iop, pe1, pe2) ->
     (* in integers, perform this op and round. in bitvector types, just perform
         the op (for all the ops where wrapping is consistent) *)

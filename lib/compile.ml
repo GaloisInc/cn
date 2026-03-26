@@ -433,7 +433,16 @@ module C_vars = struct
     match List.assoc_opt Id.equal member member_types with
     | Some ty -> return ty
     | None ->
-      fail { loc; msg = Global (Unexpected_member (List.map fst member_types, member)) }
+      (* Check if this is a flexible array member *)
+      (match def.Memory.fam with
+       | Some fam_info when Id.equal member fam_info.Memory.member ->
+         (* FAM member access returns pointer to element type.
+            Cerberus now types FAM member access as Pointer element_type directly,
+            so this matches what Cerberus expects. *)
+         return (Sctypes.Pointer fam_info.Memory.element_type)
+       | _ ->
+         fail
+           { loc; msg = Global (Unexpected_member (List.map fst member_types, member)) })
 
 
   let lookup_constr loc sym env =
@@ -553,8 +562,26 @@ module C_vars = struct
     | Struct tag ->
       let@ defs_ = lookup_struct loc tag env in
       let@ ty = lookup_member loc (tag, defs_) member in
-      let member_bt = Memory.sbt_of_sct ty in
-      return (IT.IT (StructMember (t, member), member_bt, loc))
+      (* FAMs cannot be accessed on struct values, only via pointers *)
+      (match ty with
+       | Sctypes.Array (_, None) ->
+         (* FAM: cannot access on struct value *)
+         let expected = "regular struct field (not a flexible array member)" in
+         let reason =
+           "Cannot access flexible array member on struct value. Use pointer dereference \
+            (->) instead."
+         in
+         fail
+           { loc;
+             msg =
+               WellTyped
+                 (Illtyped_it
+                    { it = Terms.pp t; has = SBT.pp (Struct tag); expected; reason })
+           }
+       | _ ->
+         (* Regular field: use StructMember with member's base type *)
+         let member_bt = Memory.sbt_of_sct ty in
+         return (IT.IT (StructMember (t, member), member_bt, loc)))
     | has ->
       let expected = "struct" in
       let reason = "struct member access" in

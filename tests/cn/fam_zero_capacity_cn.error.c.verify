@@ -1,0 +1,16 @@
+return code: 1
+cn/fam_buffer.h:13:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_buffer.h:31:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_zero_capacity_cn.error.c:13:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, 0u64; @*/
+        ^~~~~~~~~~~~~~~~~~~~ 
+[1/1]: get_from_empty -- fail
+cn/fam_zero_capacity_cn.error.c:14:12: error: Missing resource for reading
+    return buf->data[0];
+           ^~~~~~~~~~~~ 
+Resource needed: RW<signed int>(&(&buf->data)[(u64)0'i32])
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_zero_capacity_cn.error.c__get_from_empty.html

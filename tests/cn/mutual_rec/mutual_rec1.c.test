@@ -85,40 +85,40 @@ In file included from ./mutual_rec1.test.c:289:
   435 |       a_1874->u.a_node->right = R->t;
       |                               ^ ~~~~
 ./mutual_rec1.test.c:346:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
-  346 |     a_2952->u.a_node->k = V->k;
+  346 |     a_2954->u.a_node->k = V->k;
       |                         ^ ~~~~
 ./mutual_rec1.test.c:347:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
-  347 |     a_2952->u.a_node->v = V->v;
+  347 |     a_2954->u.a_node->v = V->v;
       |                         ^ ~~~~
 ./mutual_rec1.test.c:348:28: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
-  348 |     a_2952->u.a_node->left = L->t;
+  348 |     a_2954->u.a_node->left = L->t;
       |                            ^ ~~~~
 ./mutual_rec1.test.c:349:29: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
-  349 |     a_2952->u.a_node->right = R->t;
+  349 |     a_2954->u.a_node->right = R->t;
       |                             ^ ~~~~
 ./mutual_rec1.test.c:374:28: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
-  374 |     a_2971->u.b_node->even = E->t;
+  374 |     a_2973->u.b_node->even = E->t;
       |                            ^ ~~~~
 ./mutual_rec1.test.c:375:27: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
-  375 |     a_2971->u.b_node->odd = O->t;
+  375 |     a_2973->u.b_node->odd = O->t;
       |                           ^ ~~~~
 ./mutual_rec1.test.c:452:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
-  452 |     a_2839->u.a_node->k = V->k;
+  452 |     a_2841->u.a_node->k = V->k;
       |                         ^ ~~~~
 ./mutual_rec1.test.c:453:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
-  453 |     a_2839->u.a_node->v = V->v;
+  453 |     a_2841->u.a_node->v = V->v;
       |                         ^ ~~~~
 ./mutual_rec1.test.c:454:28: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
-  454 |     a_2839->u.a_node->left = L->t;
+  454 |     a_2841->u.a_node->left = L->t;
       |                            ^ ~~~~
 ./mutual_rec1.test.c:455:29: warning: incompatible pointer types assigning to 'struct b_node *' from 'struct b_tree *' [-Wincompatible-pointer-types]
-  455 |     a_2839->u.a_node->right = R->t;
+  455 |     a_2841->u.a_node->right = R->t;
       |                             ^ ~~~~
 ./mutual_rec1.test.c:478:28: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
-  478 |     a_2860->u.b_node->even = E->t;
+  478 |     a_2862->u.b_node->even = E->t;
       |                            ^ ~~~~
 ./mutual_rec1.test.c:479:27: warning: incompatible pointer types assigning to 'struct a_node *' from 'struct a_tree *' [-Wincompatible-pointer-types]
-  479 |     a_2860->u.b_node->odd = O->t;
+  479 |     a_2862->u.b_node->odd = O->t;
       |                           ^ ~~~~
 ./mutual_rec1.test.c:676:25: error: incompatible pointer to integer conversion assigning to 'int' from 'cn_bits_i32 *' (aka 'struct cn_bits_i32 *') [-Wint-conversion]
   676 |     a_2678->u.a_node->k = V->k;

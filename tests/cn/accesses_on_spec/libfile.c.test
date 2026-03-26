@@ -1,15 +1,4 @@
-return code: 1
-./libfile.exec.c:79:24: error: use of undeclared identifier 'myval'
-   79 |     __cn_ret = CN_LOAD(myval);
-      |                        ^
-./libfile.exec.c:79:24: error: use of undeclared identifier 'myval'
-./libfile.exec.c:79:24: error: use of undeclared identifier 'myval'
-./libfile.exec.c:79:24: error: use of undeclared identifier 'myval'
-./libfile.exec.c:98:11: error: use of undeclared identifier 'myval'
-   98 |   return &myval;
-      |           ^
-./libfile.exec.c:103:12: error: use of undeclared identifier 'myval'
-  103 |   memcpy((&myval), ptr, sizeof(signed int));
-      |            ^
-6 errors generated.
-Failed to compile 'libfile.exec.c'.
+return code: 0
+
+Testing Summary:
+cases: 2, passed: 2, failed: 0, errored: 0, skipped: 0

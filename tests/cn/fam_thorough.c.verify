@@ -1,0 +1,57 @@
+return code: 1
+cn/fam_thorough.c:20:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct simple_fam>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_thorough.c:59:20: warning: annotation on array_shift suggests &p->ptrs has type signed int** but it has type signed int***.
+      OwningIntPtr(array_shift<int*>(member_shift<struct pointer_fam>(p, ptrs), j))
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+[1/27]: test_fam_loop_read -- pass
+cn/fam_thorough.c:117:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, j; @*/
+        ^~~~~~~~~~~~~~~~~ 
+[2/27]: test_fam_multiple_shifts -- pass
+[3/27]: test_char_fam -- pass
+[4/27]: test_pointer_fam -- pass
+[5/27]: test_struct_elem_fam -- pass
+[6/27]: test_struct_elem_fam_shift -- pass
+[7/27]: test_ptr_to_fam_struct -- pass
+[8/27]: test_multiple_fam_accesses -- pass
+[9/27]: test_fam_offsetof -- pass
+cn/fam_thorough.c:235:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, j; @*/
+        ^~~~~~~~~~~~~~~~~ 
+[10/27]: test_fam_pointer_compare -- pass
+[11/27]: test_fam_base_vs_zero -- pass
+[12/27]: test_nested_fam_ptr -- pass
+[13/27]: test_fam_multi_deref -- pass
+[14/27]: test_fam_const -- pass
+[15/27]: test_fam_address_of -- fail
+[16/27]: test_fam_early_return -- pass
+[17/27]: test_fam_nested_blocks -- pass
+[18/27]: test_fam_ptr_arithmetic -- fail
+[19/27]: test_fam_zero_elements -- pass
+[20/27]: test_fam_one_element -- pass
+cn/fam_thorough.c:407:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, 0u64; @*/
+        ^~~~~~~~~~~~~~~~~~~~ 
+[21/27]: test_two_fam_structs -- pass
+[22/27]: test_fam_local_assignment -- pass
+[23/27]: test_fam_ternary -- pass
+[24/27]: test_fam_do_while -- pass
+[25/27]: test_fam_switch -- pass
+[26/27]: test_fam_comma -- pass
+[27/27]: test_fam_many_shifts -- pass
+cn/fam_thorough.c:310:5: error: Unprovable constraint
+    return pi - p0;
+    ^~~~~~~~~~~~~~~ 
+Constraint from cn/fam_thorough.c:302:11:
+          return == (i64)i;
+          ^~~~~~~~~~~~~~~~~ 
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_thorough.c__test_fam_address_of.html
+cn/fam_thorough.c:366:5: error: Unprovable constraint
+    return offset - base;
+    ^~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/fam_thorough.c:358:11:
+          return == (i64)n;
+          ^~~~~~~~~~~~~~~~~ 
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_thorough.c__test_fam_ptr_arithmetic.html

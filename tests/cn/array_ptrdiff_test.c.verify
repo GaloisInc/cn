@@ -1,0 +1,5 @@
+return code: 0
+cn/array_ptrdiff_test.c:19:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<int>, j; @*/
+        ^~~~~~~~~~~~~~~~~ 
+[1/1]: array_compute_diff -- pass

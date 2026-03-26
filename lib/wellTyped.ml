@@ -21,6 +21,8 @@ let add_ct, get_cts =
 
 let maybe_add_ct = function None -> () | Some ct -> add_ct ct
 
+let fam_struct_access_warned = ref false
+
 let squotes, warn, dot, string, debug, item, colon, comma =
   Pp.(squotes, warn, dot, string, debug, item, colon, comma)
 
@@ -703,6 +705,25 @@ module WIT = struct
             fail (illtyped_index_term loc t has ~expected ~reason)
         in
         let@ field_ct = get_struct_member_type loc tag member in
+        (* Warn about FAM access on struct values *)
+        let@ struct_decl = get_struct_decl loc tag in
+        let is_fam =
+          match struct_decl.Memory.fam with
+          | Some fam_info when Id.equal member fam_info.Memory.member -> true
+          | _ -> false
+        in
+        if is_fam && not !fam_struct_access_warned then (
+          fam_struct_access_warned := true;
+          warn
+            loc
+            Pp.(
+              !^"Accessing flexible array member"
+              ^^^ Id.pp member
+              ^^^ !^"on logical struct value is discouraged (will not warn again). FAM \
+                     fields in logical structs represent only the base pointer, not \
+                     array contents. Consider using pointer access (p->"
+              ^^ Id.pp member
+              ^^ !^") for array operations."));
         return (IT (StructMember (t, member), Memory.bt_of_sct field_ct, loc))
       | StructUpdate ((t, member), v) ->
         let@ t = infer t in

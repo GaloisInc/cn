@@ -1,0 +1,10 @@
+return code: 0
+cn/fam_buffer.h:13:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/fam_buffer.h:31:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
+      RW<int>(array_shift<int>(member_shift<struct buffer>(p, data), j))
+              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+[1/3]: get -- pass
+[2/3]: set -- pass
+[3/3]: get_set -- pass

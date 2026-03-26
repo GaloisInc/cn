@@ -1,7 +1,6 @@
 return code: 1
-Undefined symbols for architecture arm64:
-  "_g", referenced from:
-      _cn_test_gen_g in g.test.o
-ld: symbol(s) not found for architecture arm64
-clang: error: linker command failed with exit code 1 (use -v to see invocation)
-Failed to link *.o files.
+./g.exec.c:87:18: error: call to undeclared function 'f'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+   87 |       __cn_ret = f((CN_LOAD(x) - 12));
+      |                  ^
+1 error generated.
+Failed to compile 'g.exec.c'.

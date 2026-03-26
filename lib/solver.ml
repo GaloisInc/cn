@@ -492,9 +492,20 @@ and get_value gs ctys bt (sexp : SMT.sexp) =
   | Struct tag ->
     let _con, vals = SMT.to_con sexp in
     let decl = Sym.Map.find tag gs.struct_decls in
-    let fields = List.filter_map (fun x -> x.Memory.member_or_padding) decl.pieces in
+    let regular_fields =
+      List.filter_map (fun x -> x.Memory.member_or_padding) decl.pieces
+    in
     let mk_field (l, t) v = (l, get_ivalue gs ctys (Memory.bt_of_sct t) v) in
-    Struct (tag, List.map2 mk_field fields vals)
+    (* SMT struct includes FAM fields (as pointers), but struct values only contain regular fields.
+       We need to extract just the regular field values from the SMT result. *)
+    let n_regular = List.length regular_fields in
+    let regular_vals =
+      let rec take n lst =
+        match (n, lst) with 0, _ | _, [] -> [] | n, x :: xs -> x :: take (n - 1) xs
+      in
+      take n_regular vals
+    in
+    Struct (tag, List.map2 mk_field regular_fields regular_vals)
   | Datatype tag ->
     let con, vals = SMT.to_con sexp in
     let cons = (Sym.Map.find tag gs.datatypes).constrs in
@@ -1053,12 +1064,23 @@ module CN_Structs = struct
         (CN_Names.struct_field_name l, translate_base_type ty)
       in
       let mk_piece (x : Memory.struct_piece) = Option.map mk_field x.member_or_padding in
+      let regular_fields = List.filter_map mk_piece decl.pieces in
+      (* Include FAM fields in the struct declaration so field accessors exist.
+         Represent FAMs as pointers to element type since they're just addresses *)
+      let fam_fields =
+        Option.to_list
+          (Option.map
+             (fun (fam : Memory.fam_info) ->
+                mk_field (fam.member, Sctypes.Pointer fam.element_type))
+             decl.Memory.fam)
+      in
+      let all_fields = regular_fields @ fam_fields in
       ack_command
         s
         (SMT.declare_datatype
            (CN_Names.struct_name name)
            []
-           [ (CN_Names.struct_con_name name, List.filter_map mk_piece decl.pieces) ]))
+           [ (CN_Names.struct_con_name name, all_fields) ]))
 
 
   let declare s =

@@ -12,7 +12,7 @@ cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'
 /*@ requires take f1 = each(i32 i; 0i32 <= i && i <= 0i32) { False(p + i, i) };
                   ^
 ./inconsistent2.test.c:220:53: error: passing 'void' to parameter of incompatible type 'void *'
-  220 |   CN_ANALYZE_SHAPE_EACH_END(a_1016, i, cn_bits_i32, cn_analyze_shape_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
+  220 |   CN_ANALYZE_SHAPE_EACH_END(a_1017, i, cn_bits_i32, cn_analyze_shape_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
       |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 <OPAM_PREFIX>/lib/cn/runtime/include/cn-replicate/shape.h:26:51: note: expanded from macro 'CN_ANALYZE_SHAPE_EACH_END'
    26 |   cn_map_set(map, cast_##i_ty##_to_cn_integer(i), val);                                  \
@@ -21,7 +21,7 @@ cn/inconsistent2.c:9:19: warning: 'each' prefers a 'u64', but 'i' has type 'i32'
   211 | cn_map* cn_map_set(cn_map* m, cn_integer* key, void* value);
       |                                                      ^
 ./inconsistent2.test.c:265:48: error: passing 'void' to parameter of incompatible type 'void *'
-  265 |   CN_REPLICATE_EACH_END(a_969, i, cn_bits_i32, cn_replicate_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
+  265 |   CN_REPLICATE_EACH_END(a_970, i, cn_bits_i32, cn_replicate_False(cn_array_shift(p_cn, sizeof(signed int), cast_cn_bits_i32_to_cn_bits_u64(i)), i), convert_to_cn_bits_i32(0LL));
       |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 <OPAM_PREFIX>/lib/cn/runtime/include/cn-replicate/shape.h:70:43: note: expanded from macro 'CN_REPLICATE_EACH_END'
    70 |   CN_ANALYZE_SHAPE_EACH_END(map, i, i_ty, val, max)
