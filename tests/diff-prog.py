@@ -72,22 +72,24 @@ class Prog:
                 with open(expect_path, 'w') as expect:
                     expect.writelines(output['lines'])
             finally:
-                return { 'diff': False, 'time': .0, 'return_code': output.get('return_code', 0) }
+                return { 'diff': False, 'time': .0, 'return_code': output.get('return_code', 0), 'was_updated': True }
         with open(expect_path, 'r') as expect:
             try:
                 output = self.output(test_rel_path)
                 diff = list(difflib.unified_diff(expect.readlines(), output['lines'], expect_path, expect_path))
                 time = output['time']
                 return_code = output.get('return_code', 0)
+                was_updated = False
                 # If accept_baselines flag is set, always update the baseline
-                if self.accept_baselines:
+                if self.accept_baselines and diff:
                     with open(expect_path, 'w') as expect_file:
                         expect_file.writelines(output['lines'])
+                    was_updated = True
                     # Clear diff since we just accepted it
                     diff = []
-                return { 'diff': diff, 'time': time, 'return_code': return_code }
+                return { 'diff': diff, 'time': time, 'return_code': return_code, 'was_updated': was_updated }
             except AttributeError: # dry run
-                return { 'diff': False, 'time': .0, 'return_code': 0 }
+                return { 'diff': False, 'time': .0, 'return_code': 0, 'was_updated': False }
 
 def test_files(test_dir, matcher):
     if not os.path.isdir(test_dir):
@@ -112,27 +114,110 @@ def filter_tests(test_dir, suffix, matcher):
 def format_timing(name, value):
     return { 'name': name, 'unit': 'Seconds', 'value': value }
 
+def get_expected_return_code(baseline_path):
+    """Extract expected return code from baseline file's first line"""
+    try:
+        with open(baseline_path, 'r') as f:
+            first_line = f.readline().strip()
+            if first_line.startswith('return code:'):
+                return int(first_line.split(':')[1].strip())
+    except (FileNotFoundError, ValueError, IndexError):
+        pass
+    return 0  # Default: expect success
+
+def classify_test_outcome(test_path, actual_rc, expected_rc, has_diff, was_accepted):
+    """Classify test outcome for clear reporting"""
+    # Check if test expects error/crash based on filename
+    is_error_test = test_path.endswith('.error.c') or test_path.endswith('.error.error.c')
+    is_crash_test = test_path.endswith('.crash.c')
+    is_fail_test = test_path.endswith('.fail.c')
+
+    # Timeout is special
+    if actual_rc == 124:
+        return ('timeout', '\033[35m[ TIMEOUT ]\033[m', True)
+
+    # If codes match and no diff, test passed
+    if actual_rc == expected_rc and not has_diff:
+        return ('passed', '\033[32m[ PASSED ]\033[m', False)
+
+    # If codes match but baseline was updated
+    if actual_rc == expected_rc and has_diff and was_accepted:
+        return ('updated', '\033[36m[ UPDATED ]\033[m', False)
+
+    # If codes match but baseline differs (not yet accepted)
+    if actual_rc == expected_rc and has_diff:
+        status = 'baseline-diff'
+        # Use different label based on whether it's error or pass
+        if actual_rc == 0:
+            label = '\033[33m[ PASS (baseline updated) ]\033[m'
+        else:
+            label = '\033[33m[ ERROR (baseline updated) ]\033[m'
+        return (status, label, False)
+
+    # Codes differ - this is a true regression
+    if expected_rc == 0 and actual_rc != 0:
+        # Expected pass, got error
+        if actual_rc == 125:
+            return ('regression', '\033[31m[ PASS→CRASH ]\033[m', True)
+        else:
+            return ('regression', '\033[31m[ PASS→ERROR ]\033[m', True)
+    elif expected_rc != 0 and actual_rc == 0:
+        # Expected error/crash, got pass
+        if expected_rc == 125:
+            return ('regression', '\033[31m[ CRASH→PASS ]\033[m', True)
+        else:
+            return ('regression', '\033[31m[ ERROR→PASS ]\033[m', True)
+    elif expected_rc == 125 and actual_rc != 125:
+        # Expected crash, got error
+        return ('regression', '\033[31m[ CRASH→ERROR ]\033[m', True)
+    elif expected_rc != 0 and actual_rc != 0 and expected_rc != actual_rc:
+        # Both errors but different codes
+        return ('regression', '\033[31m[ ERROR (wrong code) ]\033[m', True)
+
+    # Shouldn't reach here, but treat as failure
+    return ('unknown', '\033[31m[ FAILED ]\033[m', True)
+
 def run_tests(prog, test_rel_paths, quiet, max_workers):
     test_rel_paths = list(test_rel_paths)
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         failed_tests = 0
+        updated_tests = 0
         timings = []
         for test_rel_path, outcome in zip(test_rel_paths, executor.map(prog.get_diff, test_rel_paths)):
             time = outcome['time']
             diff = outcome['diff']
-            return_code = outcome.get('return_code', 0)
+            actual_rc = outcome.get('return_code', 0)
+            was_updated = outcome.get('was_updated', False)
             timings.append(format_timing(test_rel_path, time))
             if not prog.run_cmd:
                 continue
-            pass_fail = '\033[32m[ PASSED ]\033[m'
-            # Test fails if there's a diff OR if return code is non-zero
-            if diff or return_code != 0:
+
+            # Get expected return code from baseline
+            baseline_path = test_rel_path + '.' + prog.name
+            expected_rc = get_expected_return_code(baseline_path)
+
+            # Classify the outcome
+            category, label, is_failure = classify_test_outcome(
+                test_rel_path, actual_rc, expected_rc, bool(diff) or was_updated, was_updated
+            )
+
+            # Print diff if there is one and we're not just accepting it
+            if diff and not prog.accept_baselines:
+                sys.stderr.writelines(diff)
+
+            # Count failures vs updates
+            if is_failure:
                 failed_tests += 1
-                if diff:
-                    sys.stderr.writelines(diff)
-                pass_fail = '\033[31m[ FAILED ]\033[m'
+            elif category == 'updated':
+                updated_tests += 1
+
             if not quiet:
-                print('%s %s' % (pass_fail, test_rel_path))
+                print('%s %s' % (label, test_rel_path))
+
+        # Print summary if there were updates
+        if updated_tests > 0 and not quiet:
+            print(f'\n{updated_tests} baseline(s) updated with --accept')
+
         return { 'code': min(failed_tests, 1), 'timings': timings }
 
 def output_bench(name, timings):
