@@ -56,8 +56,58 @@ cd tests
 **Note:**
 - Some tests may fail when run with incompatible commands (e.g., test-gen specs are too complex for verify baseline comparison). This is expected.
 - Do NOT use `run-cn-test-gen.py` directly
-  - it's a very long-running script that tests each case with 8 different parameter sets. 
+  - it's a very long-running script that tests each case with 8 different parameter sets.
   - Use `run-all-commands.sh test all ` instead.
+
+### Understanding diff-prog.py Test Output
+
+`diff-prog.py` uses color-coded labels to clearly distinguish different test outcomes:
+
+**Success (Green):**
+- `[ PASSED ]` - Test passed, baseline matches exactly
+
+**Baseline Updates (Cyan/Yellow - NOT failures):**
+- `[ UPDATED ]` - Baseline was updated with `--accept` flag (cyan)
+- `[ PASS (baseline updated) ]` - Test passed but output text changed, needs `--accept` (yellow)
+- `[ ERROR (baseline updated) ]` - Test errored as expected but output text changed, needs `--accept` (yellow)
+
+**True Regressions (Red - actual failures):**
+- `[ PASS→ERROR ]` - Expected pass, now errors (breaking regression)
+- `[ ERROR→PASS ]` - Expected error, now passes (test may be obsolete or bug fixed)
+- `[ PASS→CRASH ]` - Expected pass, now crashes with exit code 125 (serious regression)
+- `[ CRASH→PASS ]` - Expected crash, now passes (crash bug may be fixed)
+- `[ CRASH→ERROR ]` - Expected crash, now errors (behavior changed)
+- `[ ERROR (wrong code) ]` - Got error but with unexpected exit code
+
+**Other:**
+- `[ TIMEOUT ]` - Test exceeded time limit (magenta)
+
+**How to interpret the output:**
+
+1. **Green labels**: Everything is working correctly
+2. **Yellow/Cyan labels**: Tests work correctly, but output text changed (e.g., improved error messages, line number changes from code edits). Use `--accept` to update baselines after reviewing the diffs.
+3. **Red labels**: True regressions - test behavior changed. These require investigation and fixes, not just baseline updates.
+
+**Test file naming conventions indicate expected behavior:**
+- `.c` files - should pass (exit code 0)
+- `.error.c` files - should error (exit code 1)
+- `.crash.c` files - should crash with internal error (exit code 125)
+- `.fail.c` files - should fail test generation (non-zero exit)
+
+**Example workflow:**
+```bash
+# Run tests and see results
+cd tests
+./diff-prog.py cn cn/verify.json
+
+# If you see yellow labels, review the diffs shown
+# If diffs are acceptable (e.g., improved error messages), update baselines:
+./diff-prog.py cn cn/verify.json --accept
+
+# Red labels require investigation - don't just accept them!
+```
+
+**Important:** Never use `--accept` if you see red regression labels (PASS→ERROR, etc.) without understanding why the behavior changed. Yellow labels are safe to accept after reviewing the diff output.
 
 ### Debugging and Scratch Space
 
