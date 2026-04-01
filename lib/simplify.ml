@@ -211,8 +211,9 @@ module IndexTerms = struct
       | Sym _ when BT.equal the_bt BT.Unit -> unit_ the_loc
       | Sym sym ->
         (match Sym.Map.find_opt sym simp_ctxt.values with
-         | Some (IT ((Const _ | Sym _), _, _) as v) -> v
-         | _ -> the_term)
+         | Some (IT ((Const _ | Sym _ | Struct _), _, _) as v) -> v
+         | Some _ -> the_term
+         | None -> the_term)
       | Const _ -> the_term
       | Binop (Add, a, b) ->
         let a = aux a in

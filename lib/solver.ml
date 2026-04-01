@@ -19,7 +19,9 @@ module CN_Names = struct
 
   let struct_name x = Sym.pp_string_no_nums x ^ "_" ^ string_of_int (Sym.num x)
 
-  let struct_con_name x = Sym.pp_string_no_nums x ^ "_" ^ string_of_int (Sym.num x)
+  let struct_con_name x =
+    "mk_" ^ Sym.pp_string_no_nums x ^ "_" ^ string_of_int (Sym.num x)
+
 
   let struct_field_name x = Id.get_string x ^ "_struct_fld"
 
@@ -1065,13 +1067,11 @@ module CN_Structs = struct
       in
       let mk_piece (x : Memory.struct_piece) = Option.map mk_field x.member_or_padding in
       let regular_fields = List.filter_map mk_piece decl.pieces in
-      (* Include FAM fields in the struct declaration so field accessors exist.
-         Represent FAMs as pointers to element type since they're just addresses *)
       let fam_fields =
         Option.to_list
           (Option.map
              (fun (fam : Memory.fam_info) ->
-                mk_field (fam.member, Sctypes.Pointer fam.element_type))
+                (CN_Names.struct_field_name fam.member, translate_base_type (BT.Loc ())))
              decl.Memory.fam)
       in
       let all_fields = regular_fields @ fam_fields in

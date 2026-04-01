@@ -705,26 +705,15 @@ module WIT = struct
             fail (illtyped_index_term loc t has ~expected ~reason)
         in
         let@ field_ct = get_struct_member_type loc tag member in
-        (* Warn about FAM access on struct values *)
+        (* FAM fields are stored in struct values as pointers (Loc ()) *)
         let@ struct_decl = get_struct_decl loc tag in
         let is_fam =
           match struct_decl.Memory.fam with
           | Some fam_info when Id.equal member fam_info.Memory.member -> true
           | _ -> false
         in
-        if is_fam && not !fam_struct_access_warned then (
-          fam_struct_access_warned := true;
-          warn
-            loc
-            Pp.(
-              !^"Accessing flexible array member"
-              ^^^ Id.pp member
-              ^^^ !^"on logical struct value is discouraged (will not warn again). FAM \
-                     fields in logical structs represent only the base pointer, not \
-                     array contents. Consider using pointer access (p->"
-              ^^ Id.pp member
-              ^^ !^") for array operations."));
-        return (IT (StructMember (t, member), Memory.bt_of_sct field_ct, loc))
+        let result_bt = if is_fam then BT.Loc () else Memory.bt_of_sct field_ct in
+        return (IT (StructMember (t, member), result_bt, loc))
       | StructUpdate ((t, member), v) ->
         let@ t = infer t in
         let@ tag =
@@ -1808,7 +1797,13 @@ module BaseTyping = struct
         | PEmemberof (tag, member, pe) ->
           let@ pe = infer_pexpr pe in
           let@ field_ct = get_struct_member_type loc tag member in
-          return (Memory.bt_of_sct field_ct, PEmemberof (tag, member, pe))
+          let@ struct_decl = get_struct_decl loc tag in
+          let result_bt =
+            match struct_decl.Memory.fam with
+            | Some fam_info when Id.equal member fam_info.Memory.member -> BT.Loc ()
+            | _ -> Memory.bt_of_sct field_ct
+          in
+          return (result_bt, PEmemberof (tag, member, pe))
         (* reaching these cases should be prevented by the `is_unreachable` used in
            inferring types of PEif *)
         | PEerror (_, _) -> todo ()

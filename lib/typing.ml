@@ -424,6 +424,24 @@ let add_r_internal ?(derive_constraints = true) loc (r, Res.O oargs) =
       []
   in
   let@ () = set_typing_context (Context.add_r loc (r, O oargs) s) in
+  (* For struct resources with FAM fields, add constraints to connect field selectors to pointer values *)
+  let@ () =
+    match (r, oargs) with
+    | ( Request.P { name = Request.Owned (Sctypes.Struct tag, _); pointer; _ },
+        IT (Sym _, _, _) ) ->
+      let@ global = get_global () in
+      let layout = Sym.Map.find tag global.struct_decls in
+      (match layout.Memory.fam with
+       | None -> return ()
+       | Some fam_info ->
+         let fam_pointer = IT.memberShift_ (pointer, tag, fam_info.member) loc in
+         let fam_field_value =
+           IT.member_ ~member_bt:(IT.BT.Loc ()) (oargs, fam_info.member) loc
+         in
+         let constraint_ = IT.eq__ fam_field_value fam_pointer loc in
+         add_c_internal (LC.T constraint_))
+    | _ -> return ()
+  in
   iterM (fun x -> add_c_internal (LC.T x)) pointer_facts
 
 

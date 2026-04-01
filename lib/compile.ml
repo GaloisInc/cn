@@ -436,10 +436,7 @@ module C_vars = struct
       (* Check if this is a flexible array member *)
       (match def.Memory.fam with
        | Some fam_info when Id.equal member fam_info.Memory.member ->
-         (* FAM member access returns pointer to element type.
-            Cerberus now types FAM member access as Pointer element_type directly,
-            so this matches what Cerberus expects. *)
-         return (Sctypes.Pointer fam_info.Memory.element_type)
+         return (Sctypes.Array (fam_info.Memory.element_type, None))
        | _ ->
          fail
            { loc; msg = Global (Unexpected_member (List.map fst member_types, member)) })
@@ -562,26 +559,11 @@ module C_vars = struct
     | Struct tag ->
       let@ defs_ = lookup_struct loc tag env in
       let@ ty = lookup_member loc (tag, defs_) member in
-      (* FAMs cannot be accessed on struct values, only via pointers *)
-      (match ty with
-       | Sctypes.Array (_, None) ->
-         (* FAM: cannot access on struct value *)
-         let expected = "regular struct field (not a flexible array member)" in
-         let reason =
-           "Cannot access flexible array member on struct value. Use pointer dereference \
-            (->) instead."
-         in
-         fail
-           { loc;
-             msg =
-               WellTyped
-                 (Illtyped_it
-                    { it = Terms.pp t; has = SBT.pp (Struct tag); expected; reason })
-           }
-       | _ ->
-         (* Regular field: use StructMember with member's base type *)
-         let member_bt = Memory.sbt_of_sct ty in
-         return (IT.IT (StructMember (t, member), member_bt, loc)))
+      let result_ty =
+        match ty with Sctypes.Array (elem_ty, None) -> Sctypes.Pointer elem_ty | _ -> ty
+      in
+      let member_bt = Memory.sbt_of_sct result_ty in
+      return (IT.IT (StructMember (t, member), member_bt, loc))
     | has ->
       let expected = "struct" in
       let reason = "struct member access" in
@@ -869,12 +851,17 @@ module C_vars = struct
         let with_tag tag =
           let@ struct_def = lookup_struct loc tag env in
           let@ member_ty = lookup_member loc (tag, struct_def) member in
+          let result_ty =
+            match member_ty with
+            | Sctypes.Array (elem_ty, None) -> elem_ty
+            | _ -> member_ty
+          in
           let (IT (it_, _, _)) =
             Surface.inj (memberShift_ (Surface.proj e, tag, member) loc)
           in
           (* Surface.inj will not have produced a C-type-annotated bt. So stick that on
              now. *)
-          return (IT (it_, Loc (Some member_ty), loc))
+          return (IT (it_, Loc (Some result_ty), loc))
         in
         (match (opt_tag, IT.get_bt e) with
          | Some (Ctype (_, Struct tag)), Loc (Some (Struct tag')) ->

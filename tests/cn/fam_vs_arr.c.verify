@@ -1,6 +1,3 @@
 return code: 0
-cn/fam_vs_arr.c:27:15: warning: annotation on array_shift suggests &p->x has type signed int* but it has type signed int**.
-      RW<int>(array_shift<int>(member_shift<struct bar>(p, x), j))
-              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 [1/2]: use_foo -- pass
 [2/2]: use_bar -- pass

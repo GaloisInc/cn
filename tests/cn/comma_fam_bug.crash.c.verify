@@ -1,29 +1,4 @@
-return code: 125
-cn/comma_fam_bug.crash.c:28:21: warning: Accessing flexible array member data on logical struct value is discouraged (will not warn again). FAM fields in logical structs represent only the base pointer, not array contents. Consider using pointer access (p->data) for array operations.
-          let ptr = s->data;
-                    ~^~~~~~ 
-cn: internal error, uncaught exception:
-    Not_found
-    Raised at Stdlib__List.find in file "list.ml", <POS>
-    Called from Cn__List.assoc in file "lib/list.ml", <POS>
-    Called from Cn__ResourceInference.General.parametric_ftyp_args_request_step in file "lib/resourceInference.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.pure.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.pure.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.sandbox.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
-    Called from Cn__Typing.run_from_pause in file "lib/typing.ml", <POS>
-    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
-    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
-    Re-raised at Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
-    Called from Cmdliner_term.app.(fun) in file "cmdliner_term.ml", <POS>
-    Called from Cmdliner_eval.run_parser in file "cmdliner_eval.ml", <POS>
+return code: 0
+[1/3]: test_comma_fam_increment_bug -- pass
+[2/3]: test_comma_fam_no_let -- pass
+[3/3]: test_comma_fam_assign -- pass

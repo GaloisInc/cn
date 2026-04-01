@@ -489,9 +489,14 @@ let check_live_alloc_bounds ?(skip_live = false) reason loc ub ptrs =
         RI.Special.check_live_alloc reason loc (List.hd ptrs)
     in
     let here = Locations.other __LOC__ in
-    let constr = and_ (List.concat_map in_bounds ptrs) here in
+    (* Simplify pointers and constraints to help SMT solver match allocIds *)
+    let@ global = get_global () in
+    let simp_ctxt = Simplify.default global in
+    let ptrs_simp = List.map (Simplify.IndexTerms.simp simp_ctxt) ptrs in
+    let constr = and_ (List.concat_map in_bounds ptrs_simp) here in
+    let constr_simp = Simplify.IndexTerms.simp simp_ctxt constr in
     let@ provable = provable loc in
-    match provable @@ LC.T constr with
+    match provable @@ LC.T constr_simp with
     | `True -> return ()
     | `False ->
       let@ model = model () in
@@ -948,18 +953,8 @@ let rec check_pexpr path_cs (pe : BT.t Mu.pexpr) : IT.t m =
     let@ member_ct = Global.get_struct_member_type loc tag member in
     let member_bt = Memory.bt_of_sct member_ct in
     let@ () = WellTyped.ensure_base_type loc ~expect member_bt in
-    (* FAMs have array type - compute as byte offset from struct base, not struct member *)
-    (match member_ct with
-     | Array (_, None) ->
-       (* FAM: compute struct_ptr + offsetof(member) via char* arithmetic *)
-       let@ decl = Global.get_struct_decl loc tag in
-       let offset = Option.get (Memory.member_offset decl member) in
-       let offset_term = int_lit_ offset Memory.uintptr_bt loc in
-       (* Shift by bytes using char as element type *)
-       return (arrayShift_ ~base:struct_ptr ~index:offset_term Sctypes.char_ct loc)
-     | _ ->
-       (* Regular field: use memberShift *)
-       return (memberShift_ (struct_ptr, tag, member) loc))
+    (* All fields use memberShift - FAM simplification handled in simplify.ml *)
+    return (memberShift_ (struct_ptr, tag, member) loc)
   | PEwrapI (ity, iop, pe1, pe2) ->
     (* in integers, perform this op and round. in bitvector types, just perform
         the op (for all the ops where wrapping is consistent) *)

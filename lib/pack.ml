@@ -44,8 +44,9 @@ let packing_ft ~full loc global provable ret =
   | P ret ->
     (match ret.name with
      | Owned ((Void | Integer _ | Pointer _ | Function _ | Byte), _init) -> None
-     | Owned ((Array (ict, olength) as ct), init) ->
-       let qpred = unfolded_array loc init (ict, olength) ret.pointer in
+     | Owned ((Array (_ict, None) as _ct), _init) -> None
+     | Owned ((Array (ict, Some olength) as ct), init) ->
+       let qpred = unfolded_array loc init (ict, Some olength) ret.pointer in
        let o_s, o = IT.fresh_named (Memory.bt_of_sct ct) "value" loc in
        let at = LAT.Resource ((o_s, (qpred, IT.get_bt o)), (loc, None), LAT.I o) in
        Some at
@@ -88,7 +89,15 @@ let packing_ft ~full loc global provable ret =
            layout.pieces
            (LRT.I, [])
        in
-       let at = LAT.of_lrt lrt (LAT.I (IT.struct_ (tag, value) loc)) in
+       let value_with_fam =
+         match layout.fam with
+         | None -> value
+         | Some fam_info ->
+           let fam_pointer = IT.memberShift_ (ret.pointer, tag, fam_info.member) loc in
+           value @ [ (fam_info.member, fam_pointer) ]
+       in
+       let struct_val = IT.struct_ (tag, value_with_fam) loc in
+       let at = LAT.of_lrt lrt (LAT.I struct_val) in
        Some at
      | PName pn ->
        let def = Sym.Map.find pn global.resource_predicates in

@@ -136,8 +136,7 @@ module Lift (M : ErrorReader) : Lifted with type 'a t := 'a M.t = struct
       (* Check if this is a flexible array member *)
       (match layout.Memory.fam with
        | Some fam_info when Id.equal member fam_info.Memory.member ->
-         (* FAM member access returns pointer to element type *)
-         M.return (Sctypes.Pointer fam_info.Memory.element_type)
+         M.return (Sctypes.Array (fam_info.Memory.element_type, None))
        | _ -> M.fail loc (Unexpected_member (List.map fst member_types, member)))
 
 

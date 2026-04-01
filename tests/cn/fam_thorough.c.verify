@@ -1,10 +1,4 @@
 return code: 1
-cn/fam_thorough.c:20:15: warning: annotation on array_shift suggests &p->data has type signed int* but it has type signed int**.
-      RW<int>(array_shift<int>(member_shift<struct simple_fam>(p, data), j))
-              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-cn/fam_thorough.c:59:20: warning: annotation on array_shift suggests &p->ptrs has type signed int** but it has type signed int***.
-      OwningIntPtr(array_shift<int*>(member_shift<struct pointer_fam>(p, ptrs), j))
-                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 [1/27]: test_fam_loop_read -- pass
 cn/fam_thorough.c:117:9: warning: focus: index added, no effect on existing resources (yet).
     /*@ focus RW<int>, j; @*/
