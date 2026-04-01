@@ -681,16 +681,27 @@ module WIT = struct
       | Struct (tag, members) ->
         let@ layout = get_struct_decl loc tag in
         let decl_members = Memory.member_types layout in
-        let@ () = correct_members loc decl_members members in
-        (* "sort" according to declaration *)
+        let decl_members_with_fam =
+          match layout.Memory.fam with
+          | Some fam_info ->
+            decl_members
+            @ [ ( fam_info.Memory.member,
+                  Sctypes.Array (fam_info.Memory.element_type, None) )
+              ]
+          | None -> decl_members
+        in
+        let@ () = correct_members loc decl_members_with_fam members in
         let@ members_sorted =
           ListM.mapM
             (fun (id, ct) ->
-               let@ t =
-                 check loc (Memory.bt_of_sct ct) (List.assoc Id.equal id members)
+               let expected_bt =
+                 match layout.Memory.fam with
+                 | Some fam_info when Id.equal id fam_info.Memory.member -> BT.Loc ()
+                 | _ -> Memory.bt_of_sct ct
                in
+               let@ t = check loc expected_bt (List.assoc Id.equal id members) in
                return (id, t))
-            decl_members
+            decl_members_with_fam
         in
         assert (List.length members_sorted = List.length members);
         return (IT (Struct (tag, members_sorted), BT.Struct tag, loc))

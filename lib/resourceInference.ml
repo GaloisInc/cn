@@ -244,8 +244,7 @@ module General = struct
     | None ->
       let@ global = get_global () in
       let@ provable = provable loc in
-      let here = Locations.other __LOC__ in
-      (match Pack.packing_ft ~full:true here global provable (P requested) with
+      (match Pack.packing_ft ~full:true loc global provable (P requested) with
        | Some packing_ft ->
          let ft_pp =
            lazy (LogicalArgumentTypes.pp (fun _ -> Pp.string "resource") packing_ft)

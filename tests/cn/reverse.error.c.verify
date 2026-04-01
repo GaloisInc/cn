@@ -13,5 +13,5 @@ cn/reverse.error.c:124:3: error: Missing resource for de-allocating
   ^~~~~~~~~ 
 Resource needed: W<struct node>(&n3)
   which requires: W<signed int>(&&n3->head)
-      other location (File "lib/resourceInference.ml", <POS>)  (arg head)
+      cn/reverse.error.c:124:3: (arg head)
 State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__reverse.error.c__main.html
