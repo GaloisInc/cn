@@ -6,5 +6,5 @@ cn/fam_zero_capacity_cn.error.c:13:9: warning: focus: index added, no effect on 
 cn/fam_zero_capacity_cn.error.c:14:12: error: Missing resource for reading
     return buf->data[0];
            ^~~~~~~~~~~~ 
-Resource needed: RW<signed int>(&(&buf->data)[(u64)0'i32])
+Resource needed: RW<signed int>(&(&(&buf->data)[(u64)0'i32])[(u64)0'i32])
 State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_zero_capacity_cn.error.c__get_from_empty.html
