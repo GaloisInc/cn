@@ -825,17 +825,29 @@ let rec translate_term s iterm =
     let tag = BT.struct_bt (IT.get_bt t) in
     let layout = Sym.Map.find (BT.struct_bt (IT.get_bt t)) struct_decls in
     let members = Memory.member_types layout in
+    let all_members =
+      match layout.Memory.fam with
+      | Some fam_info ->
+        members
+        @ [ (fam_info.Memory.member, Sctypes.Array (fam_info.Memory.element_type, None)) ]
+      | None -> members
+    in
     let str =
       List.map
         (fun (member', sct) ->
+           let member_bt =
+             match layout.Memory.fam with
+             | Some fam_info when Id.equal member' fam_info.Memory.member -> BT.Loc ()
+             | _ -> Memory.bt_of_sct sct
+           in
            let value =
              if Id.equal member member' then
                v
              else
-               member_ ~member_bt:(Memory.bt_of_sct sct) (t, member') loc
+               member_ ~member_bt (t, member') loc
            in
            (member', value))
-        members
+        all_members
     in
     translate_term s (struct_ (tag, str) loc)
   | OffsetOf (tag, member) ->

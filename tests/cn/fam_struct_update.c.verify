@@ -1,0 +1,6 @@
+return code: 1
+[1/1]: d -- fail
+cn/fam_struct_update.c:5:1: error: Left-over unused resource 'RW<signed int>(&e->a)(I.a)'
+void d(c *e)
+~~~~~^~~~~~~ 
+State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_struct_update.c__d.html
