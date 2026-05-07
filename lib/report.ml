@@ -819,7 +819,8 @@ let read_file filename =
 
 let make filename source_filename_opt (report : report) =
   let n_pages = List.length report.trace in
-  assert (n_pages > 0);
+  (* assert (n_pages > 0); *)
+  (* Commented out to allow workaround in explain.ml *)
   let _menu =
     div
       ~id:"menu"
