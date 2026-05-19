@@ -1,0 +1,5 @@
+return code: 1
+cn/fam_struct_member.c:9:20: error: Unexpected member bad
+    RW(array_shift(N.bad, j))
+                   ~^~~~ 
+the struct only has members b

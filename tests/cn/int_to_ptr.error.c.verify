@@ -5,4 +5,4 @@ cn/int_to_ptr.error.c:16:12: error: Missing resource for reading
     return *p == 0;
            ^~ 
 Resource needed: RW<signed int>(call_cast0_return)
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__int_to_ptr.error.c__main.html
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__int_to_ptr.error.c__main.html

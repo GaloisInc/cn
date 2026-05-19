@@ -6,4 +6,5 @@ cn/mod_return_size.error.c:9:5: error: Unprovable constraint
 Constraint from cn/mod_return_size.error.c:7:13:
     ensures return == x % (i32)y; @*/
             ^~~~~~~~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__mod_return_size.error.c__different_size.html
+Specifically: (i32)((i64)x % y) == x % (i32)y
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__mod_return_size.error.c__different_size.html

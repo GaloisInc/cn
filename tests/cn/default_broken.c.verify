@@ -1,0 +1,12 @@
+return code: 1
+[1/3]: test_false_transitivity_with_default -- pass
+[2/3]: test_transitivity_same_variable -- pass
+[3/3]: test_transitivity_with_params -- fail
+cn/default_broken.c:55:9: error: Unprovable constraint
+    /*@ assert(OnePlus(a, c) == true); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/default_broken.c:55:9:
+    /*@ assert(OnePlus(a, c) == true); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Specifically: OnePlus(a, c) == true
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__default_broken.c__test_transitivity_with_params.html

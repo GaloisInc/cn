@@ -6,4 +6,5 @@ void inc(int* p)
 Constraint from cn/bad_resource_var.error.c:5:13:
             X2 < 2147483647i32; @*/
             ^~~~~~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__bad_resource_var.error.c__inc.html
+Specifically: X + 1'i32 < 2147483647'i32 /* 0x7fffffff */
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__bad_resource_var.error.c__inc.html

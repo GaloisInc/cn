@@ -7,4 +7,4 @@ cn/fam_zero_capacity_cn.error.c:14:12: error: Missing resource for reading
     return buf->data[0];
            ^~~~~~~~~~~~ 
 Resource needed: RW<signed int>(&(&(&buf->data)[(u64)0'i32])[(u64)0'i32])
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_zero_capacity_cn.error.c__get_from_empty.html
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__fam_zero_capacity_cn.error.c__get_from_empty.html

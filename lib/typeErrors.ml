@@ -532,14 +532,144 @@ let pp_message = function
     let descr =
       let spec_loc, odescr = info in
       let head, pos = Locations.head_pos_of_location spec_loc in
-      let doc =
+      let base_doc =
         match odescr with
         | None -> !^"Constraint from" ^^^ !^head ^/^ !^pos
         | Some descr -> !^"Constraint from" ^^^ !^descr ^^^ !^head ^/^ !^pos
       in
+      (* Try to identify failing conjuncts *)
+      let context, _log = ctxt in
+      let model_val, _quantifier = model in
+      let evaluate it = Solver.eval model_val it in
+      (* Recursively expand and collect (atomic_constraint, chain) pairs *)
+      let rec expand_and_collect
+                (chain : (Sym.t * IT.t list) list)
+                (IT.IT (term, bt, loc) as it)
+        : (IT.t * (Sym.t * IT.t list) list) list
+        =
+        match term with
+        | IT.Apply (f, args) ->
+          (* Try to expand this function application *)
+          (match Sym.Map.find_opt f context.global.logical_functions with
+           | Some def ->
+             (match Definition.Function.try_open def args with
+              | Some body ->
+                (* Add this function to the chain and recursively expand *)
+                let new_chain = (f, args) :: chain in
+                expand_and_collect new_chain body
+              | None -> [ (it, List.rev chain) ])
+           | None -> [ (it, List.rev chain) ])
+        | IT.Binop (And, lhs, rhs) ->
+          (* For And, collect from both sides *)
+          List.append (expand_and_collect chain lhs) (expand_and_collect chain rhs)
+        | IT.Binop (op, lhs, rhs) ->
+          (* For other binops, this is an atomic constraint *)
+          let lhs_results = expand_and_collect chain lhs in
+          let rhs_results = expand_and_collect chain rhs in
+          (* If either side had expansions, we need to reconstruct *)
+          (match (lhs_results, rhs_results) with
+           | [ (lhs_exp, _) ], [ (rhs_exp, _) ] ->
+             [ (IT.IT (IT.Binop (op, lhs_exp, rhs_exp), bt, loc), List.rev chain) ]
+           | _ ->
+             (* Complex case - just return the original *)
+             [ (it, List.rev chain) ])
+        | _ ->
+          (* Other terms are atomic *)
+          [ (it, List.rev chain) ]
+      in
+      let expanded_pairs =
+        match constr with LC.T it -> expand_and_collect [] it | _ -> []
+      in
+      (* Build a map from expanded terms to their chains *)
+      let chain_map = Hashtbl.create 16 in
+      List.iter (fun (term, chain) -> Hashtbl.add chain_map term chain) expanded_pairs;
+      (* Also simplify normally for the existing logic *)
+      let rec expand_term (IT.IT (term, bt, loc) as it) =
+        match term with
+        | IT.Apply (f, args) ->
+          (match Sym.Map.find_opt f context.global.logical_functions with
+           | Some def ->
+             (match Definition.Function.try_open def args with
+              | Some body -> expand_term body
+              | None -> it)
+           | None -> it)
+        | IT.Binop (op, lhs, rhs) ->
+          IT.IT (IT.Binop (op, expand_term lhs, expand_term rhs), bt, loc)
+        | IT.Unop (op, arg) -> IT.IT (IT.Unop (op, expand_term arg), bt, loc)
+        | IT.ITE (cond, t, f) ->
+          IT.IT (IT.ITE (expand_term cond, expand_term t, expand_term f), bt, loc)
+        | _ -> it
+      in
+      let expanded_constr =
+        match constr with LC.T it -> LC.T (expand_term it) | _ -> constr
+      in
+      let simplified = Explain.simp_constraint evaluate expanded_constr in
+      (* Separate constraints that evaluate to false vs unknown *)
+      let is_false lc =
+        match lc with
+        | LC.T it ->
+          (match evaluate it with
+           | Some (IT.IT (Const (Bool false), _, _)) -> true
+           | _ -> false)
+        | _ -> false
+      in
+      let is_unknown lc =
+        match lc with
+        | LC.T it ->
+          (match evaluate it with
+           | Some (IT.IT (Const (Bool true), _, _)) -> false
+           | Some (IT.IT (Const (Bool false), _, _)) -> false
+           | _ -> true)
+        | _ -> true
+      in
+      let false_conjuncts = List.filter is_false simplified in
+      let unknown_conjuncts = List.filter is_unknown simplified in
+      let total = List.length simplified in
+      (* Format a conjunct with its expansion chain *)
+      let pp_conjunct_with_chain lc =
+        let chain_doc =
+          match lc with
+          | LC.T it ->
+            (match Hashtbl.find_opt chain_map it with
+             | None | Some [] -> empty
+             | Some chain ->
+               let pp_step (f, args) =
+                 !^"    via:"
+                 ^^^ Sym.pp f
+                 ^^ parens (flow (comma ^^ break 1) (List.map IT.pp args))
+               in
+               hardline ^^ separate hardline (List.map pp_step chain))
+          | _ -> empty
+        in
+        !^"  " ^^ LC.pp lc ^^ chain_doc
+      in
+      let doc_with_conjuncts =
+        match (false_conjuncts, unknown_conjuncts, total) with
+        | [], _, 1 ->
+          (* Single constraint, no simplification *)
+          base_doc
+        | [ one ], _, _ ->
+          (* One definitely false conjunct *)
+          base_doc
+          ^^ hardline
+          ^^ !^"Specifically:"
+          ^^ hardline
+          ^^ pp_conjunct_with_chain one
+        | many, _, _ when List.length many > 1 && List.length many < total ->
+          (* Multiple false conjuncts, but not all *)
+          base_doc
+          ^^ hardline
+          ^^ !^"Failing conjuncts:"
+          ^^ hardline
+          ^^ separate hardline (List.map pp_conjunct_with_chain many)
+        | [], unknowns, _ when List.length unknowns > 1 && List.length unknowns = total ->
+          (* Multiple conjuncts but can't tell which failed *)
+          base_doc ^^ hardline ^^ !^"(constraint has" ^^^ int total ^^^ !^"conjuncts)"
+        | _ -> base_doc
+      in
       match RequestChain.pp requests with
-      | Some doc2 -> doc ^^ hardline ^^ doc2
-      | None -> doc
+      | Some doc2 -> doc_with_conjuncts ^^ hardline ^^ doc2
+      | None -> doc_with_conjuncts
     in
     { short; descr = Some descr; state = Some state }
   | Undefined_behaviour { ub; ctxt; model } ->

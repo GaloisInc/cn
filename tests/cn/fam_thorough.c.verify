@@ -41,11 +41,13 @@ cn/fam_thorough.c:310:5: error: Unprovable constraint
 Constraint from cn/fam_thorough.c:302:11:
           return == (i64)i;
           ^~~~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_thorough.c__test_fam_address_of.html
+Specifically: (i64)((u64)&(&s->data)[i] - (u64)&s->data) / 4'i64 == (i64)i
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__fam_thorough.c__test_fam_address_of.html
 cn/fam_thorough.c:366:5: error: Unprovable constraint
     return offset - base;
     ^~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/fam_thorough.c:358:11:
           return == (i64)n;
           ^~~~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__fam_thorough.c__test_fam_ptr_arithmetic.html
+Specifically: (i64)((u64)&(&s->data)[n] - (u64)&s->data) / 4'i64 == (i64)n
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__fam_thorough.c__test_fam_ptr_arithmetic.html

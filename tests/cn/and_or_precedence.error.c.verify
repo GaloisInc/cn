@@ -6,4 +6,5 @@ cn/and_or_precedence.error.c:15:13: error: Unprovable constraint
 Constraint from cn/and_or_precedence.error.c:15:13:
         /*@ assert (false); @*/
             ^~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__and_or_precedence.error.c__g1.html
+Specifically: false
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__and_or_precedence.error.c__g1.html

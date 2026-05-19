@@ -7,11 +7,12 @@ cn/reverse.error.c:106:7: error: Unprovable constraint
 Constraint from cn/reverse.error.c:89:14:
              L_ == rev(L);
              ^~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__reverse.error.c__reverse.html
+Specifically: Nil {} == rev(L)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__reverse.error.c__reverse.html
 cn/reverse.error.c:124:3: error: Missing resource for de-allocating
   return 0;
   ^~~~~~~~~ 
 Resource needed: W<struct node>(&n3)
   which requires: W<signed int>(&&n3->head)
       cn/reverse.error.c:124:3: (arg head)
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__reverse.error.c__main.html
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__reverse.error.c__main.html

@@ -31,5 +31,11 @@ type state_extras =
 (** No additional information *)
 val no_ex : state_extras
 
+(** Simplify a constraint in the context of a model, returning a list of conjuncts *)
+val simp_constraint
+  :  (IndexTerms.t -> IndexTerms.t option) ->
+  LogicalConstraints.t ->
+  LogicalConstraints.t list
+
 (** Generate a report describing what went wrong. *)
 val trace : Context.t * log -> Solver.model_with_q -> state_extras -> Report.report

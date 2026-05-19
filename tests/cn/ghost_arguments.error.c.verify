@@ -10,4 +10,5 @@ cn/ghost_arguments.error.c:18:10: error: Unprovable constraint
 Constraint from cn/ghost_arguments.error.c:5:3:
   n + m + k == p;
   ^~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__ghost_arguments.error.c__main.html
+Specifically: 2'i32 + 3'i32 + 1'i32 + 1'i32 == 6'i32
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__ghost_arguments.error.c__main.html

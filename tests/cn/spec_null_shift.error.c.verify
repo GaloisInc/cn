@@ -6,4 +6,5 @@ void f(int *p, int *q)
 Constraint from cn/spec_null_shift.error.c:13:5:
     ptr_eq(x, NULL) || ptr_eq(y, NULL) || (u64) x == 1u64 || (u64) y == 2u64;
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-State file: file:///var/folders/tz/g0kxkm2915xdtm6qgv8rff000000gp/T/state__spec_null_shift.error.c__f.html
+Specifically: (u64)&p[2'u64] == 2'u64
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__spec_null_shift.error.c__f.html
