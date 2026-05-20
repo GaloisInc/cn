@@ -593,7 +593,13 @@ let pp_message = function
             (* Try left side first, then right *)
             prerr_endline (prefix ^ "Checking conjunction...\n");
             (* Apply substitution to both sides *)
+            prerr_endline
+              (prefix
+               ^ "Applying substitution with "
+               ^ string_of_int (List.length subst)
+               ^ " bindings...\n");
             let lhs_subst = apply_subst lhs in
+            prerr_endline (prefix ^ "Substitution applied\n");
             let rhs_subst = apply_subst rhs in
             let lhs_str = Pp.plain (IT.pp lhs) in
             prerr_endline (prefix ^ "LHS: " ^ lhs_str ^ "\n");
