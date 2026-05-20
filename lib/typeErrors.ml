@@ -543,10 +543,13 @@ let pp_message = function
       let evaluate it = try Solver.eval model_val it with _ -> None in
       (* Depth-first search: print as we explore, find first atomic failure *)
       let rec explore_failure ~(depth : int) ~(subst : (Sym.t * IT.t) list) (it : IT.t) =
-        let (IT.IT (term, _bt, _loc)) = it in
-        (* Helper to apply substitution to a term *)
-        let apply_subst t =
-          match subst with [] -> t | _ -> IT.subst (IT.make_subst subst) t
+        let (IT.IT (term, bt, loc)) = it in
+        (* Helper to wrap a term in accumulated let bindings *)
+        let wrap_in_lets t =
+          List.fold_right
+            (fun (name, value) body -> IT.IT (IT.Let ((name, value), body), bt, loc))
+            subst
+            t
         in
         let prefix = "depth: " ^ string_of_int depth ^ " " in
         if depth > 20 then (
@@ -567,8 +570,8 @@ let pp_message = function
                   in
                   prerr_endline
                     (prefix ^ "Expanding: " ^ Sym.pp_string f ^ "(" ^ args_str ^ ")\n");
-                  (* Recurse into the body - reset subst since function body is new scope *)
-                  explore_failure ~depth:(depth + 1) ~subst:[] body
+                  (* Recurse into the body - keep subst since arguments may reference outer variables *)
+                  explore_failure ~depth:(depth + 1) ~subst body
                 | None ->
                   (* Can't expand - check if it's false *)
                   (match evaluate it with
@@ -584,11 +587,9 @@ let pp_message = function
                   Some it
                 | _ -> None))
           | IT.Let ((name, body_val), rest) ->
-            (* Let binding - just accumulate symbolically, don't evaluate *)
+            (* Let binding - accumulate without substitution *)
             prerr_endline (prefix ^ "Let " ^ Sym.pp_string name ^ " = ...\n");
-            let body_subst = apply_subst body_val in
-            (* Store symbolically - evaluation only happens at atomic constraints *)
-            explore_failure ~depth:(depth + 1) ~subst:((name, body_subst) :: subst) rest
+            explore_failure ~depth:(depth + 1) ~subst:((name, body_val) :: subst) rest
           | IT.Binop (And, lhs, rhs) ->
             (* Explore structurally: try left, if not found try right *)
             prerr_endline (prefix ^ "Conjunction: exploring LHS\n");
@@ -599,9 +600,13 @@ let pp_message = function
                explore_failure ~depth:(depth + 1) ~subst rhs)
           | IT.Binop (Implies, lhs, rhs) ->
             (* Implication: need to check premise to decide branch *)
-            prerr_endline (prefix ^ "Implication: checking premise\n");
-            let lhs_subst = apply_subst lhs in
-            (match evaluate lhs_subst with
+            prerr_endline
+              (prefix
+               ^ "Implication: checking premise (wrapped): "
+               ^ Pp.plain (IT.pp (wrap_in_lets lhs))
+               ^ "\n");
+            let lhs_wrapped = wrap_in_lets lhs in
+            (match evaluate lhs_wrapped with
              | Some (IT.IT (Const (Bool true), _, _)) ->
                prerr_endline (prefix ^ "Implication: premise true, exploring conclusion\n");
                explore_failure ~depth:(depth + 1) ~subst rhs
@@ -613,9 +618,13 @@ let pp_message = function
                None)
           | IT.ITE (cond, ifT, ifF) ->
             (* Check condition, follow appropriate branch *)
-            prerr_endline (prefix ^ "ITE: evaluating condition...\n");
-            let cond_subst = apply_subst cond in
-            (match evaluate cond_subst with
+            prerr_endline
+              (prefix
+               ^ "ITE: evaluating condition (wrapped): "
+               ^ Pp.plain (IT.pp (wrap_in_lets cond))
+               ^ "\n");
+            let cond_wrapped = wrap_in_lets cond in
+            (match evaluate cond_wrapped with
              | Some (IT.IT (Const (Bool true), _, _)) ->
                prerr_endline (prefix ^ "ITE: condition TRUE, checking then branch\n");
                explore_failure ~depth:(depth + 1) ~subst ifT
@@ -648,11 +657,19 @@ let pp_message = function
             (* Literal true - not a failure *)
             None
           | _ ->
-            (* Atomic constraint - substitute and evaluate *)
-            let it_subst = apply_subst it in
+            (* Atomic constraint - wrap in lets and evaluate *)
             prerr_endline
-              (prefix ^ "Evaluating atomic constraint: " ^ Pp.plain (IT.pp it) ^ "\n");
-            (match evaluate it_subst with
+              (prefix
+               ^ "Current subst length: "
+               ^ string_of_int (List.length subst)
+               ^ "\n");
+            let it_wrapped = wrap_in_lets it in
+            prerr_endline
+              (prefix
+               ^ "Evaluating atomic constraint (wrapped): "
+               ^ Pp.plain (IT.pp it_wrapped)
+               ^ "\n");
+            (match evaluate it_wrapped with
              | Some (IT.IT (Const (Bool false), _, _)) ->
                prerr_endline (prefix ^ "Atomic constraint evaluates to FALSE\n");
                Some it
