@@ -584,81 +584,32 @@ let pp_message = function
                   Some it
                 | _ -> None))
           | IT.Let ((name, body_val), rest) ->
-            (* Let binding - try to evaluate once and cache the concrete value *)
+            (* Let binding - just accumulate symbolically, don't evaluate *)
             prerr_endline (prefix ^ "Let " ^ Sym.pp_string name ^ " = ...\n");
             let body_subst = apply_subst body_val in
-            (* Try to evaluate to get a concrete value from the model *)
-            (match evaluate body_subst with
-             | Some concrete_val ->
-               prerr_endline (prefix ^ "Let binding evaluated to concrete value\n");
-               (* Store the concrete value - much cheaper to substitute later *)
-               explore_failure
-                 ~depth:(depth + 1)
-                 ~subst:((name, concrete_val) :: subst)
-                 rest
-             | None ->
-               prerr_endline (prefix ^ "Let binding unevaluated, storing symbolic\n");
-               (* Can't evaluate - store symbolically *)
-               explore_failure
-                 ~depth:(depth + 1)
-                 ~subst:((name, body_subst) :: subst)
-                 rest)
+            (* Store symbolically - evaluation only happens at atomic constraints *)
+            explore_failure ~depth:(depth + 1) ~subst:((name, body_subst) :: subst) rest
           | IT.Binop (And, lhs, rhs) ->
-            (* Try left side first, then right *)
-            prerr_endline (prefix ^ "Checking conjunction...\n");
-            let lhs_str = Pp.plain (IT.pp lhs) in
-            prerr_endline (prefix ^ "LHS: " ^ lhs_str ^ "\n");
-            (* Try to evaluate to determine which side fails, but with a size check *)
-            let lhs_size = String.length lhs_str in
-            if lhs_size < 500 then (
-              prerr_endline
-                (prefix
-                 ^ "LHS is small ("
-                 ^ string_of_int lhs_size
-                 ^ " chars), trying to evaluate\n");
-              let lhs_subst = apply_subst lhs in
-              match evaluate lhs_subst with
-              | Some (IT.IT (Const (Bool false), _, _)) ->
-                prerr_endline (prefix ^ "LHS evaluates to FALSE\n");
-                explore_failure ~depth:(depth + 1) ~subst lhs
-              | Some (IT.IT (Const (Bool true), _, _)) ->
-                prerr_endline (prefix ^ "LHS evaluates to TRUE, checking RHS\n");
-                let rhs_str = Pp.plain (IT.pp rhs) in
-                prerr_endline (prefix ^ "RHS: " ^ rhs_str ^ "\n");
-                explore_failure ~depth:(depth + 1) ~subst rhs
-              | _ ->
-                prerr_endline
-                  (prefix ^ "LHS evaluates to UNKNOWN, exploring structurally\n");
-                (match explore_failure ~depth:(depth + 1) ~subst lhs with
-                 | Some _ as result -> result
-                 | None ->
-                   let rhs_str = Pp.plain (IT.pp rhs) in
-                   prerr_endline (prefix ^ "RHS: " ^ rhs_str ^ "\n");
-                   explore_failure ~depth:(depth + 1) ~subst rhs))
-            else (
-              prerr_endline
-                (prefix
-                 ^ "LHS is large ("
-                 ^ string_of_int lhs_size
-                 ^ " chars), exploring structurally\n");
-              match explore_failure ~depth:(depth + 1) ~subst lhs with
-              | Some _ as result -> result
-              | None ->
-                let rhs_str = Pp.plain (IT.pp rhs) in
-                prerr_endline (prefix ^ "RHS: " ^ rhs_str ^ "\n");
-                explore_failure ~depth:(depth + 1) ~subst rhs)
+            (* Explore structurally: try left, if not found try right *)
+            prerr_endline (prefix ^ "Conjunction: exploring LHS\n");
+            (match explore_failure ~depth:(depth + 1) ~subst lhs with
+             | Some _ as result -> result
+             | None ->
+               prerr_endline (prefix ^ "Conjunction: LHS OK, exploring RHS\n");
+               explore_failure ~depth:(depth + 1) ~subst rhs)
           | IT.Binop (Implies, lhs, rhs) ->
-            (* Check if lhs is true, then explore rhs *)
+            (* Implication: need to check premise to decide branch *)
+            prerr_endline (prefix ^ "Implication: checking premise\n");
             let lhs_subst = apply_subst lhs in
             (match evaluate lhs_subst with
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (prefix ^ "Implication: premise true, checking conclusion\n");
+               prerr_endline (prefix ^ "Implication: premise true, exploring conclusion\n");
                explore_failure ~depth:(depth + 1) ~subst rhs
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "Implication: premise false, OK\n");
+               prerr_endline (prefix ^ "Implication: premise false, vacuously true\n");
                None
              | _ ->
-               prerr_endline (prefix ^ "Implication: premise unknown\n");
+               prerr_endline (prefix ^ "Implication: premise unknown, cannot determine\n");
                None)
           | IT.ITE (cond, ifT, ifF) ->
             (* Check condition, follow appropriate branch *)
@@ -684,17 +635,23 @@ let pp_message = function
              | Some _value ->
                prerr_endline
                  (prefix ^ "Match: scrutinee evaluated, trying to find matching branch\n");
-               (* Try each branch - we don't have pattern matching logic here,
-                  so try all branches and see which one doesn't fail *)
+               (* Try each branch - skip branches with literal false bodies (impossible patterns) *)
                let rec try_branches = function
                  | [] ->
                    prerr_endline (prefix ^ "Match: no branches matched\n");
                    None
                  | (_pattern, body) :: rest ->
-                   prerr_endline (prefix ^ "Match: trying branch...\n");
-                   (match explore_failure ~depth:(depth + 1) ~subst body with
-                    | Some _ as result -> result
-                    | None -> try_branches rest)
+                   let (IT.IT (body_term, _, _)) = body in
+                   (match body_term with
+                    | IT.Const (Bool false) ->
+                      prerr_endline
+                        (prefix ^ "Match: skipping branch with literal false\n");
+                      try_branches rest
+                    | _ ->
+                      prerr_endline (prefix ^ "Match: trying branch...\n");
+                      (match explore_failure ~depth:(depth + 1) ~subst body with
+                       | Some _ as result -> result
+                       | None -> try_branches rest))
                in
                try_branches branches
              | None ->
@@ -702,20 +659,40 @@ let pp_message = function
                let rec try_branches = function
                  | [] -> None
                  | (_pattern, body) :: rest ->
-                   (match explore_failure ~depth:(depth + 1) ~subst body with
-                    | Some _ as result -> result
-                    | None -> try_branches rest)
+                   let (IT.IT (body_term, _, _)) = body in
+                   (match body_term with
+                    | IT.Const (Bool false) ->
+                      prerr_endline
+                        (prefix ^ "Match: skipping branch with literal false\n");
+                      try_branches rest
+                    | _ ->
+                      (match explore_failure ~depth:(depth + 1) ~subst body with
+                       | Some _ as result -> result
+                       | None -> try_branches rest))
                in
                try_branches branches)
+          | IT.Const (Bool false) ->
+            (* Literal false - this is the failure *)
+            prerr_endline (prefix ^ "Failed: false (literal)\n");
+            Some it
+          | IT.Const (Bool true) ->
+            (* Literal true - not a failure *)
+            None
           | _ ->
-            (* Atomic constraint - check if it's false *)
+            (* Atomic constraint - substitute and evaluate *)
             let it_subst = apply_subst it in
+            prerr_endline
+              (prefix ^ "Evaluating atomic constraint: " ^ Pp.plain (IT.pp it) ^ "\n");
             (match evaluate it_subst with
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
-               (* Return the original term (will be substituted if needed for display) *)
+               prerr_endline (prefix ^ "Atomic constraint evaluates to FALSE\n");
                Some it
-             | _ -> None))
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (prefix ^ "Atomic constraint evaluates to TRUE\n");
+               None
+             | _ ->
+               prerr_endline (prefix ^ "Atomic constraint evaluation UNKNOWN\n");
+               None))
       in
       let failing_constraint =
         match constr with
