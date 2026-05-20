@@ -2576,20 +2576,25 @@ let record_globals : 'bty. (Sym.t * 'bty Mu.globs) list -> LC.t list m =
          let ptr = sym_ (sym, bt, here) in
          let hasAllocId = LC.T (IT.hasAllocId_ ptr here) in
          let range =
-           if !IT.use_vip then
-             let module H = Alloc.History in
-             let H.{ base; size } = H.(split (lookup_ptr ptr here) here) in
-             let addr = addr_ ptr here in
-             let upper = IT.upper_bound addr ct here in
-             let bounds =
-               and_
-                 [ le_ (base, addr) here;
-                   le_ (addr, upper) here;
-                   le_ (upper, add_ (base, size) here) here
-                 ]
-                 here
-             in
-             [ LC.T bounds ]
+           if !IT.use_vip then (
+             try
+               let module H = Alloc.History in
+               let H.{ base; size } = H.(split (lookup_ptr ptr here) here) in
+               let addr = addr_ ptr here in
+               let upper = IT.upper_bound addr ct here in
+               let bounds =
+                 and_
+                   [ le_ (base, addr) here;
+                     le_ (addr, upper) here;
+                     le_ (upper, add_ (base, size) here) here
+                   ]
+                   here
+               in
+               [ LC.T bounds ]
+             with
+             | Assert_failure _ ->
+               (* Skip bounds check for incomplete types (e.g., extern arrays with unknown size) *)
+               [])
            else
              []
          in
