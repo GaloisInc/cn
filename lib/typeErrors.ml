@@ -600,7 +600,14 @@ let pp_message = function
             prerr_endline (prefix ^ "Checking conjunction...\n");
             let lhs_str = Pp.plain (IT.pp lhs) in
             prerr_endline (prefix ^ "LHS: " ^ lhs_str ^ "\n");
-            (match evaluate_with_ctx lhs with
+            prerr_endline
+              (prefix
+               ^ "Wrapping LHS in "
+               ^ string_of_int (List.length let_ctx)
+               ^ " let bindings...\n");
+            let wrapped_lhs = wrap_in_lets lhs in
+            prerr_endline (prefix ^ "Evaluating wrapped LHS...\n");
+            (match evaluate wrapped_lhs with
              | Some (IT.IT (Const (Bool false), _, _)) ->
                prerr_endline (prefix ^ "LHS evaluates to FALSE\n");
                explore_failure ~depth:(depth + 1) ~let_ctx lhs
