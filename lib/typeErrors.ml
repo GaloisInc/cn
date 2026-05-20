@@ -544,6 +544,7 @@ let pp_message = function
       (* Depth-first search: print as we explore, find first atomic failure *)
       let rec explore_failure ~(depth : int) ~(subst : (Sym.t * IT.t) list) (it : IT.t) =
         let (IT.IT (term, _bt, _loc)) = it in
+        let prefix = String.make (depth * 2) ' ' in
         if depth > 20 then (* Prevent infinite loops *)
           None
         else (
@@ -554,6 +555,7 @@ let pp_message = function
              | Some def ->
                (match Definition.Function.try_open def args with
                 | Some body ->
+                  prerr_endline (prefix ^ "Expanding: " ^ Sym.pp_string f);
                   (* Recurse into the body - keep subst since arguments may reference outer variables *)
                   explore_failure ~depth:(depth + 1) ~subst body
                 | None ->
@@ -568,6 +570,7 @@ let pp_message = function
                 | _ -> None))
           | IT.Let ((name, body_val), rest) ->
             (* Let binding - substitute known values, evaluate to get concrete value *)
+            prerr_endline (prefix ^ "Let " ^ Sym.pp_string name);
             let body_subst =
               match subst with
               | [] -> body_val
@@ -589,45 +592,100 @@ let pp_message = function
                  rest)
           | IT.Binop (And, lhs, rhs) ->
             (* Explore structurally: try left, if not found try right *)
+            prerr_endline (prefix ^ "And: trying LHS");
             (match explore_failure ~depth:(depth + 1) ~subst lhs with
-             | Some _ as result -> result
-             | None -> explore_failure ~depth:(depth + 1) ~subst rhs)
+             | Some _ as result ->
+               prerr_endline (prefix ^ "And: LHS failed");
+               result
+             | None ->
+               prerr_endline (prefix ^ "And: LHS OK, trying RHS");
+               explore_failure ~depth:(depth + 1) ~subst rhs)
           | IT.Binop (Implies, lhs, rhs) ->
             (* Implication: substitute known values in premise, then evaluate *)
+            prerr_endline (prefix ^ "Implies: checking premise");
             let lhs_subst =
               match subst with [] -> lhs | _ -> IT.subst (IT.make_subst subst) lhs
             in
             (match evaluate lhs_subst with
              | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (prefix ^ "Implies: premise true, checking conclusion");
                explore_failure ~depth:(depth + 1) ~subst rhs
-             | Some (IT.IT (Const (Bool false), _, _)) -> None
-             | _ -> None)
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (prefix ^ "Implies: premise false, vacuous");
+               None
+             | _ ->
+               prerr_endline (prefix ^ "Implies: premise unknown");
+               None)
           | IT.ITE (cond, ifT, ifF) ->
             (* Substitute known values in condition, then evaluate to pick branch *)
+            prerr_endline (prefix ^ "ITE: evaluating condition");
             let cond_subst =
               match subst with [] -> cond | _ -> IT.subst (IT.make_subst subst) cond
             in
             (match evaluate cond_subst with
              | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (prefix ^ "ITE: true branch");
                explore_failure ~depth:(depth + 1) ~subst ifT
              | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (prefix ^ "ITE: false branch");
                explore_failure ~depth:(depth + 1) ~subst ifF
              | _ ->
+               prerr_endline (prefix ^ "ITE: unknown, trying both");
                (* Condition unknown - try both branches *)
                (match explore_failure ~depth:(depth + 1) ~subst ifT with
                 | Some _ as result -> result
                 | None -> explore_failure ~depth:(depth + 1) ~subst ifF))
-          | IT.Match (_scrutinee, _branches) ->
-            (* Match - treat as atomic, substitute and evaluate *)
-            let it_subst =
-              match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
+          | IT.Match (scrutinee, branches) ->
+            (* Match - try to evaluate scrutinee and explore matching branch *)
+            prerr_endline (prefix ^ "Match on: " ^ Pp.plain (IT.pp scrutinee));
+            let scrutinee_subst =
+              match subst with [] -> scrutinee | _ -> IT.subst (IT.make_subst subst) scrutinee
             in
-            (match evaluate it_subst with
-             | Some (IT.IT (Const (Bool false), _, _)) -> Some it
-             | Some (IT.IT (Const (Bool true), _, _)) -> None
-             | _ -> None)
-          | IT.Const (Bool false) -> Some it
-          | IT.Const (Bool true) -> None
+            let scrutinee_simp = Simplify.IndexTerms.simp (Simplify.default context.global) scrutinee_subst in
+            prerr_endline (prefix ^ "Match scrutinee simplified: " ^ Pp.plain (IT.pp scrutinee_simp));
+            (* Try to find matching branch based on scrutinee *)
+            (match IT.get_term scrutinee_simp with
+             | IT.Constructor (ctor, _args) ->
+               (* Scrutinee is a concrete constructor - find matching branch *)
+               prerr_endline (prefix ^ "Match scrutinee is constructor: " ^ Pp.plain (Sym.pp ctor));
+               let matching_branch =
+                 List.find_opt
+                   (fun (pat, _body) ->
+                     match pat with
+                     | IT.Pat (IT.PConstructor (pat_ctor, _), _, _) -> Sym.equal ctor pat_ctor
+                     | IT.Pat (IT.PWild, _, _) -> true
+                     | _ -> false)
+                   branches
+               in
+               (match matching_branch with
+                | Some (_pat, body) ->
+                  prerr_endline (prefix ^ "Match: exploring matching branch");
+                  explore_failure ~depth:(depth + 1) ~subst body
+                | None ->
+                  prerr_endline (prefix ^ "Match: no matching branch found");
+                  None)
+             | _ ->
+               (* Scrutinee is not a concrete constructor - treat whole match as atomic *)
+               prerr_endline (prefix ^ "Match scrutinee is not concrete");
+               let it_subst =
+                 match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
+               in
+               (match evaluate it_subst with
+                | Some (IT.IT (Const (Bool false), _, _)) ->
+                  prerr_endline (prefix ^ "Match evaluates to FALSE");
+                  Some it
+                | Some (IT.IT (Const (Bool true), _, _)) ->
+                  prerr_endline (prefix ^ "Match evaluates to TRUE");
+                  None
+                | _ ->
+                  prerr_endline (prefix ^ "Match unknown (" ^ string_of_int (List.length branches) ^ " branches)");
+                  None))
+          | IT.Const (Bool false) ->
+            prerr_endline (prefix ^ "Literal false");
+            Some it
+          | IT.Const (Bool true) ->
+            prerr_endline (prefix ^ "Literal true");
+            None
           | _ ->
             (* Atomic constraint - substitute concrete values, simplify, then evaluate *)
             let it_subst =
@@ -637,10 +695,17 @@ let pp_message = function
             let it_simplified =
               Simplify.IndexTerms.simp (Simplify.default context.global) it_subst
             in
+            prerr_endline (prefix ^ "Atomic: " ^ Pp.plain (IT.pp it_simplified));
             (match evaluate it_simplified with
-             | Some (IT.IT (Const (Bool false), _, _)) -> Some it
-             | Some (IT.IT (Const (Bool true), _, _)) -> None
-             | _ -> None))
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (prefix ^ "  -> FALSE");
+               Some it
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (prefix ^ "  -> TRUE");
+               None
+             | _ ->
+               prerr_endline (prefix ^ "  -> UNKNOWN");
+               None))
       in
       let failing_constraint =
         match constr with

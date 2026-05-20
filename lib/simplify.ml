@@ -196,6 +196,50 @@ module IndexTerms = struct
       match f it with None -> it | Some it3 -> accessor_reduce f it3)
 
 
+  (* Try to match a term against patterns and return the matching branch body *)
+  let rec try_match_pattern scrutinee branches =
+    match branches with
+    | [] -> None
+    | (pat, body) :: rest ->
+      (match try_match_single_pattern scrutinee pat with
+       | Some subst ->
+         (* Pattern matched - substitute bound variables in body *)
+         Some (IT.subst (IT.make_subst subst) body)
+       | None -> try_match_pattern scrutinee rest)
+
+
+  (* Try to match a term against a single pattern, return substitution if match *)
+  and try_match_single_pattern (term : IT.t) (pat : BT.t IT.pattern) : (Sym.t * IT.t) list option
+    =
+    let (IT.Pat (pat_, _pat_bt, _)) = pat in
+    match pat_ with
+    | PSym s -> Some [ (s, term) ]
+    | PWild -> Some []
+    | PConstructor (ctor, arg_pats) ->
+      (match IT.get_term term with
+       | Constructor (ctor', arg_terms) when Sym.equal ctor ctor' ->
+         (* Try to match all arguments *)
+         (match
+            List.fold_left2
+              (fun acc_opt (id, arg_pat) (id', arg_term) ->
+                match acc_opt with
+                | None -> None
+                | Some acc ->
+                  if Id.equal id id' then
+                    match try_match_single_pattern arg_term arg_pat with
+                    | Some bindings -> Some (bindings @ acc)
+                    | None -> None
+                  else
+                    None)
+              (Some [])
+              arg_pats
+              arg_terms
+          with
+          | Some bindings -> Some bindings
+          | None -> None)
+       | _ -> None)
+
+
   let num_lit_norm bt z =
     match bt with
     | BT.Bits (sign, sz) -> IT.num_lit_ (BT.normalise_to_range (sign, sz) z) bt
@@ -686,6 +730,17 @@ module IndexTerms = struct
           match Definition.Function.try_open def args with
           | Some inlined -> aux inlined
           | None -> t)
+      | Match (scrutinee, branches) ->
+        let scrutinee' = aux scrutinee in
+        (* Try to match scrutinee against patterns and simplify to the branch body *)
+        (match try_match_pattern scrutinee' branches with
+         | Some body -> aux body
+         | None ->
+           (* Can't simplify, reconstruct with simplified scrutinee and branches *)
+           let branches' =
+             List.map (fun (pat, body) -> (pat, aux body)) branches
+           in
+           IT (Match (scrutinee', branches'), the_bt, the_loc))
       | _ ->
         (* FIXME: it's problematic that some term shapes aren't even explored *)
         it
