@@ -537,139 +537,119 @@ let pp_message = function
         | None -> !^"Constraint from" ^^^ !^head ^/^ !^pos
         | Some descr -> !^"Constraint from" ^^^ !^descr ^^^ !^head ^/^ !^pos
       in
-      (* Try to identify failing conjuncts *)
+      (* Depth-first search for failing constraint with immediate output *)
       let context, _log = ctxt in
       let model_val, _quantifier = model in
       let evaluate it = Solver.eval model_val it in
-      (* Recursively expand and collect (atomic_constraint, chain) pairs *)
-      let rec expand_and_collect
-                (chain : (Sym.t * IT.t list) list)
-                (IT.IT (term, bt, loc) as it)
-        : (IT.t * (Sym.t * IT.t list) list) list
-        =
-        match term with
-        | IT.Apply (f, args) ->
-          (* Try to expand this function application *)
-          (match Sym.Map.find_opt f context.global.logical_functions with
-           | Some def ->
-             (match Definition.Function.try_open def args with
-              | Some body ->
-                (* Add this function to the chain and recursively expand *)
-                let new_chain = (f, args) :: chain in
-                expand_and_collect new_chain body
-              | None -> [ (it, List.rev chain) ])
-           | None -> [ (it, List.rev chain) ])
-        | IT.Binop (And, lhs, rhs) ->
-          (* For And, collect from both sides *)
-          List.append (expand_and_collect chain lhs) (expand_and_collect chain rhs)
-        | IT.Binop (op, lhs, rhs) ->
-          (* For other binops, this is an atomic constraint *)
-          let lhs_results = expand_and_collect chain lhs in
-          let rhs_results = expand_and_collect chain rhs in
-          (* If either side had expansions, we need to reconstruct *)
-          (match (lhs_results, rhs_results) with
-           | [ (lhs_exp, _) ], [ (rhs_exp, _) ] ->
-             [ (IT.IT (IT.Binop (op, lhs_exp, rhs_exp), bt, loc), List.rev chain) ]
-           | _ ->
-             (* Complex case - just return the original *)
-             [ (it, List.rev chain) ])
-        | _ ->
-          (* Other terms are atomic *)
-          [ (it, List.rev chain) ]
+      (* Depth-first search: print as we explore, find first atomic failure *)
+      let rec explore_failure ~depth (IT.IT (term, _bt, _loc) as it) =
+        let indent = String.make (depth * 2) ' ' in
+        if depth > 20 then (
+          (* Prevent infinite loops *)
+          prerr_endline (indent ^ "(max depth reached)\n");
+          None)
+        else (
+          match term with
+          | IT.Apply (f, args) ->
+            (* Try to expand this function *)
+            (match Sym.Map.find_opt f context.global.logical_functions with
+             | Some def ->
+               (match Definition.Function.try_open def args with
+                | Some body ->
+                  (* Print what we're expanding *)
+                  let args_str =
+                    String.concat ", " (List.map (fun arg -> Pp.plain (IT.pp arg)) args)
+                  in
+                  prerr_endline
+                    (indent ^ "Expanding: " ^ Sym.pp_string f ^ "(" ^ args_str ^ ")\n");
+                  (* Recurse into the body *)
+                  explore_failure ~depth:(depth + 1) body
+                | None ->
+                  (* Can't expand - check if it's false *)
+                  (match evaluate it with
+                   | Some (IT.IT (Const (Bool false), _, _)) ->
+                     prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+                     Some it
+                   | _ -> None))
+             | None ->
+               (* Not a function - check if it's false *)
+               (match evaluate it with
+                | Some (IT.IT (Const (Bool false), _, _)) ->
+                  prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+                  Some it
+                | _ -> None))
+          | IT.Binop (And, lhs, rhs) ->
+            (* Try left side first, then right *)
+            prerr_endline (indent ^ "Checking conjunction...\n");
+            (match evaluate lhs with
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (indent ^ "  Left side fails\n");
+               explore_failure ~depth:(depth + 1) lhs
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (indent ^ "  Left side OK, checking right\n");
+               (match evaluate rhs with
+                | Some (IT.IT (Const (Bool false), _, _)) ->
+                  explore_failure ~depth:(depth + 1) rhs
+                | _ -> None)
+             | _ ->
+               (* Unknown - try exploring both *)
+               prerr_endline (indent ^ "  Left side unknown, checking it\n");
+               (match explore_failure ~depth:(depth + 1) lhs with
+                | Some _ as result -> result
+                | None -> explore_failure ~depth:(depth + 1) rhs))
+          | IT.Binop (Implies, lhs, rhs) ->
+            (* Check if lhs is true, then explore rhs *)
+            (match evaluate lhs with
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (indent ^ "Implication: premise true, checking conclusion\n");
+               explore_failure ~depth:(depth + 1) rhs
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (indent ^ "Implication: premise false, OK\n");
+               None
+             | _ ->
+               prerr_endline (indent ^ "Implication: premise unknown\n");
+               None)
+          | IT.ITE (cond, ifT, ifF) ->
+            (* Check condition, follow appropriate branch *)
+            (match evaluate cond with
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (indent ^ "ITE: condition true, checking then branch\n");
+               explore_failure ~depth:(depth + 1) ifT
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (indent ^ "ITE: condition false, checking else branch\n");
+               explore_failure ~depth:(depth + 1) ifF
+             | _ ->
+               prerr_endline (indent ^ "ITE: condition unknown\n");
+               None)
+          | _ ->
+            (* Atomic constraint - check if it fails *)
+            (match evaluate it with
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+               Some it
+             | _ -> None))
       in
-      let expanded_pairs =
-        match constr with LC.T it -> expand_and_collect [] it | _ -> []
-      in
-      (* Build a map from expanded terms to their chains *)
-      let chain_map = Hashtbl.create 16 in
-      List.iter (fun (term, chain) -> Hashtbl.add chain_map term chain) expanded_pairs;
-      (* Also simplify normally for the existing logic *)
-      let rec expand_term (IT.IT (term, bt, loc) as it) =
-        match term with
-        | IT.Apply (f, args) ->
-          (match Sym.Map.find_opt f context.global.logical_functions with
-           | Some def ->
-             (match Definition.Function.try_open def args with
-              | Some body -> expand_term body
-              | None -> it)
-           | None -> it)
-        | IT.Binop (op, lhs, rhs) ->
-          IT.IT (IT.Binop (op, expand_term lhs, expand_term rhs), bt, loc)
-        | IT.Unop (op, arg) -> IT.IT (IT.Unop (op, expand_term arg), bt, loc)
-        | IT.ITE (cond, t, f) ->
-          IT.IT (IT.ITE (expand_term cond, expand_term t, expand_term f), bt, loc)
-        | _ -> it
-      in
-      let expanded_constr =
-        match constr with LC.T it -> LC.T (expand_term it) | _ -> constr
-      in
-      let simplified = Explain.simp_constraint evaluate expanded_constr in
-      (* Separate constraints that evaluate to false vs unknown *)
-      let is_false lc =
-        match lc with
+      let failing_constraint =
+        match constr with
         | LC.T it ->
-          (match evaluate it with
-           | Some (IT.IT (Const (Bool false), _, _)) -> true
-           | _ -> false)
-        | _ -> false
+          prerr_endline "\n=== Exploring constraint failure ===\n";
+          explore_failure ~depth:0 it
+        | _ -> None
       in
-      let is_unknown lc =
-        match lc with
-        | LC.T it ->
-          (match evaluate it with
-           | Some (IT.IT (Const (Bool true), _, _)) -> false
-           | Some (IT.IT (Const (Bool false), _, _)) -> false
-           | _ -> true)
-        | _ -> true
-      in
-      let false_conjuncts = List.filter is_false simplified in
-      let unknown_conjuncts = List.filter is_unknown simplified in
-      let total = List.length simplified in
-      (* Format a conjunct with its expansion chain *)
-      let pp_conjunct_with_chain lc =
-        let chain_doc =
-          match lc with
-          | LC.T it ->
-            (match Hashtbl.find_opt chain_map it with
-             | None | Some [] -> empty
-             | Some chain ->
-               let pp_step (f, args) =
-                 !^"    via:"
-                 ^^^ Sym.pp f
-                 ^^ parens (flow (comma ^^ break 1) (List.map IT.pp args))
-               in
-               hardline ^^ separate hardline (List.map pp_step chain))
-          | _ -> empty
-        in
-        !^"  " ^^ LC.pp lc ^^ chain_doc
-      in
-      let doc_with_conjuncts =
-        match (false_conjuncts, unknown_conjuncts, total) with
-        | [], _, 1 ->
-          (* Single constraint, no simplification *)
-          base_doc
-        | [ one ], _, _ ->
-          (* One definitely false conjunct *)
+      let doc_with_details =
+        match failing_constraint with
+        | Some failed_it ->
           base_doc
           ^^ hardline
-          ^^ !^"Specifically:"
+          ^^ !^"Failing constraint:"
           ^^ hardline
-          ^^ pp_conjunct_with_chain one
-        | many, _, _ when List.length many > 1 && List.length many < total ->
-          (* Multiple false conjuncts, but not all *)
-          base_doc
-          ^^ hardline
-          ^^ !^"Failing conjuncts:"
-          ^^ hardline
-          ^^ separate hardline (List.map pp_conjunct_with_chain many)
-        | [], unknowns, _ when List.length unknowns > 1 && List.length unknowns = total ->
-          (* Multiple conjuncts but can't tell which failed *)
-          base_doc ^^ hardline ^^ !^"(constraint has" ^^^ int total ^^^ !^"conjuncts)"
-        | _ -> base_doc
+          ^^ !^"  "
+          ^^ IT.pp failed_it
+        | None -> base_doc
       in
       match RequestChain.pp requests with
-      | Some doc2 -> doc_with_conjuncts ^^ hardline ^^ doc2
-      | None -> doc_with_conjuncts
+      | Some doc2 -> doc_with_details ^^ hardline ^^ doc2
+      | None -> doc_with_details
     in
     { short; descr = Some descr; state = Some state }
   | Undefined_behaviour { ub; ctxt; model } ->
