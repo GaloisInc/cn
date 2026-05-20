@@ -209,7 +209,8 @@ module IndexTerms = struct
 
 
   (* Try to match a term against a single pattern, return substitution if match *)
-  and try_match_single_pattern (term : IT.t) (pat : BT.t IT.pattern) : (Sym.t * IT.t) list option
+  and try_match_single_pattern (term : IT.t) (pat : BT.t IT.pattern)
+    : (Sym.t * IT.t) list option
     =
     let (IT.Pat (pat_, _pat_bt, _)) = pat in
     match pat_ with
@@ -222,15 +223,15 @@ module IndexTerms = struct
          (match
             List.fold_left2
               (fun acc_opt (id, arg_pat) (id', arg_term) ->
-                match acc_opt with
-                | None -> None
-                | Some acc ->
-                  if Id.equal id id' then
-                    match try_match_single_pattern arg_term arg_pat with
-                    | Some bindings -> Some (bindings @ acc)
-                    | None -> None
-                  else
-                    None)
+                 match acc_opt with
+                 | None -> None
+                 | Some acc ->
+                   if Id.equal id id' then (
+                     match try_match_single_pattern arg_term arg_pat with
+                     | Some bindings -> Some (bindings @ acc)
+                     | None -> None)
+                   else
+                     None)
               (Some [])
               arg_pats
               arg_terms
@@ -737,9 +738,7 @@ module IndexTerms = struct
          | Some body -> aux body
          | None ->
            (* Can't simplify, reconstruct with simplified scrutinee and branches *)
-           let branches' =
-             List.map (fun (pat, body) -> (pat, aux body)) branches
-           in
+           let branches' = List.map (fun (pat, body) -> (pat, aux body)) branches in
            IT (Match (scrutinee', branches'), the_bt, the_loc))
       | _ ->
         (* FIXME: it's problematic that some term shapes aren't even explored *)

@@ -639,22 +639,29 @@ let pp_message = function
             (* Match - try to evaluate scrutinee and explore matching branch *)
             prerr_endline (prefix ^ "Match on: " ^ Pp.plain (IT.pp scrutinee));
             let scrutinee_subst =
-              match subst with [] -> scrutinee | _ -> IT.subst (IT.make_subst subst) scrutinee
+              match subst with
+              | [] -> scrutinee
+              | _ -> IT.subst (IT.make_subst subst) scrutinee
             in
-            let scrutinee_simp = Simplify.IndexTerms.simp (Simplify.default context.global) scrutinee_subst in
-            prerr_endline (prefix ^ "Match scrutinee simplified: " ^ Pp.plain (IT.pp scrutinee_simp));
+            let scrutinee_simp =
+              Simplify.IndexTerms.simp (Simplify.default context.global) scrutinee_subst
+            in
+            prerr_endline
+              (prefix ^ "Match scrutinee simplified: " ^ Pp.plain (IT.pp scrutinee_simp));
             (* Try to find matching branch based on scrutinee *)
             (match IT.get_term scrutinee_simp with
              | IT.Constructor (ctor, _args) ->
                (* Scrutinee is a concrete constructor - find matching branch *)
-               prerr_endline (prefix ^ "Match scrutinee is constructor: " ^ Pp.plain (Sym.pp ctor));
+               prerr_endline
+                 (prefix ^ "Match scrutinee is constructor: " ^ Pp.plain (Sym.pp ctor));
                let matching_branch =
                  List.find_opt
                    (fun (pat, _body) ->
-                     match pat with
-                     | IT.Pat (IT.PConstructor (pat_ctor, _), _, _) -> Sym.equal ctor pat_ctor
-                     | IT.Pat (IT.PWild, _, _) -> true
-                     | _ -> false)
+                      match pat with
+                      | IT.Pat (IT.PConstructor (pat_ctor, _), _, _) ->
+                        Sym.equal ctor pat_ctor
+                      | IT.Pat (IT.PWild, _, _) -> true
+                      | _ -> false)
                    branches
                in
                (match matching_branch with
@@ -678,7 +685,11 @@ let pp_message = function
                   prerr_endline (prefix ^ "Match evaluates to TRUE");
                   None
                 | _ ->
-                  prerr_endline (prefix ^ "Match unknown (" ^ string_of_int (List.length branches) ^ " branches)");
+                  prerr_endline
+                    (prefix
+                     ^ "Match unknown ("
+                     ^ string_of_int (List.length branches)
+                     ^ " branches)");
                   None))
           | IT.Const (Bool false) ->
             prerr_endline (prefix ^ "Literal false");
