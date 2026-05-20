@@ -627,50 +627,19 @@ let pp_message = function
                (match explore_failure ~depth:(depth + 1) ~subst ifT with
                 | Some _ as result -> result
                 | None -> explore_failure ~depth:(depth + 1) ~subst ifF))
-          | IT.Match (scrutinee, branches) ->
-            (* Match - evaluate scrutinee and follow the matching branch *)
-            prerr_endline (prefix ^ "Match: evaluating scrutinee...\n");
-            let scrutinee_subst = apply_subst scrutinee in
-            (match evaluate scrutinee_subst with
-             | Some _value ->
-               prerr_endline
-                 (prefix ^ "Match: scrutinee evaluated, trying to find matching branch\n");
-               (* Try each branch - skip branches with literal false bodies (impossible patterns) *)
-               let rec try_branches = function
-                 | [] ->
-                   prerr_endline (prefix ^ "Match: no branches matched\n");
-                   None
-                 | (_pattern, body) :: rest ->
-                   let (IT.IT (body_term, _, _)) = body in
-                   (match body_term with
-                    | IT.Const (Bool false) ->
-                      prerr_endline
-                        (prefix ^ "Match: skipping branch with literal false\n");
-                      try_branches rest
-                    | _ ->
-                      prerr_endline (prefix ^ "Match: trying branch...\n");
-                      (match explore_failure ~depth:(depth + 1) ~subst body with
-                       | Some _ as result -> result
-                       | None -> try_branches rest))
-               in
-               try_branches branches
-             | None ->
-               prerr_endline (prefix ^ "Match: scrutinee UNKNOWN, trying all branches\n");
-               let rec try_branches = function
-                 | [] -> None
-                 | (_pattern, body) :: rest ->
-                   let (IT.IT (body_term, _, _)) = body in
-                   (match body_term with
-                    | IT.Const (Bool false) ->
-                      prerr_endline
-                        (prefix ^ "Match: skipping branch with literal false\n");
-                      try_branches rest
-                    | _ ->
-                      (match explore_failure ~depth:(depth + 1) ~subst body with
-                       | Some _ as result -> result
-                       | None -> try_branches rest))
-               in
-               try_branches branches)
+          | IT.Match (_scrutinee, _branches) ->
+            (* Match - treat as atomic/unknown, can't decompose structurally *)
+            prerr_endline (prefix ^ "Match: treating as atomic constraint\n");
+            (match evaluate it with
+             | Some (IT.IT (Const (Bool false), _, _)) ->
+               prerr_endline (prefix ^ "Match evaluates to FALSE\n");
+               Some it
+             | Some (IT.IT (Const (Bool true), _, _)) ->
+               prerr_endline (prefix ^ "Match evaluates to TRUE\n");
+               None
+             | _ ->
+               prerr_endline (prefix ^ "Match evaluation unknown, continuing\n");
+               None)
           | IT.Const (Bool false) ->
             (* Literal false - this is the failure *)
             prerr_endline (prefix ^ "Failed: false (literal)\n");
