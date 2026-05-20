@@ -584,26 +584,11 @@ let pp_message = function
                   Some it
                 | _ -> None))
           | IT.Let ((name, body_val), rest) ->
-            (* Let binding - evaluate and add to substitution *)
+            (* Let binding - add to substitution without evaluating *)
             prerr_endline (prefix ^ "Let " ^ Sym.pp_string name ^ " = ...\n");
             let body_subst = apply_subst body_val in
-            prerr_endline (prefix ^ "Evaluating let binding...\n");
-            (match evaluate body_subst with
-             | Some _result_val ->
-               prerr_endline (prefix ^ "Let binding evaluated, adding to substitution\n");
-               (* Add the substituted expression to substitution (already evaluated) *)
-               explore_failure
-                 ~depth:(depth + 1)
-                 ~subst:((name, body_subst) :: subst)
-                 rest
-             | None ->
-               prerr_endline
-                 (prefix ^ "Let binding unknown, adding symbolic value to substitution\n");
-               (* Add symbolic expression to substitution *)
-               explore_failure
-                 ~depth:(depth + 1)
-                 ~subst:((name, body_subst) :: subst)
-                 rest)
+            (* Don't evaluate - just add symbolically. Evaluation happens when used in constraints *)
+            explore_failure ~depth:(depth + 1) ~subst:((name, body_subst) :: subst) rest
           | IT.Binop (And, lhs, rhs) ->
             (* Try left side first, then right *)
             prerr_endline (prefix ^ "Checking conjunction...\n");
