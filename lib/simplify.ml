@@ -539,7 +539,34 @@ module IndexTerms = struct
         let s_it = aux s_it in
         let rec make t =
           match t with
-          | IT (Struct (_, members), _, _) -> List.assoc Id.equal member members
+          | IT (Struct (_tag, members), _, _) ->
+            (* Direct struct value access - extract the member *)
+            List.assoc Id.equal member members
+          | IT (StructMember (inner, inner_member), bt_inner, loc_inner) ->
+            (* Nested member access: x.m1.m2
+               Look up the type of m1 to see if we can flatten further *)
+            (match bt_inner with
+             | BT.Struct _inner_tag ->
+               (* The inner access returns a struct, so we can combine accesses *)
+               (* But we can't flatten without knowing the actual struct value *)
+               (* Keep the nested structure but try to simplify the inner part first *)
+               let simplified_inner = make inner in
+               (match simplified_inner with
+                | IT (Struct (_, members), _, _) ->
+                  (* Inner simplified to a struct value, extract from it *)
+                  List.assoc Id.equal inner_member members
+                | _ ->
+                  (* Can't simplify further, reconstruct *)
+                  IT
+                    ( StructMember
+                        ( IT
+                            ( StructMember (simplified_inner, inner_member),
+                              bt_inner,
+                              loc_inner ),
+                          member ),
+                      the_bt,
+                      the_loc ))
+             | _ -> IT (StructMember (t, member), the_bt, the_loc))
           | IT (ITE (cond, it1, it2), _, _) ->
             (* (if cond then it1 else it2) . member --> (if cond then it1.member else
                it2.member) *)
@@ -607,7 +634,16 @@ module IndexTerms = struct
             | _ -> IT (Cast (cbt, a), cbt, the_loc))
          | _ -> IT (Cast (cbt, a), cbt, the_loc))
       | MemberShift (t, tag, member) ->
-        IT (MemberShift (aux t, tag, member), the_bt, the_loc)
+        let t' = aux t in
+        (* Flatten nested MemberShift when accessing a struct value
+           Example: memberShift(struct{...}, tag, member) -> extract member directly *)
+        (match t' with
+         | IT (Struct (tag', members), _, _) when Sym.equal tag tag' ->
+           (* Direct struct value access - extract the member *)
+           (match List.assoc_opt Id.equal member members with
+            | Some member_value -> member_value
+            | None -> IT (MemberShift (t', tag, member), the_bt, the_loc))
+         | _ -> IT (MemberShift (t', tag, member), the_bt, the_loc))
       | ArrayShift { base; ct; index } ->
         let base = aux base in
         let base, index =
