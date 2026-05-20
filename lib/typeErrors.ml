@@ -540,13 +540,23 @@ let pp_message = function
       (* Depth-first search for failing constraint with immediate output *)
       let context, _log = ctxt in
       let model_val, _quantifier = model in
-      let evaluate it = Solver.eval model_val it in
+      let evaluate it = try Solver.eval model_val it with _ -> None in
       (* Depth-first search: print as we explore, find first atomic failure *)
-      let rec explore_failure ~depth (IT.IT (term, _bt, _loc) as it) =
-        let indent = String.make (depth * 2) ' ' in
+      let rec explore_failure ~depth ~let_ctx (IT.IT (term, bt, loc) as it) =
+        (* Helper to wrap a term in the accumulated let context *)
+        let wrap_in_lets inner =
+          List.fold_right
+            (fun (name, body_val, bt', loc') acc ->
+               IT.IT (IT.Let ((name, body_val), acc), bt', loc'))
+            let_ctx
+            inner
+        in
+        (* Helper to evaluate with let context *)
+        let evaluate_with_ctx term = evaluate (wrap_in_lets term) in
+        let prefix = "depth: " ^ string_of_int depth ^ " " in
         if depth > 20 then (
           (* Prevent infinite loops *)
-          prerr_endline (indent ^ "(max depth reached)\n");
+          prerr_endline (prefix ^ "(max depth reached)\n");
           None)
         else (
           match term with
@@ -561,79 +571,117 @@ let pp_message = function
                     String.concat ", " (List.map (fun arg -> Pp.plain (IT.pp arg)) args)
                   in
                   prerr_endline
-                    (indent ^ "Expanding: " ^ Sym.pp_string f ^ "(" ^ args_str ^ ")\n");
-                  (* Recurse into the body *)
-                  explore_failure ~depth:(depth + 1) body
+                    (prefix ^ "Expanding: " ^ Sym.pp_string f ^ "(" ^ args_str ^ ")\n");
+                  (* Recurse into the body - reset let_ctx since function body is new scope *)
+                  explore_failure ~depth:(depth + 1) ~let_ctx:[] body
                 | None ->
                   (* Can't expand - check if it's false *)
                   (match evaluate it with
                    | Some (IT.IT (Const (Bool false), _, _)) ->
-                     prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+                     prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
                      Some it
                    | _ -> None))
              | None ->
                (* Not a function - check if it's false *)
                (match evaluate it with
                 | Some (IT.IT (Const (Bool false), _, _)) ->
-                  prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+                  prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
                   Some it
                 | _ -> None))
+          | IT.Let ((name, body_val), rest) ->
+            (* Let binding - add to context and explore inside *)
+            prerr_endline (prefix ^ "Let " ^ Sym.pp_string name ^ " = ...\n");
+            explore_failure
+              ~depth:(depth + 1)
+              ~let_ctx:((name, body_val, bt, loc) :: let_ctx)
+              rest
           | IT.Binop (And, lhs, rhs) ->
             (* Try left side first, then right *)
-            prerr_endline (indent ^ "Checking conjunction...\n");
-            (match evaluate lhs with
+            prerr_endline (prefix ^ "Checking conjunction...\n");
+            let lhs_str = Pp.plain (IT.pp lhs) in
+            prerr_endline (prefix ^ "LHS: " ^ lhs_str ^ "\n");
+            (match evaluate_with_ctx lhs with
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (indent ^ "  Left side fails\n");
-               explore_failure ~depth:(depth + 1) lhs
+               prerr_endline (prefix ^ "LHS evaluates to FALSE\n");
+               explore_failure ~depth:(depth + 1) ~let_ctx lhs
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (indent ^ "  Left side OK, checking right\n");
-               (match evaluate rhs with
+               prerr_endline (prefix ^ "LHS evaluates to TRUE\n");
+               let rhs_str = Pp.plain (IT.pp rhs) in
+               prerr_endline (prefix ^ "RHS: " ^ rhs_str ^ "\n");
+               let rhs_eval = evaluate_with_ctx rhs in
+               (match rhs_eval with
                 | Some (IT.IT (Const (Bool false), _, _)) ->
-                  explore_failure ~depth:(depth + 1) rhs
-                | _ -> None)
+                  prerr_endline (prefix ^ "RHS evaluates to FALSE\n");
+                  explore_failure ~depth:(depth + 1) ~let_ctx rhs
+                | Some (IT.IT (Const (Bool true), _, _)) ->
+                  prerr_endline (prefix ^ "RHS evaluates to TRUE\n");
+                  None
+                | _ ->
+                  (* Right side unknown - explore it *)
+                  prerr_endline (prefix ^ "RHS evaluates to UNKNOWN\n");
+                  explore_failure ~depth:(depth + 1) ~let_ctx rhs)
              | _ ->
                (* Unknown - try exploring both *)
-               prerr_endline (indent ^ "  Left side unknown, checking it\n");
-               (match explore_failure ~depth:(depth + 1) lhs with
+               prerr_endline (prefix ^ "LHS evaluates to UNKNOWN\n");
+               (match explore_failure ~depth:(depth + 1) ~let_ctx lhs with
                 | Some _ as result -> result
-                | None -> explore_failure ~depth:(depth + 1) rhs))
+                | None -> explore_failure ~depth:(depth + 1) ~let_ctx rhs))
           | IT.Binop (Implies, lhs, rhs) ->
             (* Check if lhs is true, then explore rhs *)
-            (match evaluate lhs with
+            (match evaluate_with_ctx lhs with
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (indent ^ "Implication: premise true, checking conclusion\n");
-               explore_failure ~depth:(depth + 1) rhs
+               prerr_endline (prefix ^ "Implication: premise true, checking conclusion\n");
+               explore_failure ~depth:(depth + 1) ~let_ctx rhs
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (indent ^ "Implication: premise false, OK\n");
+               prerr_endline (prefix ^ "Implication: premise false, OK\n");
                None
              | _ ->
-               prerr_endline (indent ^ "Implication: premise unknown\n");
+               prerr_endline (prefix ^ "Implication: premise unknown\n");
                None)
           | IT.ITE (cond, ifT, ifF) ->
             (* Check condition, follow appropriate branch *)
-            (match evaluate cond with
+            (match evaluate_with_ctx cond with
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (indent ^ "ITE: condition true, checking then branch\n");
-               explore_failure ~depth:(depth + 1) ifT
+               prerr_endline (prefix ^ "ITE: condition true, checking then branch\n");
+               explore_failure ~depth:(depth + 1) ~let_ctx ifT
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (indent ^ "ITE: condition false, checking else branch\n");
-               explore_failure ~depth:(depth + 1) ifF
+               prerr_endline (prefix ^ "ITE: condition false, checking else branch\n");
+               explore_failure ~depth:(depth + 1) ~let_ctx ifF
              | _ ->
-               prerr_endline (indent ^ "ITE: condition unknown\n");
+               prerr_endline (prefix ^ "ITE: condition unknown\n");
+               None)
+          | IT.Match (scrutinee, branches) ->
+            (* Match - evaluate scrutinee and follow the branch *)
+            prerr_endline (prefix ^ "Checking match...\n");
+            (match evaluate_with_ctx scrutinee with
+             | Some _value ->
+               (* Try to find which branch matches *)
+               let rec try_branches = function
+                 | [] -> None
+                 | (_pattern, body) :: rest ->
+                   (* For now, just try exploring each branch *)
+                   (match explore_failure ~depth:(depth + 1) ~let_ctx body with
+                    | Some _ as result -> result
+                    | None -> try_branches rest)
+               in
+               try_branches branches
+             | None ->
+               prerr_endline (prefix ^ "Scrutinee unknown\n");
                None)
           | _ ->
-            (* Atomic constraint - check if it fails *)
-            (match evaluate it with
+            (* Atomic constraint - check if it's false *)
+            (match evaluate_with_ctx it with
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (indent ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
-               Some it
+               prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
+               (* Return the term with lets wrapped around it *)
+               Some (wrap_in_lets it)
              | _ -> None))
       in
       let failing_constraint =
         match constr with
         | LC.T it ->
           prerr_endline "\n=== Exploring constraint failure ===\n";
-          explore_failure ~depth:0 it
+          explore_failure ~depth:0 ~let_ctx:[] it
         | _ -> None
       in
       let doc_with_details =
