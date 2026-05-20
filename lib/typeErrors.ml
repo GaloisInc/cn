@@ -667,7 +667,9 @@ let pp_message = function
         match constr with
         | LC.T it ->
           prerr_endline "\n=== Exploring constraint failure ===\n";
-          explore_failure ~depth:0 ~subst:[] it
+          (* Simplify the constraint first to fold struct accesses, arithmetic, etc. *)
+          let it_simp = Simplify.IndexTerms.simp (Simplify.default context.global) it in
+          explore_failure ~depth:0 ~subst:[] it_simp
         | _ -> None
       in
       let doc_with_details =
