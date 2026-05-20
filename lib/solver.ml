@@ -1224,7 +1224,23 @@ let make globals variable_bindings =
       log = Logger.make (SMT.string_of_solver_extension base_cfg.exts)
     }
   in
-  let model_cfg = { cfg with log = Logger.make "model" } in
+  let model_cfg =
+    (* Disable model completion to avoid Z3 inventing complex values *)
+    let setup_no_completion =
+      List.map
+        (fun cmd ->
+           match cmd with
+           | Sexplib.Sexp.List
+               [ Sexplib.Sexp.Atom "set-option";
+                 Sexplib.Sexp.Atom ":model.completion";
+                 _
+               ] ->
+             SMT.set_option ":model.completion" "false"
+           | _ -> cmd)
+        cfg.setup
+    in
+    { cfg with log = Logger.make "model"; setup = setup_no_completion }
+  in
   let _, ctypes, ctypes_rev =
     let open WellTyped in
     CTS.fold
