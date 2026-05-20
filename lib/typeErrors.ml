@@ -543,19 +543,9 @@ let pp_message = function
       let evaluate it = try Solver.eval model_val it with _ -> None in
       (* Depth-first search: print as we explore, find first atomic failure *)
       let rec explore_failure ~(depth : int) ~(subst : (Sym.t * IT.t) list) (it : IT.t) =
-        let (IT.IT (term, bt, loc)) = it in
-        (* Helper to wrap a term in accumulated let bindings *)
-        let wrap_in_lets t =
-          List.fold_right
-            (fun (name, value) body -> IT.IT (IT.Let ((name, value), body), bt, loc))
-            subst
-            t
-        in
-        let prefix = "depth: " ^ string_of_int depth ^ " " in
-        if depth > 20 then (
-          (* Prevent infinite loops *)
-          prerr_endline (prefix ^ "(max depth reached)\n");
-          None)
+        let (IT.IT (term, _bt, _loc)) = it in
+        if depth > 20 then (* Prevent infinite loops *)
+          None
         else (
           match term with
           | IT.Apply (f, args) ->
@@ -564,126 +554,97 @@ let pp_message = function
              | Some def ->
                (match Definition.Function.try_open def args with
                 | Some body ->
-                  (* Print what we're expanding *)
-                  let args_str =
-                    String.concat ", " (List.map (fun arg -> Pp.plain (IT.pp arg)) args)
-                  in
-                  prerr_endline
-                    (prefix ^ "Expanding: " ^ Sym.pp_string f ^ "(" ^ args_str ^ ")\n");
                   (* Recurse into the body - keep subst since arguments may reference outer variables *)
                   explore_failure ~depth:(depth + 1) ~subst body
                 | None ->
-                  (* Can't expand - check if it's false *)
+                  (* Can't expand - treat as atomic *)
                   (match evaluate it with
-                   | Some (IT.IT (Const (Bool false), _, _)) ->
-                     prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
-                     Some it
+                   | Some (IT.IT (Const (Bool false), _, _)) -> Some it
                    | _ -> None))
              | None ->
-               (* Not a function - check if it's false *)
+               (* Not a function - treat as atomic *)
                (match evaluate it with
-                | Some (IT.IT (Const (Bool false), _, _)) ->
-                  prerr_endline (prefix ^ "Failed: " ^ Pp.plain (IT.pp it) ^ "\n");
-                  Some it
+                | Some (IT.IT (Const (Bool false), _, _)) -> Some it
                 | _ -> None))
           | IT.Let ((name, body_val), rest) ->
-            (* Let binding - accumulate without substitution *)
-            prerr_endline (prefix ^ "Let " ^ Sym.pp_string name ^ " = ...\n");
-            explore_failure ~depth:(depth + 1) ~subst:((name, body_val) :: subst) rest
+            (* Let binding - substitute known values, evaluate to get concrete value *)
+            let body_subst =
+              match subst with
+              | [] -> body_val
+              | _ -> IT.subst (IT.make_subst subst) body_val
+            in
+            (* Try to evaluate to get fully concrete value from model *)
+            (match evaluate body_subst with
+             | Some concrete_value ->
+               (* Store concrete value for future substitutions *)
+               explore_failure
+                 ~depth:(depth + 1)
+                 ~subst:((name, concrete_value) :: subst)
+                 rest
+             | None ->
+               (* Couldn't fully evaluate - store partially substituted term *)
+               explore_failure
+                 ~depth:(depth + 1)
+                 ~subst:((name, body_subst) :: subst)
+                 rest)
           | IT.Binop (And, lhs, rhs) ->
             (* Explore structurally: try left, if not found try right *)
-            prerr_endline (prefix ^ "Conjunction: exploring LHS\n");
             (match explore_failure ~depth:(depth + 1) ~subst lhs with
              | Some _ as result -> result
-             | None ->
-               prerr_endline (prefix ^ "Conjunction: LHS OK, exploring RHS\n");
-               explore_failure ~depth:(depth + 1) ~subst rhs)
+             | None -> explore_failure ~depth:(depth + 1) ~subst rhs)
           | IT.Binop (Implies, lhs, rhs) ->
-            (* Implication: need to check premise to decide branch *)
-            prerr_endline
-              (prefix
-               ^ "Implication: checking premise (wrapped): "
-               ^ Pp.plain (IT.pp (wrap_in_lets lhs))
-               ^ "\n");
-            let lhs_wrapped = wrap_in_lets lhs in
-            (match evaluate lhs_wrapped with
+            (* Implication: substitute known values in premise, then evaluate *)
+            let lhs_subst =
+              match subst with [] -> lhs | _ -> IT.subst (IT.make_subst subst) lhs
+            in
+            (match evaluate lhs_subst with
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (prefix ^ "Implication: premise true, exploring conclusion\n");
                explore_failure ~depth:(depth + 1) ~subst rhs
-             | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "Implication: premise false, vacuously true\n");
-               None
-             | _ ->
-               prerr_endline (prefix ^ "Implication: premise unknown, cannot determine\n");
-               None)
+             | Some (IT.IT (Const (Bool false), _, _)) -> None
+             | _ -> None)
           | IT.ITE (cond, ifT, ifF) ->
-            (* Check condition, follow appropriate branch *)
-            prerr_endline
-              (prefix
-               ^ "ITE: evaluating condition (wrapped): "
-               ^ Pp.plain (IT.pp (wrap_in_lets cond))
-               ^ "\n");
-            let cond_wrapped = wrap_in_lets cond in
-            (match evaluate cond_wrapped with
+            (* Substitute known values in condition, then evaluate to pick branch *)
+            let cond_subst =
+              match subst with [] -> cond | _ -> IT.subst (IT.make_subst subst) cond
+            in
+            (match evaluate cond_subst with
              | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (prefix ^ "ITE: condition TRUE, checking then branch\n");
                explore_failure ~depth:(depth + 1) ~subst ifT
              | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "ITE: condition FALSE, checking else branch\n");
                explore_failure ~depth:(depth + 1) ~subst ifF
              | _ ->
-               prerr_endline (prefix ^ "ITE: condition UNKNOWN, trying both branches\n");
+               (* Condition unknown - try both branches *)
                (match explore_failure ~depth:(depth + 1) ~subst ifT with
                 | Some _ as result -> result
                 | None -> explore_failure ~depth:(depth + 1) ~subst ifF))
           | IT.Match (_scrutinee, _branches) ->
-            (* Match - treat as atomic/unknown, can't decompose structurally *)
-            prerr_endline (prefix ^ "Match: treating as atomic constraint\n");
-            (match evaluate it with
-             | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "Match evaluates to FALSE\n");
-               Some it
-             | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (prefix ^ "Match evaluates to TRUE\n");
-               None
-             | _ ->
-               prerr_endline (prefix ^ "Match evaluation unknown, continuing\n");
-               None)
-          | IT.Const (Bool false) ->
-            (* Literal false - this is the failure *)
-            prerr_endline (prefix ^ "Failed: false (literal)\n");
-            Some it
-          | IT.Const (Bool true) ->
-            (* Literal true - not a failure *)
-            None
+            (* Match - treat as atomic, substitute and evaluate *)
+            let it_subst =
+              match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
+            in
+            (match evaluate it_subst with
+             | Some (IT.IT (Const (Bool false), _, _)) -> Some it
+             | Some (IT.IT (Const (Bool true), _, _)) -> None
+             | _ -> None)
+          | IT.Const (Bool false) -> Some it
+          | IT.Const (Bool true) -> None
           | _ ->
-            (* Atomic constraint - wrap in lets and evaluate *)
-            prerr_endline
-              (prefix
-               ^ "Current subst length: "
-               ^ string_of_int (List.length subst)
-               ^ "\n");
-            let it_wrapped = wrap_in_lets it in
-            prerr_endline
-              (prefix
-               ^ "Evaluating atomic constraint (wrapped): "
-               ^ Pp.plain (IT.pp it_wrapped)
-               ^ "\n");
-            (match evaluate it_wrapped with
-             | Some (IT.IT (Const (Bool false), _, _)) ->
-               prerr_endline (prefix ^ "Atomic constraint evaluates to FALSE\n");
-               Some it
-             | Some (IT.IT (Const (Bool true), _, _)) ->
-               prerr_endline (prefix ^ "Atomic constraint evaluates to TRUE\n");
-               None
-             | _ ->
-               prerr_endline (prefix ^ "Atomic constraint evaluation UNKNOWN\n");
-               None))
+            (* Atomic constraint - substitute concrete values, simplify, then evaluate *)
+            let it_subst =
+              match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
+            in
+            (* Simplify to fold struct accesses, evaluate comparisons, etc. *)
+            let it_simplified =
+              Simplify.IndexTerms.simp (Simplify.default context.global) it_subst
+            in
+            (match evaluate it_simplified with
+             | Some (IT.IT (Const (Bool false), _, _)) -> Some it
+             | Some (IT.IT (Const (Bool true), _, _)) -> None
+             | _ -> None))
       in
       let failing_constraint =
         match constr with
         | LC.T it ->
-          prerr_endline "\n=== Exploring constraint failure ===\n";
           (* Simplify the constraint first to fold struct accesses, arithmetic, etc. *)
           let it_simp = Simplify.IndexTerms.simp (Simplify.default context.global) it in
           explore_failure ~depth:0 ~subst:[] it_simp
