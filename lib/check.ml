@@ -2982,41 +2982,51 @@ let time_check_c_functions
   let here = Locations.other __LOC__ in
   let@ () = add_cs here global_var_constraints in
   let@ global = get_global () in
-  let@ () =
+  let@ consistency_errors =
     match check_consistency with
     | true ->
-      let@ () =
+      (* Collect all consistency errors instead of stopping at the first one *)
+      let@ pred_errors =
         Sym.Map.fold
-          (fun _ def acc ->
-             (* I think this avoids a left-recursion in the monad bind *)
-             let@ () = Consistent.predicate def in
-             acc)
+          (fun _name def acc ->
+             let@ errors = acc in
+             let@ result = sandbox (Consistent.predicate def) in
+             match result with
+             | Ok () -> return errors
+             | Error err -> return (err :: errors))
           global.resource_predicates
-          (return ())
+          (return [])
       in
-      let@ () =
-        Sym.Map.fold
-          (fun _ (loc, def, _) acc ->
-             match def with
-             | None -> acc
-             | Some def ->
-               (* I think this avoids a left-recursion in the monad bind *)
-               let@ () = Consistent.function_type "proc/fun" loc def in
-               acc)
-          global.fun_decls
-          (return ())
+      (* Only check procedures (function implementations), not function declarations,
+         to avoid duplicate error reporting. The procedure check includes the spec check. *)
+      let@ proc_errors =
+        let rec fold_procs acc = function
+          | [] -> return acc
+          | (_, (loc, args_and_body)) :: rest ->
+            let@ result = sandbox (Consistent.procedure loc args_and_body) in
+            let new_acc =
+              match result with Ok () -> acc | Error err -> err :: acc
+            in
+            fold_procs new_acc rest
+        in
+        fold_procs [] checked
       in
-      let@ () =
-        ListM.iterM
-          (fun (_, (loc, args_and_body)) -> Consistent.procedure loc args_and_body)
-          checked
-      in
-      return ()
-    | false -> return ()
+      return (pred_errors @ proc_errors)
+    | false -> return []
+  in
+  (* Convert consistency errors to the same format as check_c_functions errors *)
+  let consistency_error_list =
+    List.mapi
+      (fun i err ->
+         (* Use a simple name that won't cause filesystem issues *)
+         let name = "consistency_check_" ^ string_of_int i in
+         (name, err))
+      consistency_errors
   in
   let@ errors = check_c_functions skip_and_only checked in
   Cerb_debug.end_csv_timing "type checking functions";
-  return errors
+  (* Combine consistency errors with regular errors *)
+  return (consistency_error_list @ errors)
 
 
 let generate_lemmas lemmata o_lemma_mode =
