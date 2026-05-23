@@ -229,13 +229,19 @@ let report_type_error
       ?(output_dir : string option)
       ?(fn_name : string option)
       ?(serialize_json : bool = false)
+      ?(generate_state_html : bool = true)
       (error : TypeErrors.t)
   : unit
   =
   if json then
-    TypeErrors.report_json ?output_dir ?fn_name ~serialize_json error
+    TypeErrors.report_json ?output_dir ?fn_name ~serialize_json ~generate_state_html error
   else
-    TypeErrors.report_pretty ?output_dir ?fn_name ~serialize_json error
+    TypeErrors.report_pretty
+      ?output_dir
+      ?fn_name
+      ~serialize_json
+      ~generate_state_html
+      error
 
 
 (** Generate an appropriate exit code for the provided error. *)
@@ -261,9 +267,10 @@ let handle_type_error
       ~(json : bool)
       ?(output_dir : string option)
       ?(serialize_json : bool = false)
+      ?(generate_state_html : bool = true)
       (error : TypeErrors.t)
   =
-  report_type_error ~json ?output_dir ~serialize_json error;
+  report_type_error ~json ?output_dir ~serialize_json ~generate_state_html error;
   exit (exit_code_of_error error)
 
 

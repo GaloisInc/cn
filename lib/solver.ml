@@ -11,6 +11,8 @@ let inc_enabled = ref true
 
 let inc_timeout = ref None
 
+let produce_models = ref true
+
 (** Functions that pick names for things. *)
 module CN_Names = struct
   let fn_name x = Sym.pp_string_no_nums x ^ "_" ^ string_of_int (Sym.num x)
@@ -1221,7 +1223,8 @@ let make globals variable_bindings =
     { base_cfg with
       exe = Option.value ~default:base_cfg.exe !solver_path;
       opts = Option.value ~default:base_cfg.opts !solver_flags;
-      log = Logger.make (SMT.string_of_solver_extension base_cfg.exts)
+      log = Logger.make (SMT.string_of_solver_extension base_cfg.exts);
+      produce_models = !produce_models
     }
   in
   let model_cfg =
@@ -1279,7 +1282,13 @@ let empty_model = fun it -> Some it
 
 let model_state = ref (None : model_with_q option)
 
-let model () = Option.get !model_state
+let model () =
+  match !model_state with
+  | Some m -> m
+  | None ->
+    (* Return a dummy model that always returns None for evaluation *)
+    ((fun _ -> None), [])
+
 
 (** Load a model into the model solver, by running [cmds], followed by
     `check-sat`. *)
@@ -1434,10 +1443,10 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
     (match answer with
      | Unsat -> `True
      | Sat ->
-       record_model solver cmds qs;
+       if !produce_models then record_model solver cmds qs;
        `False
      | Unknown ->
-       record_model solver cmds qs;
+       if !produce_models then record_model solver cmds qs;
        `Unknown)
 
 

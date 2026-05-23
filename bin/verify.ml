@@ -43,6 +43,8 @@ let verify
       try_hard
       disable_unfold_multiclause_preds
       check_consistency
+      no_produce_models
+      no_state_html
   =
   if json then (
     if debug_level > 0 then
@@ -66,6 +68,7 @@ let verify
   Solver.try_hard := try_hard;
   Solver.inc_enabled := solver_inc_enabled;
   Solver.inc_timeout := solver_inc_timeout;
+  Solver.produce_models := not no_produce_models;
   IndexTerms.use_vip := not dont_use_vip;
   Check.fail_fast := fail_fast;
   Diagnostics.diag_string := diag;
@@ -93,7 +96,12 @@ let verify
     ~save_cpp:None
     ~disable_linemarkers:false
     ~skip_label_inlining:false
-    ~handle_error:(Common.handle_type_error ~json ?output_dir ~serialize_json:json_trace)
+    ~handle_error:
+      (Common.handle_type_error
+         ~json
+         ?output_dir
+         ~serialize_json:json_trace
+         ~generate_state_html:(not no_state_html))
     ~f:(fun ~cabs_tunit:_ ~prog5:_ ~ail_prog:_ ~statement_locs:_ ~paused ->
       let check (functions, global_var_constraints, lemmas) =
         let open Typing in
@@ -111,6 +119,7 @@ let verify
                  ?output_dir
                  ~fn_name:fn
                  ~serialize_json:json_trace
+                 ~generate_state_html:(not no_state_html)
                  err)
             errors;
         Option.fold ~none:() ~some:exit (Common.exit_code_of_errors (List.map snd errors));
@@ -240,6 +249,16 @@ module Flags = struct
       "check consistency of predicate definitions, function specifications, and lemmas"
     in
     Arg.(value & flag & info [ "check-consistency" ] ~doc)
+
+
+  let no_produce_models =
+    let doc = "disable SMT model generation (counterexamples) for improved performance" in
+    Arg.(value & flag & info [ "no-produce-models" ] ~doc)
+
+
+  let no_state_html =
+    let doc = "disable HTML state file generation" in
+    Arg.(value & flag & info [ "no-state-html" ] ~doc)
 end
 
 module Lemma_flags = struct
@@ -315,6 +334,8 @@ let verify_t : unit Term.t =
   $ Flags.try_hard
   $ Flags.disable_unfold_multiclause_preds
   $ Flags.check_consistency
+  $ Flags.no_produce_models
+  $ Flags.no_state_html
 
 
 let cmd =

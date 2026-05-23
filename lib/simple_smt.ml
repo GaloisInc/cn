@@ -510,7 +510,8 @@ type solver_config =
     setup : Sexp.t list; (* setup commands *)
     (* (parameter name * setting) list, the name without leading colon *)
     exts : solver_extensions;
-    log : solver_log
+    log : solver_log;
+    produce_models : bool
   }
 
 (** A connection to a solver *)
@@ -832,7 +833,9 @@ let new_solver (cfg : solver_config) : solver =
     }
   in
   ack_command s (set_option ":print-success" "true");
-  ack_command s (set_option ":produce-models" "true");
+  ack_command
+    s
+    (set_option ":produce-models" (if cfg.produce_models then "true" else "false"));
   List.iter (ack_command s) cfg.setup;
   (* Gc.finalise (fun me -> me.stop ()) s; *)
   s
@@ -914,7 +917,8 @@ let cvc5 : solver_config =
     opts = [ "--sets-exp"; "--force-logic=QF_ALL" ];
     setup = [];
     exts = CVC5;
-    log = quiet_log
+    log = quiet_log;
+    produce_models = true
   }
 
 
@@ -930,7 +934,13 @@ let z3 : solver_config =
       (* list [atom "set-simplifier"; simple_command ["then"; "simplify"; "propagate-values"; "solve-eqs";]] *)
     ]
   in
-  { exe = "z3"; opts = [ "-in"; "-smt2" ]; setup; exts = Z3; log = quiet_log }
+  { exe = "z3";
+    opts = [ "-in"; "-smt2" ];
+    setup;
+    exts = Z3;
+    log = quiet_log;
+    produce_models = true
+  }
 
 
 let incremental cfg =

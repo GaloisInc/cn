@@ -953,13 +953,14 @@ let report_pretty
       ?(output_dir : string option)
       ?(fn_name : string option)
       ?(serialize_json : bool = false)
+      ?(generate_state_html : bool = true)
       { loc; msg }
   =
   (* stealing some logic from pp_errors *)
   let report = pp_message msg in
   let consider =
     match report.state with
-    | Some state ->
+    | Some state when generate_state_html ->
       let dir = mk_output_dir output_dir in
       let file = mk_state_file_name ?fn_name dir loc in
       let link = Report.make file (Cerb_location.get_filename loc) state in
@@ -972,7 +973,7 @@ let report_pretty
         [ state_msg; report_msg ])
       else
         [ state_msg ]
-    | None -> []
+    | _ -> []
   in
   error loc report.short (Option.to_list report.descr @ consider)
 
@@ -982,12 +983,13 @@ let report_json
       ?(output_dir : string option)
       ?(fn_name : string option)
       ?(serialize_json : bool = false)
+      ?(generate_state_html : bool = true)
       { loc; msg }
   =
   let report = pp_message msg in
   let state_error_file, report_file =
     match report.state with
-    | Some state ->
+    | Some state when generate_state_html ->
       let dir = mk_output_dir output_dir in
       let file = mk_state_file_name ?fn_name dir loc in
       let link = Report.make file (Cerb_location.get_filename loc) state in
@@ -998,7 +1000,7 @@ let report_json
         (`String link, `String report_file))
       else
         (`String link, `Null)
-    | None -> (`Null, `Null)
+    | _ -> (`Null, `Null)
   in
   let descr =
     match report.descr with None -> `Null | Some descr -> `String (plain descr)

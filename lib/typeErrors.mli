@@ -183,6 +183,7 @@ val report_pretty
   :  ?output_dir:string ->
   ?fn_name:string ->
   ?serialize_json:bool ->
+  ?generate_state_html:bool ->
   t ->
   unit
 
@@ -191,5 +192,6 @@ val report_json
   :  ?output_dir:string ->
   ?fn_name:string ->
   ?serialize_json:bool ->
+  ?generate_state_html:bool ->
   t ->
   unit
