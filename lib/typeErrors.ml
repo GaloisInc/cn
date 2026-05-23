@@ -6,6 +6,9 @@ module Req = Request
 open Pp
 open Error_common
 
+(** Control whether to perform expression exploration for root-cause analysis *)
+let explore_root_cause = ref true
+
 let call_situation = function
   | FunctionCall fsym -> !^"checking call of function" ^^^ Sym.pp fsym
   | LemmaApplication l -> !^"applying lemma" ^^^ Sym.pp l
@@ -719,12 +722,15 @@ let pp_message = function
                None))
       in
       let failing_constraint =
-        match constr with
-        | LC.T it ->
-          (* Simplify the constraint first to fold struct accesses, arithmetic, etc. *)
-          let it_simp = Simplify.IndexTerms.simp (Simplify.default context.global) it in
-          explore_failure ~depth:0 ~subst:[] it_simp
-        | _ -> None
+        if !explore_root_cause then (
+          match constr with
+          | LC.T it ->
+            (* Simplify the constraint first to fold struct accesses, arithmetic, etc. *)
+            let it_simp = Simplify.IndexTerms.simp (Simplify.default context.global) it in
+            explore_failure ~depth:0 ~subst:[] it_simp
+          | _ -> None)
+        else
+          None
       in
       let doc_with_details =
         match failing_constraint with

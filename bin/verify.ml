@@ -45,6 +45,7 @@ let verify
       check_consistency
       no_produce_models
       no_state_html
+      no_explore_root_cause
   =
   if json then (
     if debug_level > 0 then
@@ -57,6 +58,7 @@ let verify
   Pp.print_level := print_level;
   Sym.print_nums := print_sym_nums;
   Pp.print_timestamps := not no_timestamps;
+  TypeErrors.explore_root_cause := not no_explore_root_cause;
   (match solver_logging with
    | Some d ->
      Solver.Logger.to_file := true;
@@ -259,6 +261,11 @@ module Flags = struct
   let no_state_html =
     let doc = "disable HTML state file generation" in
     Arg.(value & flag & info [ "no-state-html" ] ~doc)
+
+
+  let no_explore_root_cause =
+    let doc = "disable expression exploration for root-cause analysis" in
+    Arg.(value & flag & info [ "no-explore-root-cause" ] ~doc)
 end
 
 module Lemma_flags = struct
@@ -336,6 +343,7 @@ let verify_t : unit Term.t =
   $ Flags.check_consistency
   $ Flags.no_produce_models
   $ Flags.no_state_html
+  $ Flags.no_explore_root_cause
 
 
 let cmd =

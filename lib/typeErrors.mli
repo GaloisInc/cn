@@ -3,6 +3,9 @@
 (** TODO Cleanly factor out all pretty printing from all error gathering.
     Pp.document, string to actual types (including polymorphic variants if need be) *)
 
+(** Control whether to perform expression exploration for root-cause analysis *)
+val explore_root_cause : bool ref
+
 (** TODO move *)
 val call_situation : Error_common.call_situation -> Pp.document
 
