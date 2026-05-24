@@ -3,6 +3,9 @@
 (* In-memory cache *)
 let cache : (string, [ `True | `False | `Unknown ]) Hashtbl.t = Hashtbl.create 10000
 
+(* Track whether we've loaded the disk cache *)
+let disk_cache_loaded = ref false
+
 (* Statistics *)
 let hits = ref 0
 
@@ -45,18 +48,32 @@ let result_from_string = function
   | _ -> None
 
 
-let load_from_disk hash =
-  if not !enabled then
-    None
-  else (
-    let path = cache_file_path hash in
-    try
-      let ic = open_in path in
-      let line = input_line ic in
-      close_in ic;
-      result_from_string line
-    with
-    | _ -> None)
+(* Load entire disk cache into memory at startup *)
+let load_disk_cache () =
+  if !enabled && not !disk_cache_loaded then (
+    disk_cache_loaded := true;
+    let dir = cache_dir () in
+    if Sys.file_exists dir then (
+      try
+        let files = Sys.readdir dir in
+        Array.iter
+          (fun hash ->
+             let path = Filename.concat dir hash in
+             try
+               let ic = open_in path in
+               let line = input_line ic in
+               close_in ic;
+               match result_from_string line with
+               | Some result ->
+                 if not (Hashtbl.mem cache hash) then (
+                   Hashtbl.add cache hash result;
+                   incr disk_hits)
+               | None -> ()
+             with
+             | _ -> ())
+          files
+      with
+      | _ -> ()))
 
 
 let save_to_disk hash result =
@@ -64,10 +81,14 @@ let save_to_disk hash result =
     try
       ensure_cache_dir ();
       let path = cache_file_path hash in
-      let oc = open_out path in
+      (* Atomic write: write to temp file, then rename *)
+      let temp_path = path ^ ".tmp." ^ string_of_int (Unix.getpid ()) in
+      let oc = open_out temp_path in
       output_string oc (result_to_string result);
       output_char oc '\n';
-      close_out oc
+      close_out oc;
+      (* Atomic rename - if file already exists, it's fine, we're writing the same content *)
+      try Unix.rename temp_path path with _ -> ()
     with
     | _ -> ())
 
@@ -78,7 +99,7 @@ let hash_smt_commands (commands : Sexplib.Sexp.t list) : string =
   Digest.string str |> Digest.to_hex
 
 
-(* Look up query in cache (memory first, then disk) *)
+(* Look up query in cache (all in memory after load) *)
 let lookup_smt_commands (commands : Sexplib.Sexp.t list)
   : [> `True | `False | `Unknown ] option
   =
@@ -86,8 +107,10 @@ let lookup_smt_commands (commands : Sexplib.Sexp.t list)
     None
   else (
     let t0 = Unix.gettimeofday () in
+    (* Load disk cache on first lookup *)
+    if not !disk_cache_loaded then load_disk_cache ();
     let hash = hash_smt_commands commands in
-    (* Check in-memory cache first *)
+    (* All queries are now in memory (both new and from disk) *)
     match Hashtbl.find_opt cache hash with
     | Some (`True as r) ->
       incr hits;
@@ -105,20 +128,10 @@ let lookup_smt_commands (commands : Sexplib.Sexp.t list)
       total_lookup_time := !total_lookup_time +. (t1 -. t0);
       Some r
     | None ->
-      (* Check disk cache *)
-      (match load_from_disk hash with
-       | Some result ->
-         (* Disk hit - populate memory cache *)
-         incr disk_hits;
-         Hashtbl.add cache hash result;
-         let t1 = Unix.gettimeofday () in
-         total_lookup_time := !total_lookup_time +. (t1 -. t0);
-         Some result
-       | None ->
-         incr misses;
-         let t1 = Unix.gettimeofday () in
-         total_lookup_time := !total_lookup_time +. (t1 -. t0);
-         None))
+      incr misses;
+      let t1 = Unix.gettimeofday () in
+      total_lookup_time := !total_lookup_time +. (t1 -. t0);
+      None)
 
 
 (* Store query result in cache (both memory and disk) *)
@@ -155,6 +168,7 @@ let print_stats () =
 (* Clear cache *)
 let clear () =
   Hashtbl.clear cache;
+  disk_cache_loaded := false;
   hits := 0;
   disk_hits := 0;
   misses := 0;
