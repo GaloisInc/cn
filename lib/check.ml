@@ -3004,9 +3004,7 @@ let time_check_c_functions
           | [] -> return acc
           | (_, (loc, args_and_body)) :: rest ->
             let@ result = sandbox (Consistent.procedure loc args_and_body) in
-            let new_acc =
-              match result with Ok () -> acc | Error err -> err :: acc
-            in
+            let new_acc = match result with Ok () -> acc | Error err -> err :: acc in
             fold_procs new_acc rest
         in
         fold_procs [] checked

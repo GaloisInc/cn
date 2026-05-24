@@ -46,9 +46,12 @@ module CN_Names = struct
 end
 
 type solver_frame =
-  { mutable commands : SMT.sexp list (** Ack-style SMT commands, most recent first. *) }
+  { mutable commands : SMT.sexp list; (** Ack-style SMT commands, most recent first. *)
+    saved_counters : (BT.t, int) Hashtbl.t
+      (** Saved counter state at push time for proper pop restoration *)
+  }
 
-let empty_solver_frame () = { commands = [] }
+let empty_solver_frame () = { commands = []; saved_counters = Hashtbl.create 10 }
 
 type solver =
   { smt_solver : SMT.solver; (** The SMT solver connection. *)
@@ -146,7 +149,12 @@ let debug_ack_command s cmd =
 (** Start a new scope. *)
 let push s =
   debug_ack_command s (SMT.push 1);
-  s.prev_frames := !(s.cur_frame) :: !(s.prev_frames);
+  (* Save current counter state before pushing *)
+  let frame = !(s.cur_frame) in
+  Hashtbl.iter
+    (fun bt count -> Hashtbl.replace frame.saved_counters bt count)
+    s.var_counters;
+  s.prev_frames := frame :: !(s.prev_frames);
   s.cur_frame := empty_solver_frame ()
 
 
@@ -161,7 +169,12 @@ let pop s n =
       | new_cur :: new_rest ->
         if count = 1 then (
           s.cur_frame := new_cur;
-          s.prev_frames := new_rest)
+          s.prev_frames := new_rest;
+          (* Restore counter state from the frame we're returning to *)
+          Hashtbl.clear s.var_counters;
+          Hashtbl.iter
+            (fun bt count -> Hashtbl.replace s.var_counters bt count)
+            new_cur.saved_counters)
         else
           drop (count - 1) new_rest
       | _ -> assert false
@@ -1506,17 +1519,15 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
     let qs =
       Timing.time_phase "smt_query_setup" (fun () ->
         push solver;
-        (* DON'T clear normalization - symbols may be reused across queries *)
         let { qs; expr; extra } = reduce_goal assumptions lc in
         List.iter (declare_variable solver) qs;
         List.iter (fun t -> assume solver (T t)) (not_ expr loc :: extra);
         qs)
     in
+    (* Get all commands including incremental state from previous frames *)
     let cmds = List.rev (get_commands solver) in
-    (* For caching, only use commands from the current query (top frame), not the full context *)
-    let query_cmds = List.rev !(solver.cur_frame).commands in
-    (* Check cache before querying Z3 *)
-    let cached_result = QCache.lookup_smt_commands query_cmds in
+    (* Check cache with full incremental context, not just current frame *)
+    let cached_result = QCache.lookup_smt_commands cmds in
     (match cached_result with
      | Some result ->
        (* Cache hit - skip Z3 *)
@@ -1543,8 +1554,8 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
              Timing.time_phase "record_model" (fun () -> record_model solver cmds qs);
            `Unknown
        in
-       (* Store in cache *)
-       QCache.store_smt_commands query_cmds result;
+       (* Store in cache with full incremental context *)
+       QCache.store_smt_commands cmds result;
        result)
 
 
