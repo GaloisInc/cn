@@ -516,7 +516,28 @@ let valid_for_deref loc pointer ct =
 
 (** Helper functions for not_necessarily builtin **)
 
-(* Detect not_necessarily(c) pattern in a logical constraint *)
+(* Check if not_necessarily appears in a constraint (used to detect nested usage) *)
+let rec constraint_has_not_necessarily (lc : LC.t) : bool =
+  match lc with
+  | LC.T it -> term_has_not_necessarily it
+  | LC.Forall ((_sym, _bt), it) -> term_has_not_necessarily it
+
+
+and term_has_not_necessarily (it : IT.t) : bool =
+  match it with
+  | IT (Apply (sym, _args), _, _) when String.equal (Sym.pp_string sym) "not_necessarily"
+    ->
+    true
+  | IT (Apply (_, args), _, _) -> List.exists term_has_not_necessarily args
+  | IT (Unop (_, t), _, _) -> term_has_not_necessarily t
+  | IT (Binop (_, t1, t2), _, _) ->
+    term_has_not_necessarily t1 || term_has_not_necessarily t2
+  | IT (ITE (c, t, e), _, _) ->
+    term_has_not_necessarily c || term_has_not_necessarily t || term_has_not_necessarily e
+  | _ -> false (* Simplified check - covers most common cases *)
+
+
+(* Detect not_necessarily(c) pattern at top level of a logical constraint *)
 let is_not_necessarily_constraint (lc : LC.t) : LC.t option =
   match lc with
   | LC.T (IT (Apply (sym, [ inner_expr ]), _, _))
@@ -2331,21 +2352,31 @@ let rec check_expr labels (e : BT.t Mu.expr) (k : IT.t -> unit m) : unit m =
            (* Negative assertion: verify inner_lc is NOT necessarily true *)
            ensure_not_necessarily loc inner_lc
          | None ->
-           (* Regular assertion: verify lc IS provable *)
-           let@ provable = provable loc in
-           (match provable lc with
-            | `True -> return ()
-            | `False ->
-              let@ model = model () in
-              let@ simp_ctxt = simp_ctxt () in
-              RI.debug_constraint_failure_diagnostics 6 model simp_ctxt lc;
-              let@ () = Diagnostics.investigate model lc in
-              fail (fun ctxt ->
-                { loc;
-                  msg =
-                    Unproven_constraint
-                      { constr = lc; info = (loc, None); requests = []; ctxt; model }
-                })))
+           (* Check for nested not_necessarily usage (not allowed) *)
+           if constraint_has_not_necessarily lc then
+             fail (fun _ ->
+               { loc;
+                 msg =
+                   Generic
+                     !^"not_necessarily can only be used at the top level of assertions, \
+                        not nested within other expressions"
+                   [@alert "-deprecated"]
+               })
+           else (* Regular assertion: verify lc IS provable *)
+             let@ provable = provable loc in
+             (match provable lc with
+              | `True -> return ()
+              | `False ->
+                let@ model = model () in
+                let@ simp_ctxt = simp_ctxt () in
+                RI.debug_constraint_failure_diagnostics 6 model simp_ctxt lc;
+                let@ () = Diagnostics.investigate model lc in
+                fail (fun ctxt ->
+                  { loc;
+                    msg =
+                      Unproven_constraint
+                        { constr = lc; info = (loc, None); requests = []; ctxt; model }
+                  })))
       | Inline _nms -> return ()
       | Print it ->
         let@ it = WellTyped.infer_term it in

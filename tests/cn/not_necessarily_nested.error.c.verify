@@ -1,0 +1,9 @@
+return code: 1
+[1/2]: test_nested_in_implication -- fail
+[2/2]: test_nested_in_conjunction -- fail
+cn/not_necessarily_nested.error.c:11:9: error: not_necessarily can only be used at the top level of assertions, not nested within other expressions
+    /*@ assert((i32)x > 50i32 implies not_necessarily((i32)y == 5i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+cn/not_necessarily_nested.error.c:22:9: error: not_necessarily can only be used at the top level of assertions, not nested within other expressions
+    /*@ assert((i32)x >= 0i32 && not_necessarily((i32)y == 5i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
