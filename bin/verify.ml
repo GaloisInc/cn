@@ -46,6 +46,9 @@ let verify
       no_produce_models
       no_state_html
       no_explore_root_cause
+      profile
+      enable_query_cache
+      clear_query_cache
   =
   if json then (
     if debug_level > 0 then
@@ -59,6 +62,9 @@ let verify
   Sym.print_nums := print_sym_nums;
   Pp.print_timestamps := not no_timestamps;
   TypeErrors.explore_root_cause := not no_explore_root_cause;
+  Timing.enabled := profile;
+  Query_cache.enabled := enable_query_cache;
+  if clear_query_cache then Query_cache.clear ();
   (match solver_logging with
    | Some d ->
      Solver.Logger.to_file := true;
@@ -124,6 +130,8 @@ let verify
                  ~generate_state_html:(not no_state_html)
                  err)
             errors;
+        Timing.print_stats ();
+        Query_cache.print_stats ();
         Option.fold ~none:() ~some:exit (Common.exit_code_of_errors (List.map snd errors));
         Check.generate_lemmas lemmas lemmata
       in
@@ -266,6 +274,21 @@ module Flags = struct
   let no_explore_root_cause =
     let doc = "disable expression exploration for root-cause analysis" in
     Arg.(value & flag & info [ "no-explore-root-cause" ] ~doc)
+
+
+  let profile =
+    let doc = "enable performance profiling and print timing statistics" in
+    Arg.(value & flag & info [ "profile" ] ~doc)
+
+
+  let enable_query_cache =
+    let doc = "enable query caching with alpha-renaming normalization" in
+    Arg.(value & flag & info [ "query-cache" ] ~doc)
+
+
+  let clear_query_cache =
+    let doc = "clear query cache before starting" in
+    Arg.(value & flag & info [ "clear-query-cache" ] ~doc)
 end
 
 module Lemma_flags = struct
@@ -344,6 +367,9 @@ let verify_t : unit Term.t =
   $ Flags.no_produce_models
   $ Flags.no_state_html
   $ Flags.no_explore_root_cause
+  $ Flags.profile
+  $ Flags.enable_query_cache
+  $ Flags.clear_query_cache
 
 
 let cmd =

@@ -4,6 +4,7 @@ open IT
 module LC = LogicalConstraints
 module CTypeMap = Map.Make (Sctypes)
 module IntMap = Map.Make (Int)
+module QCache = Query_cache
 open Global
 open Pp
 
@@ -59,7 +60,10 @@ type solver =
     ctypes_rev : Sctypes.t IntMap.t;
       (** Declarations for C types. Each C type is assigned a unique integer.
           Unlike previously, this mapping is fixed (constant) from the start. *)
-    model_smt_solver : SMT.solver (* The SMT solver used for model evaluation. *)
+    model_smt_solver : SMT.solver; (* The SMT solver used for model evaluation. *)
+    var_normalization : (Sym.t, string) Hashtbl.t;
+      (** Maps quantified vars to normalized names *)
+    var_counters : (BT.t, int) Hashtbl.t (** Counter per type for normalized names *)
   }
 
 module Debug = struct
@@ -75,6 +79,56 @@ module Debug = struct
     ^/^ separate_map hardline dump_frame (!(solver.cur_frame) :: !(solver.prev_frames))
     ^/^ !^"|~~~~~~ End Solver Dump ~~~~~~~~~|"
 end
+
+(* Generate normalized variable name: v_{type}_{counter} *)
+let normalized_var_name solver bt =
+  (* Use the full type as the key to avoid ambiguity (e.g., different array types) *)
+  let count =
+    match Hashtbl.find_opt solver.var_counters bt with Some n -> n | None -> 0
+  in
+  Hashtbl.replace solver.var_counters bt (count + 1);
+  (* Generate a readable but unique prefix based on type *)
+  let type_prefix =
+    match bt with
+    | BT.Bits (_, w) -> Printf.sprintf "bv%d" w
+    | Bool -> "bool"
+    | Integer -> "int"
+    | Alloc_id -> "alloc"
+    | Map (_k, _v) ->
+      (* Include a hash of the full type to disambiguate different array types *)
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "arr_%s" (String.sub type_hash 0 8)
+    | Loc _ -> "loc"
+    | Struct tag -> Printf.sprintf "struct_%s" (Sym.pp_string_no_nums tag)
+    | Datatype tag -> Printf.sprintf "dt_%s" (Sym.pp_string_no_nums tag)
+    | Record _ ->
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "rec_%s" (String.sub type_hash 0 8)
+    | Tuple _ ->
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "tuple_%s" (String.sub type_hash 0 8)
+    | Set _ ->
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "set_%s" (String.sub type_hash 0 8)
+    | List _ ->
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "list_%s" (String.sub type_hash 0 8)
+    | Real -> "real"
+    | Unit -> "unit"
+    | CType -> "ctype"
+    | MemByte -> "membyte"
+    | Option _ ->
+      let type_str = Pp.plain (BT.pp bt) in
+      let type_hash = Digest.string type_str |> Digest.to_hex in
+      Printf.sprintf "opt_%s" (String.sub type_hash 0 8)
+  in
+  Printf.sprintf "v_%s_%d" type_prefix count
+
 
 let get_commands s =
   let frames = !(s.cur_frame) :: !(s.prev_frames) in
@@ -645,7 +699,11 @@ let rec translate_term s iterm =
   in
   match IT.get_term iterm with
   | Const c -> translate_const s c
-  | Sym x -> SMT.atom (CN_Names.fn_name x)
+  | Sym x ->
+    (* Check if this symbol has been normalized for caching *)
+    (match Hashtbl.find_opt s.var_normalization x with
+     | Some norm_name -> SMT.atom norm_name
+     | None -> SMT.atom (CN_Names.fn_name x))
   | Unop (op, e1) ->
     (match op with
      | BW_FFS_NoSMT ->
@@ -1033,7 +1091,17 @@ let define_fun s name arg_binders res_bt body =
   ack_command s (SMT.define_fun sname args ret_t (translate_term s body))
 
 
-let declare_variable solver (sym, bt) = declare_fun solver sym [] bt
+let declare_variable solver (sym, bt) =
+  if !QCache.enabled then (
+    (* Use normalized name and store mapping for term translation *)
+    let norm_name = normalized_var_name solver bt in
+    Hashtbl.add solver.var_normalization sym norm_name;
+    let args_ts = [] in
+    let res_t = translate_base_type bt in
+    ack_command solver (SMT.declare_fun norm_name args_ts res_t))
+  else
+    declare_fun solver sym [] bt
+
 
 (** {1 Solver Initialization} *)
 
@@ -1258,7 +1326,9 @@ let make globals variable_bindings =
       ctypes;
       ctypes_rev;
       globals;
-      model_smt_solver = SMT.new_solver model_cfg
+      model_smt_solver = SMT.new_solver model_cfg;
+      var_normalization = Hashtbl.create 100;
+      var_counters = Hashtbl.create 20
     }
   in
   List.iter (SMT.ack_command s.model_smt_solver) (SMT.incremental model_cfg);
@@ -1416,9 +1486,9 @@ let assume solver lc =
 
 
 let check_new_solver cfg cmds =
-  let s = SMT.new_solver cfg in
-  List.iter (SMT.ack_command s) cmds;
-  let result = SMT.check s in
+  let s = Timing.time_phase "smt_solver_spawn" (fun () -> SMT.new_solver cfg) in
+  Timing.time_phase "smt_send_commands" (fun () -> List.iter (SMT.ack_command s) cmds);
+  let result = Timing.time_phase "smt_actual_check" (fun () -> SMT.check s) in
   s.stop ();
   result
 
@@ -1426,28 +1496,56 @@ let check_new_solver cfg cmds =
 let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
   clear_model ();
   (* shortcut, as similarly suggested by Robbert *)
-  match Simplify.LogicalConstraints.simp simp_ctxt lc with
+  let lc =
+    Timing.time_phase "simplify_constraint" (fun () ->
+      Simplify.LogicalConstraints.simp simp_ctxt lc)
+  in
+  match lc with
   | LC.T (IT (Const (Bool true), _, _)) -> `True
   | lc ->
-    push solver;
-    let { qs; expr; extra } = reduce_goal assumptions lc in
-    List.iter (declare_variable solver) qs;
-    List.iter (fun t -> assume solver (T t)) (not_ expr loc :: extra);
-    let cmds = List.rev (get_commands solver) in
-    let answer =
-      match if !inc_enabled then SMT.check solver.smt_solver else Unknown with
-      | Unknown -> check_new_solver solver.smt_solver.config cmds
-      | a -> a
+    let qs =
+      Timing.time_phase "smt_query_setup" (fun () ->
+        push solver;
+        (* DON'T clear normalization - symbols may be reused across queries *)
+        let { qs; expr; extra } = reduce_goal assumptions lc in
+        List.iter (declare_variable solver) qs;
+        List.iter (fun t -> assume solver (T t)) (not_ expr loc :: extra);
+        qs)
     in
-    pop solver 1;
-    (match answer with
-     | Unsat -> `True
-     | Sat ->
-       if !produce_models then record_model solver cmds qs;
-       `False
-     | Unknown ->
-       if !produce_models then record_model solver cmds qs;
-       `Unknown)
+    let cmds = List.rev (get_commands solver) in
+    (* For caching, only use commands from the current query (top frame), not the full context *)
+    let query_cmds = List.rev !(solver.cur_frame).commands in
+    (* Check cache before querying Z3 *)
+    let cached_result = QCache.lookup_smt_commands query_cmds in
+    (match cached_result with
+     | Some result ->
+       (* Cache hit - skip Z3 *)
+       pop solver 1;
+       result
+     | None ->
+       (* Cache miss - query Z3 *)
+       let answer =
+         Timing.time_phase "smt_check" (fun () ->
+           match if !inc_enabled then SMT.check solver.smt_solver else Unknown with
+           | Unknown -> check_new_solver solver.smt_solver.config cmds
+           | a -> a)
+       in
+       pop solver 1;
+       let result =
+         match answer with
+         | Unsat -> `True
+         | Sat ->
+           if !produce_models then
+             Timing.time_phase "record_model" (fun () -> record_model solver cmds qs);
+           `False
+         | Unknown ->
+           if !produce_models then
+             Timing.time_phase "record_model" (fun () -> record_model solver cmds qs);
+           `Unknown
+       in
+       (* Store in cache *)
+       QCache.store_smt_commands query_cmds result;
+       result)
 
 
 (** The main way to query the solver. *)
