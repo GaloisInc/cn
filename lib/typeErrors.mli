@@ -81,6 +81,11 @@ type message =
         ctxt : Context.t * Explain.log;
         model : Solver.model_with_q
       }
+  | Unexpected_Provable_Constraint of
+      { constr : LogicalConstraints.t;
+        info : Locations.info;
+        ctxt : Context.t * Explain.log
+      }
   | Undefined_behaviour of
       { ub : Cerb_frontend.Undefined.undefined_behaviour;
         ctxt : Context.t * Explain.log;

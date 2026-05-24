@@ -1,0 +1,16 @@
+return code: 1
+[1/4]: get_value -- pass
+[2/4]: use_return_value -- pass
+[3/4]: test_specific_value -- pass
+[4/4]: test_constraint_persistence -- fail
+Atomic: call_get_value2_return == 50'i32 /* 0x32 */
+  -> FALSE
+cn/not_necessarily_return.c:63:9: error: Unprovable constraint
+    /*@ assert((i32)y == 50i32); @*/  // Can we prove this?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/not_necessarily_return.c:63:9:
+    /*@ assert((i32)y == 50i32); @*/  // Can we prove this?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  call_get_value2_return == 50'i32 /* 0x32 */
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_return.c__test_constraint_persistence.html

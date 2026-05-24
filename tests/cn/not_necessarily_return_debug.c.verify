@@ -1,0 +1,14 @@
+return code: 1
+[1/2]: get_value -- pass
+[2/2]: test_simple -- fail
+Atomic: call_get_value0_return == 50'i32 /* 0x32 */
+  -> FALSE
+cn/not_necessarily_return_debug.c:26:9: error: Unprovable constraint
+    /*@ assert((i32)y == 50i32); @*/   // Will this work?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/not_necessarily_return_debug.c:26:9:
+    /*@ assert((i32)y == 50i32); @*/   // Will this work?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  call_get_value0_return == 50'i32 /* 0x32 */
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_return_debug.c__test_simple.html

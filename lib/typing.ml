@@ -400,16 +400,124 @@ let get_movable_indices () = inspect (fun s -> s.movable_indices)
 
 let set_movable_indices ixs : unit m = modify (fun s -> { s with movable_indices = ixs })
 
+(** Helper functions for not_necessarily builtin **)
+
+(* Detect not_necessarily(c) pattern in a logical constraint *)
+let is_not_necessarily_constraint (lc : LC.t) : LC.t option =
+  match lc with
+  | LC.T (IT (Apply (sym, [ inner_expr ]), _, _))
+    when String.equal (Sym.pp_string sym) "not_necessarily" ->
+    Some (LC.T inner_expr)
+  | _ -> None
+
+
+(* Check that a constraint is NOT necessarily true (for negative testing)
+   not_necessarily(X) requires: X is SAT and ¬X is SAT
+   i.e., provable(X) = False and provable(¬X) = False *)
+let ensure_not_necessarily (loc : Loc.t) (lc : LC.t) : unit m =
+  let@ solver = get_solver () in
+  let@ s = get_typing_context () in
+  let@ simp_ctxt = simp_ctxt () in
+  let assumptions = s.Context.constraints in
+  (* First check if X is provable *)
+  match Solver.provable ~loc ~solver ~assumptions ~simp_ctxt lc with
+  | `True ->
+    (* X is provable - FAILURE *)
+    fail (fun ctxt_log ->
+      { loc;
+        msg =
+          TypeErrors.Unexpected_Provable_Constraint
+            { constr = lc;
+              info =
+                ( loc,
+                  Some "constraint was expected to NOT be provable, but it is provable" );
+              ctxt = ctxt_log
+            }
+      })
+  | `Unknown ->
+    (* Solver couldn't decide on X - treat as failure *)
+    fail (fun ctxt_log ->
+      { loc;
+        msg =
+          TypeErrors.Unexpected_Provable_Constraint
+            { constr = lc;
+              info =
+                ( loc,
+                  Some "constraint provability is inconclusive (solver returned Unknown)"
+                );
+              ctxt = ctxt_log
+            }
+      })
+  | `False ->
+    (* X is not provable, now check if ¬X is provable *)
+    let negated_lc =
+      match lc with
+      | LC.T expr -> LC.T (IT.not_ expr loc)
+      | LC.Forall ((_sym, _bt), expr) ->
+        (* ¬(∀x. P(x)) = ∃x. ¬P(x), which we can't directly express,
+           so we just check the negated body *)
+        LC.T (IT.not_ expr loc)
+    in
+    (match Solver.provable ~loc ~solver ~assumptions ~simp_ctxt negated_lc with
+     | `True ->
+       (* ¬X is provable, so X is necessarily false - FAILURE *)
+       fail (fun ctxt_log ->
+         { loc;
+           msg =
+             TypeErrors.Unexpected_Provable_Constraint
+               { constr = lc;
+                 info =
+                   ( loc,
+                     Some
+                       "constraint was expected to be satisfiable, but its negation is \
+                        provable (constraint is necessarily false)" );
+                 ctxt = ctxt_log
+               }
+         })
+     | `Unknown ->
+       (* Solver couldn't decide on ¬X - treat as failure *)
+       fail (fun ctxt_log ->
+         { loc;
+           msg =
+             TypeErrors.Unexpected_Provable_Constraint
+               { constr = lc;
+                 info =
+                   ( loc,
+                     Some
+                       "constraint negation provability is inconclusive (solver returned \
+                        Unknown)" );
+                 ctxt = ctxt_log
+               }
+         })
+     | `False ->
+       (* Both X and ¬X are not provable - SUCCESS! *)
+       return ())
+
+
 let add_c_internal lc =
   let@ s = get_typing_context () in
   let@ solver = get_solver () in
   let@ simp_ctxt = simp_ctxt () in
-  let lc = Simplify.LogicalConstraints.simp simp_ctxt lc in
-  let s = Context.add_c lc s in
-  let () = Solver.assume solver lc in
-  let@ _ = add_sym_eqs (List.filter_map LC.is_sym_lhs_equality [ lc ]) in
-  let@ () = set_typing_context s in
-  return ()
+  (* Check if this is a not_necessarily constraint BEFORE simplification *)
+  match is_not_necessarily_constraint lc with
+  | Some _inner_lc ->
+    (* not_necessarily in requires/assumptions: skip entirely.
+       It only makes sense to check not_necessarily locally in assertions
+       and function body postconditions, not in preconditions/assumptions. *)
+    Pp.(
+      debug
+        9
+        (lazy
+          (item "skipping not_necessarily in precondition/assumption context" (LC.pp lc))));
+    return ()
+  | None ->
+    (* Regular constraint: simplify and add to context and solver *)
+    let lc = Simplify.LogicalConstraints.simp simp_ctxt lc in
+    let s = Context.add_c lc s in
+    let () = Solver.assume solver lc in
+    let@ _ = add_sym_eqs (List.filter_map LC.is_sym_lhs_equality [ lc ]) in
+    let@ () = set_typing_context s in
+    return ()
 
 
 let add_r_internal ?(derive_constraints = true) loc (r, Res.O oargs) =

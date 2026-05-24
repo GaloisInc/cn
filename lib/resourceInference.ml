@@ -12,6 +12,17 @@ let debug_constraint_failure_diagnostics
   ()
 
 
+(** Helper function for not_provable builtin **)
+
+(* Detect not_necessarily(c) pattern in a logical constraint *)
+let is_not_necessarily_constraint (lc : LC.t) : LC.t option =
+  match lc with
+  | LC.T (IT (Apply (sym, [ inner_expr ]), _, _))
+    when String.equal (Sym.pp_string sym) "not_necessarily" ->
+    Some (LC.T inner_expr)
+  | _ -> None
+
+
 let fail_missing_resource loc (situation, requests) =
   let here = Locations.other __LOC__ in
   let@ provable = provable loc in
@@ -154,24 +165,126 @@ module General = struct
       let it = Simplify.IndexTerms.simp simp_ctxt it in
       return (LAT.subst rt_subst (IT.make_subst [ (s, it) ]) ftyp, [])
     | Constraint (c, info, ftyp) ->
-      let@ provable = provable loc in
-      Pp.(debug 9 (lazy (item "checking constraint" (LC.pp c))));
-      let res = provable ~purpose:"constraint" c in
-      (match res with
-       | `True -> return (ftyp, [])
-       | `False ->
-         let@ model = model () in
-         let@ all_cs = get_cs () in
-         let () = assert (not (LC.Set.mem c all_cs)) in
-         debug_constraint_failure_diagnostics 6 model simp_ctxt c;
-         let@ () = Diagnostics.investigate model c in
-         fail (fun ctxt ->
-           (* let ctxt = { ctxt with resources = original_resources } in *)
-           { loc;
-             msg =
-               TypeErrors.Unproven_constraint
-                 { constr = c; info; requests = snd uiinfo; ctxt; model }
-           }))
+      (* Check if this is a not_necessarily constraint *)
+      (match is_not_necessarily_constraint c with
+       | Some inner_c ->
+         (* not_necessarily is a special statement for local checking only.
+            Skip it in interprocedural contexts (function calls, subtyping). *)
+         let situation, _request_chain = uiinfo in
+         let is_interprocedural =
+           match situation with
+           | Error_common.Call (Error_common.FunctionCall _)
+           | Error_common.Call Error_common.Subtyping ->
+             true
+           | _ -> false
+         in
+         if is_interprocedural then (
+           (* Skip not_necessarily constraints at function boundaries *)
+           Pp.(
+             debug
+               9
+               (lazy
+                 (item
+                    "skipping not_necessarily in interprocedural context"
+                    (LC.pp inner_c))));
+           return (ftyp, []))
+         else (* Check not_necessarily locally (in function body postconditions) *)
+           let@ provable = provable loc in
+           Pp.(
+             debug 9 (lazy (item "checking not_necessarily constraint" (LC.pp inner_c))));
+           (* Check if inner_c is provable *)
+           (match provable ~purpose:"not_necessarily" inner_c with
+            | `True ->
+              (* inner_c IS provable - FAILURE *)
+              fail (fun ctxt ->
+                { loc;
+                  msg =
+                    TypeErrors.Unexpected_Provable_Constraint
+                      { constr = inner_c;
+                        info =
+                          ( loc,
+                            Some
+                              "constraint is necessarily true (expected: not necessarily \
+                               true)" );
+                        ctxt
+                      }
+                })
+            | `Unknown ->
+              (* Solver couldn't decide - treat as failure *)
+              fail (fun ctxt ->
+                { loc;
+                  msg =
+                    TypeErrors.Unexpected_Provable_Constraint
+                      { constr = inner_c;
+                        info =
+                          ( loc,
+                            Some
+                              "constraint provability is inconclusive (solver returned \
+                               Unknown)" );
+                        ctxt
+                      }
+                })
+            | `False ->
+              (* inner_c is not provable, now check if ¬inner_c is provable *)
+              let negated_c =
+                match inner_c with
+                | LC.T expr -> LC.T (IT.not_ expr loc)
+                | LC.Forall ((_sym, _bt), expr) -> LC.T (IT.not_ expr loc)
+              in
+              (match provable ~purpose:"not_necessarily_negation" negated_c with
+               | `True ->
+                 (* ¬inner_c is provable, so inner_c is necessarily false - FAILURE *)
+                 fail (fun ctxt ->
+                   { loc;
+                     msg =
+                       TypeErrors.Unexpected_Provable_Constraint
+                         { constr = inner_c;
+                           info =
+                             ( loc,
+                               Some
+                                 "constraint is necessarily false (expected: not \
+                                  necessarily true)" );
+                           ctxt
+                         }
+                   })
+               | `Unknown ->
+                 (* Solver couldn't decide on negation - treat as failure *)
+                 fail (fun ctxt ->
+                   { loc;
+                     msg =
+                       TypeErrors.Unexpected_Provable_Constraint
+                         { constr = inner_c;
+                           info =
+                             ( loc,
+                               Some
+                                 "constraint negation provability is inconclusive \
+                                  (solver returned Unknown)" );
+                           ctxt
+                         }
+                   })
+               | `False ->
+                 (* Both inner_c and ¬inner_c are not provable - SUCCESS *)
+                 return (ftyp, [])))
+       | None ->
+         (* Regular constraint: check it's provable *)
+         let@ provable = provable loc in
+         Pp.(debug 9 (lazy (item "checking constraint" (LC.pp c))));
+         let res = provable ~purpose:"constraint" c in
+         (match res with
+          | `True -> return (ftyp, [])
+          | `False ->
+            let@ model = model () in
+            let@ all_cs = get_cs () in
+            let () = assert (not (LC.Set.mem c all_cs)) in
+            debug_constraint_failure_diagnostics 6 model simp_ctxt c;
+            let@ () = Diagnostics.investigate model c in
+            fail (fun ctxt ->
+              (* let ctxt = { ctxt with resources = original_resources } in *)
+              { loc;
+                msg =
+                  TypeErrors.Unproven_constraint
+                    { constr = c; info; requests = snd uiinfo; ctxt; model }
+              })))
     | I _rt -> return (ftyp, [])
 
 

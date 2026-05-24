@@ -1,0 +1,4 @@
+return code: 0
+[1/3]: test_ensures -- pass
+[2/3]: test_requires -- pass
+[3/3]: test_range_ensures -- pass

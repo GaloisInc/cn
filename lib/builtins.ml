@@ -116,6 +116,13 @@ let is_null_def : builtin_fn_def =
     (IT.eq__ (IT.sym_ (sym, bt, loc)) (IT.null_ loc)) loc)
 
 
+(* not_necessarily is a meta-level predicate for negative testing.
+   It checks that a constraint is satisfiable but not entailed (possible but not necessary).
+   The actual checking happens in check.ml and resourceInference.ml *)
+let not_necessarily_builtin_def : builtin_fn_def =
+  mk_builtin_arg1 "not_necessarily" BT.Bool (fun (sym, bt) -> IT.sym_ (sym, bt, loc))
+
+
 (* Cannot translate this to a logical function until the TODO in `cn_to_ail_expr_aux_internal` in `cn_internal_to_ail.ml` is resolved*)
 let has_alloc_id_def =
   ( "has_alloc_id",
@@ -282,7 +289,14 @@ let builtin_funs
 
 
 let builtin_fun_defs =
-  max_min_bits @ [ not_def; is_null_def; ptr_eq_def; prov_eq_def; addr_eq_def ]
+  max_min_bits
+  @ [ not_def;
+      is_null_def;
+      not_necessarily_builtin_def;
+      ptr_eq_def;
+      prov_eq_def;
+      addr_eq_def
+    ]
 
 
 let apply_builtin_funs fsym args loc =

@@ -514,6 +514,98 @@ let valid_for_deref loc pointer ct =
     ({ name = Owned (ct, Uninit); pointer; iargs = [] }, None)
 
 
+(** Helper functions for not_necessarily builtin **)
+
+(* Detect not_necessarily(c) pattern in a logical constraint *)
+let is_not_necessarily_constraint (lc : LC.t) : LC.t option =
+  match lc with
+  | LC.T (IT (Apply (sym, [ inner_expr ]), _, _))
+    when String.equal (Sym.pp_string sym) "not_necessarily" ->
+    Some (LC.T inner_expr)
+  | _ -> None
+
+
+(* Check that a constraint is NOT necessarily true (for negative testing)
+   not_necessarily(X) requires: X is SAT and ¬X is SAT
+   i.e., provable(X) = False and provable(¬X) = False *)
+let ensure_not_necessarily (loc : Loc.t) (lc : LC.t) : unit m =
+  let@ provable = provable loc in
+  (* First check if X is provable *)
+  match provable lc with
+  | `True ->
+    (* X is provable - FAILURE *)
+    fail (fun ctxt ->
+      { loc;
+        msg =
+          Unexpected_Provable_Constraint
+            { constr = lc;
+              info =
+                ( loc,
+                  Some "constraint is necessarily true (expected: not necessarily true)"
+                );
+              ctxt
+            }
+      })
+  | `Unknown ->
+    (* Solver couldn't decide on X - treat as failure *)
+    fail (fun ctxt ->
+      { loc;
+        msg =
+          Unexpected_Provable_Constraint
+            { constr = lc;
+              info =
+                ( loc,
+                  Some "constraint provability is inconclusive (solver returned Unknown)"
+                );
+              ctxt
+            }
+      })
+  | `False ->
+    (* X is not provable, now check if ¬X is provable *)
+    let negated_lc =
+      match lc with
+      | LC.T expr -> LC.T (IT.not_ expr loc)
+      | LC.Forall ((_sym, _bt), expr) ->
+        (* ¬(∀x. P(x)) = ∃x. ¬P(x), which we can't directly express,
+           so we just check the negated body *)
+        LC.T (IT.not_ expr loc)
+    in
+    (match provable negated_lc with
+     | `True ->
+       (* ¬X is provable, so X is necessarily false - FAILURE *)
+       fail (fun ctxt ->
+         { loc;
+           msg =
+             Unexpected_Provable_Constraint
+               { constr = lc;
+                 info =
+                   ( loc,
+                     Some
+                       "constraint is necessarily false (expected: not necessarily true)"
+                   );
+                 ctxt
+               }
+         })
+     | `Unknown ->
+       (* Solver couldn't decide on ¬X - treat as failure *)
+       fail (fun ctxt ->
+         { loc;
+           msg =
+             Unexpected_Provable_Constraint
+               { constr = lc;
+                 info =
+                   ( loc,
+                     Some
+                       "constraint negation provability is inconclusive (solver returned \
+                        Unknown)" );
+                 ctxt
+               }
+         })
+     | `False ->
+       (* Both X and ¬X are not provable - SUCCESS! *)
+       return ())
+
+
 let rec check_pexpr path_cs (pe : BT.t Mu.pexpr) : IT.t m =
   let (Mu.Pexpr (loc, _, expect, pe_)) = pe in
   let provable loc =
@@ -2233,20 +2325,27 @@ let rec check_expr labels (e : BT.t Mu.expr) (k : IT.t -> unit m) : unit m =
              return ())
       | Assert lc ->
         let@ lc = WellTyped.logical_constraint loc lc in
-        let@ provable = provable loc in
-        (match provable lc with
-         | `True -> return ()
-         | `False ->
-           let@ model = model () in
-           let@ simp_ctxt = simp_ctxt () in
-           RI.debug_constraint_failure_diagnostics 6 model simp_ctxt lc;
-           let@ () = Diagnostics.investigate model lc in
-           fail (fun ctxt ->
-             { loc;
-               msg =
-                 Unproven_constraint
-                   { constr = lc; info = (loc, None); requests = []; ctxt; model }
-             }))
+        (* Check if this is a not_necessarily assertion *)
+        (match is_not_necessarily_constraint lc with
+         | Some inner_lc ->
+           (* Negative assertion: verify inner_lc is NOT necessarily true *)
+           ensure_not_necessarily loc inner_lc
+         | None ->
+           (* Regular assertion: verify lc IS provable *)
+           let@ provable = provable loc in
+           (match provable lc with
+            | `True -> return ()
+            | `False ->
+              let@ model = model () in
+              let@ simp_ctxt = simp_ctxt () in
+              RI.debug_constraint_failure_diagnostics 6 model simp_ctxt lc;
+              let@ () = Diagnostics.investigate model lc in
+              fail (fun ctxt ->
+                { loc;
+                  msg =
+                    Unproven_constraint
+                      { constr = lc; info = (loc, None); requests = []; ctxt; model }
+                })))
       | Inline _nms -> return ()
       | Print it ->
         let@ it = WellTyped.infer_term it in

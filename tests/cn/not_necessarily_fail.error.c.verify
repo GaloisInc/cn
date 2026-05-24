@@ -1,0 +1,10 @@
+return code: 1
+[1/1]: test_provable_constraint -- fail
+cn/not_necessarily_fail.error.c:11:9: error: Unexpected provable constraint
+    /*@ assert(not_necessarily((i32)x >= 10i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+constraint is necessarily true (expected: not necessarily true) from cn/not_necessarily_fail.error.c:11:9:
+    /*@ assert(not_necessarily((i32)x >= 10i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+This constraint was marked as 'not_necessarily' but is necessarily true
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_fail.error.c__test_provable_constraint.html

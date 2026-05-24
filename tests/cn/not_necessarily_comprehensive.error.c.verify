@@ -1,0 +1,28 @@
+return code: 1
+[1/3]: test_provable_true -- fail
+[2/3]: test_provable_false -- fail
+[3/3]: test_exact_value -- fail
+cn/not_necessarily_comprehensive.error.c:12:9: error: Unexpected provable constraint
+    /*@ assert(not_necessarily((i32)x >= 10i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+constraint is necessarily true (expected: not necessarily true) from cn/not_necessarily_comprehensive.error.c:12:9:
+    /*@ assert(not_necessarily((i32)x >= 10i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+This constraint was marked as 'not_necessarily' but is necessarily true
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_comprehensive.error.c__test_provable_true.html
+cn/not_necessarily_comprehensive.error.c:24:9: error: Unexpected provable constraint
+    /*@ assert(not_necessarily((i32)x < 5i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+constraint is necessarily false (expected: not necessarily true) from cn/not_necessarily_comprehensive.error.c:24:9:
+    /*@ assert(not_necessarily((i32)x < 5i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+This constraint was marked as 'not_necessarily' but is necessarily true
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_comprehensive.error.c__test_provable_false.html
+cn/not_necessarily_comprehensive.error.c:36:9: error: Unexpected provable constraint
+    /*@ assert(not_necessarily((i32)x == 42i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+constraint is necessarily true (expected: not necessarily true) from cn/not_necessarily_comprehensive.error.c:36:9:
+    /*@ assert(not_necessarily((i32)x == 42i32)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+This constraint was marked as 'not_necessarily' but is necessarily true
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__not_necessarily_comprehensive.error.c__test_exact_value.html

@@ -1,0 +1,4 @@
+return code: 0
+[1/3]: test_necessarily_true -- pass
+[2/3]: test_necessarily_false -- pass
+[3/3]: test_possible_not_necessary -- pass

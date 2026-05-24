@@ -1,0 +1,5 @@
+return code: 0
+[1/4]: callee -- pass
+[2/4]: caller_pass -- pass
+[3/4]: caller_fail -- pass
+[4/4]: caller_fail_negation -- pass

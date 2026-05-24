@@ -138,6 +138,11 @@ type message =
         ctxt : Context.t * Explain.log;
         model : Solver.model_with_q
       }
+  | Unexpected_Provable_Constraint of
+      { constr : LC.t;
+        info : Locations.info;
+        ctxt : Context.t * Explain.log
+      }
   | Undefined_behaviour of
       { ub : CF.Undefined.undefined_behaviour;
         ctxt : Context.t * Explain.log;
@@ -746,6 +751,27 @@ let pp_message = function
       match RequestChain.pp requests with
       | Some doc2 -> doc_with_details ^^ hardline ^^ doc2
       | None -> doc_with_details
+    in
+    { short; descr = Some descr; state = Some state }
+  | Unexpected_Provable_Constraint { constr; info; ctxt } ->
+    let short = !^"Unexpected provable constraint" in
+    let state =
+      Explain.trace
+        ctxt
+        (Solver.empty_model, [])
+        Explain.{ no_ex with unproven_constraint = Some constr }
+    in
+    let descr =
+      let spec_loc, odescr = info in
+      let head, pos = Locations.head_pos_of_location spec_loc in
+      let base_doc =
+        match odescr with
+        | None -> !^"Constraint from" ^^^ !^head ^/^ !^pos
+        | Some descr -> !^descr ^^^ !^"from" ^^^ !^head ^/^ !^pos
+      in
+      base_doc
+      ^^ hardline
+      ^^ !^"This constraint was marked as 'not_necessarily' but is necessarily true"
     in
     { short; descr = Some descr; state = Some state }
   | Undefined_behaviour { ub; ctxt; model } ->
