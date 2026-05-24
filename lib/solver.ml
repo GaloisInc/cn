@@ -46,9 +46,15 @@ module CN_Names = struct
 end
 
 type solver_frame =
-  { mutable commands : SMT.sexp list (** Ack-style SMT commands, most recent first. *) }
+  { mutable commands : SMT.sexp list; (** Ack-style SMT commands, most recent first. *)
+    mutable declared_symbols : Sym.t list;
+      (** Symbols declared in this frame, for cleanup on pop *)
+    saved_counters : (BT.t, int) Hashtbl.t (** Counter state at push time *)
+  }
 
-let empty_solver_frame () = { commands = [] }
+let empty_solver_frame () =
+  { commands = []; declared_symbols = []; saved_counters = Hashtbl.create 10 }
+
 
 type solver =
   { smt_solver : SMT.solver; (** The SMT solver connection. *)
@@ -155,7 +161,12 @@ let debug_ack_command s cmd =
 (** Start a new scope. *)
 let push s =
   debug_ack_command s (SMT.push 1);
-  s.prev_frames := !(s.cur_frame) :: !(s.prev_frames);
+  (* Save current counter state in the frame being pushed *)
+  let frame = !(s.cur_frame) in
+  Hashtbl.iter
+    (fun bt count -> Hashtbl.replace frame.saved_counters bt count)
+    s.var_counters;
+  s.prev_frames := frame :: !(s.prev_frames);
   s.cur_frame := empty_solver_frame ()
 
 
@@ -165,14 +176,29 @@ let pop s n =
     ()
   else (
     debug_ack_command s (SMT.pop n);
+    (* Remove declared symbols from var_normalization for popped frames *)
     let rec drop count xs =
       match xs with
       | new_cur :: new_rest ->
         if count = 1 then (
+          (* Remove symbols declared in the frame we're popping *)
+          List.iter
+            (fun sym -> Hashtbl.remove s.var_normalization sym)
+            !(s.cur_frame).declared_symbols;
+          (* Restore counter state from the frame we're returning to *)
+          Hashtbl.clear s.var_counters;
+          Hashtbl.iter
+            (fun bt count -> Hashtbl.replace s.var_counters bt count)
+            new_cur.saved_counters;
           s.cur_frame := new_cur;
           s.prev_frames := new_rest)
-        else
-          drop (count - 1) new_rest
+        else (
+          (* Also remove symbols from intermediate frames being popped *)
+          let frame_to_pop = List.hd xs in
+          List.iter
+            (fun sym -> Hashtbl.remove s.var_normalization sym)
+            frame_to_pop.declared_symbols;
+          drop (count - 1) new_rest)
       | _ -> assert false
     in
     drop n !(s.prev_frames))
@@ -1111,6 +1137,9 @@ let declare_variable solver (sym, bt) =
         (* Use normalized name and store mapping for term translation *)
         let norm_name = normalized_var_name solver bt in
         Hashtbl.add solver.var_normalization sym norm_name;
+        (* Track this symbol in the current frame for cleanup on pop *)
+        let frame = !(solver.cur_frame) in
+        frame.declared_symbols <- sym :: frame.declared_symbols;
         let args_ts = [] in
         let res_t = translate_base_type bt in
         ack_command solver (SMT.declare_fun norm_name args_ts res_t))
