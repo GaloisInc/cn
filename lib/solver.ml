@@ -46,12 +46,9 @@ module CN_Names = struct
 end
 
 type solver_frame =
-  { mutable commands : SMT.sexp list; (** Ack-style SMT commands, most recent first. *)
-    saved_counters : (BT.t, int) Hashtbl.t
-      (** Saved counter state at push time for proper pop restoration *)
-  }
+  { mutable commands : SMT.sexp list (** Ack-style SMT commands, most recent first. *) }
 
-let empty_solver_frame () = { commands = []; saved_counters = Hashtbl.create 10 }
+let empty_solver_frame () = { commands = [] }
 
 type solver =
   { smt_solver : SMT.solver; (** The SMT solver connection. *)
@@ -83,13 +80,22 @@ module Debug = struct
     ^/^ !^"|~~~~~~ End Solver Dump ~~~~~~~~~|"
 end
 
+(* Normalize base type to SMT-level representation for counter keying.
+   Types that map to the same SMT type should share counters. *)
+let counter_key_of_bt bt =
+  match bt with
+  | BT.Bits (_, w) -> BT.Bits (Unsigned, w) (* Normalize signed/unsigned to unsigned *)
+  | _ -> bt
+
+
 (* Generate normalized variable name: v_{type}_{counter} *)
 let normalized_var_name solver bt =
-  (* Use the full type as the key to avoid ambiguity (e.g., different array types) *)
+  (* Use SMT-level type as key so u32 and i32 share the same counter *)
+  let key = counter_key_of_bt bt in
   let count =
-    match Hashtbl.find_opt solver.var_counters bt with Some n -> n | None -> 0
+    match Hashtbl.find_opt solver.var_counters key with Some n -> n | None -> 0
   in
-  Hashtbl.replace solver.var_counters bt (count + 1);
+  Hashtbl.replace solver.var_counters key (count + 1);
   (* Generate a readable but unique prefix based on type *)
   let type_prefix =
     match bt with
@@ -149,12 +155,7 @@ let debug_ack_command s cmd =
 (** Start a new scope. *)
 let push s =
   debug_ack_command s (SMT.push 1);
-  (* Save current counter state before pushing *)
-  let frame = !(s.cur_frame) in
-  Hashtbl.iter
-    (fun bt count -> Hashtbl.replace frame.saved_counters bt count)
-    s.var_counters;
-  s.prev_frames := frame :: !(s.prev_frames);
+  s.prev_frames := !(s.cur_frame) :: !(s.prev_frames);
   s.cur_frame := empty_solver_frame ()
 
 
@@ -169,12 +170,7 @@ let pop s n =
       | new_cur :: new_rest ->
         if count = 1 then (
           s.cur_frame := new_cur;
-          s.prev_frames := new_rest;
-          (* Restore counter state from the frame we're returning to *)
-          Hashtbl.clear s.var_counters;
-          Hashtbl.iter
-            (fun bt count -> Hashtbl.replace s.var_counters bt count)
-            new_cur.saved_counters)
+          s.prev_frames := new_rest)
         else
           drop (count - 1) new_rest
       | _ -> assert false
@@ -1106,12 +1102,18 @@ let define_fun s name arg_binders res_bt body =
 
 let declare_variable solver (sym, bt) =
   if !QCache.enabled then (
-    (* Use normalized name and store mapping for term translation *)
-    let norm_name = normalized_var_name solver bt in
-    Hashtbl.add solver.var_normalization sym norm_name;
-    let args_ts = [] in
-    let res_t = translate_base_type bt in
-    ack_command solver (SMT.declare_fun norm_name args_ts res_t))
+    (* Check if already declared to avoid duplicate declarations *)
+      match Hashtbl.find_opt solver.var_normalization sym with
+      | Some _norm_name ->
+        (* Already declared, skip *)
+        ()
+      | None ->
+        (* Use normalized name and store mapping for term translation *)
+        let norm_name = normalized_var_name solver bt in
+        Hashtbl.add solver.var_normalization sym norm_name;
+        let args_ts = [] in
+        let res_t = translate_base_type bt in
+        ack_command solver (SMT.declare_fun norm_name args_ts res_t))
   else
     declare_fun solver sym [] bt
 
