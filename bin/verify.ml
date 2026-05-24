@@ -76,7 +76,8 @@ let verify
   Solver.try_hard := try_hard;
   Solver.inc_enabled := solver_inc_enabled;
   Solver.inc_timeout := solver_inc_timeout;
-  Solver.produce_models := not no_produce_models;
+  (* Disable models when query cache is enabled (can't cache model state) *)
+  Solver.produce_models := (not no_produce_models) && not enable_query_cache;
   IndexTerms.use_vip := not dont_use_vip;
   Check.fail_fast := fail_fast;
   Diagnostics.diag_string := diag;
