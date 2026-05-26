@@ -18,7 +18,6 @@
    -Werror=shadow
    -Werror=strict-prototypes
    -Wframe-larger-than=2048
-   -Wno-error=cast-function-type-strict
    -Wundef
    -Wvla)))
 
