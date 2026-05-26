@@ -2846,15 +2846,48 @@ let check_c_function ((fsym, (loc, args_and_body)) : c_function) : unit m =
 (** Check the provided C functions. The first failed check will short-circuit
     the remainder of the checks, and the associated error will be returned as
     [Some], along with the name of the function in which it occurred. *)
-let check_c_functions_fast (funs : c_function list) : (string * TypeErrors.t) option m =
+let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t) option m
+  =
   let total = List.length funs in
   let check_and_record (num_checked, prev_error) c_fn =
     match prev_error with
     | Some _ -> return (num_checked, prev_error)
     | None ->
+      let fsym, (loc, _args_and_body) = c_fn in
       let fn_name = c_function_name c_fn in
+      let start_time = Unix.gettimeofday () in
       let@ outcome = sandbox (check_c_function c_fn) in
+      let end_time = Unix.gettimeofday () in
+      let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
       let checked = num_checked + 1 in
+      (* Record result in database if enabled *)
+      (match db with
+       | Some db_handle ->
+         let sym_str = Sym.pp_string fsym in
+         let file_path = Pp.plain (Locations.pp loc) in
+         (* Use stub hash for now - TODO: implement proper hashing *)
+         let content_hash = "stub_content_" ^ sym_str in
+         let spec_hash = "stub_spec_" ^ sym_str in
+         (match outcome with
+          | Ok () ->
+            VerificationDb.record_function_verified
+              db_handle
+              ~sym:sym_str
+              ~name:fn_name
+              ~file_path
+              ~content_hash
+              ~spec_hash
+              ~time_ms
+          | Error err ->
+            let report = TypeErrors.pp_message err.TypeErrors.msg in
+            let error_msg = Pp.plain report.TypeErrors.short in
+            VerificationDb.record_function_failed
+              db_handle
+              ~sym:sym_str
+              ~content_hash
+              ~spec_hash
+              ~error:error_msg)
+       | None -> ());
       (match outcome with
        | Ok () ->
          progress_simple (of_total checked total) (fn_name ^ " -- pass");
@@ -2875,12 +2908,44 @@ let check_c_functions_fast (funs : c_function list) : (string * TypeErrors.t) op
     The result's order is determined by the input's order: if function [f]
     appears before function [g], then function [f]'s error (if any) will appear
     before function [g]'s error (if any). *)
-let check_c_functions_all (funs : c_function list) : (string * TypeErrors.t) list m =
+let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t) list m =
   let total = List.length funs in
   let check_and_record (num_checked, errors) c_fn =
+    let fsym, (loc, _args_and_body) = c_fn in
     let fn_name = c_function_name c_fn in
+    let start_time = Unix.gettimeofday () in
     let@ outcome = sandbox (check_c_function c_fn) in
+    let end_time = Unix.gettimeofday () in
+    let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
     let checked = num_checked + 1 in
+    (* Record result in database if enabled *)
+    (match db with
+     | Some db_handle ->
+       let sym_str = Sym.pp_string fsym in
+       let file_path = Pp.plain (Locations.pp loc) in
+       (* Use stub hash for now - TODO: implement proper hashing *)
+       let content_hash = "stub_content_" ^ sym_str in
+       let spec_hash = "stub_spec_" ^ sym_str in
+       (match outcome with
+        | Ok () ->
+          VerificationDb.record_function_verified
+            db_handle
+            ~sym:sym_str
+            ~name:fn_name
+            ~file_path
+            ~content_hash
+            ~spec_hash
+            ~time_ms
+        | Error err ->
+          let report = TypeErrors.pp_message err.TypeErrors.msg in
+          let error_msg = Pp.plain report.TypeErrors.short in
+          VerificationDb.record_function_failed
+            db_handle
+            ~sym:sym_str
+            ~content_hash
+            ~spec_hash
+            ~error:error_msg)
+     | None -> ());
     match outcome with
     | Ok () ->
       progress_simple (of_total checked total) (fn_name ^ " -- pass");
@@ -3145,9 +3210,9 @@ let time_check_c_functions
   let@ errors =
     match !fail_fast with
     | true ->
-      let@ error_opt = check_c_functions_fast selected_funs in
+      let@ error_opt = check_c_functions_fast ?db selected_funs in
       return (Option.to_list error_opt)
-    | false -> check_c_functions_all selected_funs
+    | false -> check_c_functions_all ?db selected_funs
   in
   Cerb_debug.end_csv_timing "type checking functions";
   (* Combine consistency errors with regular errors *)
