@@ -4,3 +4,8 @@
  (name test_verificationDb)
  (libraries cn ounit2)
  (modules test_verificationDb))
+
+(test
+ (name test_contentHash)
+ (libraries cn ounit2)
+ (modules test_contentHash))
