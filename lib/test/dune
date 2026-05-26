@@ -1,0 +1,6 @@
+(include_subdirs no)
+
+(test
+ (name test_verificationDb)
+ (libraries cn ounit2)
+ (modules test_verificationDb))

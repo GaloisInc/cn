@@ -22,6 +22,7 @@ depends: [
   "cmdliner"
   "ocamlgraph"
   "zarith" {>= "1.13"}
+  "sqlite3" {>= "5.0.0"}
   "ounit2" {with-test}
   "qcheck" {with-test}
   "qcheck-ounit" {with-test}
