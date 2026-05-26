@@ -3085,9 +3085,12 @@ let check_decls_lemmata_fun_specs (file : unit Mu.file) =
 let time_check_c_functions
       skip_and_only
       check_consistency
+      ?db
       (global_var_constraints, (checked : c_function list))
   : (string * TypeErrors.t) list m
   =
+  let _ = db in
+  (* Silence unused warning for now - will use later *)
   Cerb_debug.begin_csv_timing () (*type checking functions*);
   let@ () = init_solver () in
   let here = Locations.other __LOC__ in

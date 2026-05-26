@@ -49,6 +49,10 @@ let verify
       profile
       enable_query_cache
       clear_query_cache
+      use_db
+      db_path
+      clear_db
+      db_stats
   =
   if json then (
     if debug_level > 0 then
@@ -65,6 +69,19 @@ let verify
   Timing.enabled := profile;
   Query_cache.enabled := enable_query_cache;
   if clear_query_cache then Query_cache.clear ();
+  (* Open verification database if requested *)
+  let db_handle =
+    if use_db then (
+      (* Create .cn directory if it doesn't exist *)
+      let db_dir = Filename.dirname db_path in
+      (try Unix.mkdir db_dir 0o755 with Unix.Unix_error (Unix.EEXIST, _, _) -> ());
+      let db = VerificationDb.open_db db_path in
+      VerificationDb.init_schema db;
+      if clear_db then VerificationDb.clear_all db;
+      Some db)
+    else
+      None
+  in
   (match solver_logging with
    | Some d ->
      Solver.Logger.to_file := true;
@@ -118,6 +135,7 @@ let verify
           Check.time_check_c_functions
             (skip, only)
             check_consistency
+            ?db:db_handle
             (global_var_constraints, functions)
         in
         if not quiet then
@@ -133,6 +151,15 @@ let verify
             errors;
         Timing.print_stats ();
         Query_cache.print_stats ();
+        (* Show database statistics if requested *)
+        (match db_handle with
+         | Some _db when db_stats ->
+           (* TODO: implement print_statistics *)
+           Printf.printf "\nVerification Database Statistics:\n";
+           Printf.printf "  Database: %s\n" db_path
+         | _ -> ());
+        (* Close database *)
+        Option.iter (fun db -> ignore (VerificationDb.close_db db)) db_handle;
         Option.fold ~none:() ~some:exit (Common.exit_code_of_errors (List.map snd errors));
         Check.generate_lemmas lemmas lemmata
       in
@@ -290,6 +317,28 @@ module Flags = struct
   let clear_query_cache =
     let doc = "clear query cache before starting" in
     Arg.(value & flag & info [ "clear-query-cache" ] ~doc)
+
+
+  let use_db =
+    let doc =
+      "enable verification status database for incremental checking (EXPERIMENTAL)"
+    in
+    Arg.(value & flag & info [ "use-db"; "verification-db" ] ~doc)
+
+
+  let db_path =
+    let doc = "path to verification database file (default: .cn/verification.db)" in
+    Arg.(value & opt string ".cn/verification.db" & info [ "db-path" ] ~docv:"PATH" ~doc)
+
+
+  let clear_db =
+    let doc = "clear verification database before run" in
+    Arg.(value & flag & info [ "clear-db" ] ~doc)
+
+
+  let db_stats =
+    let doc = "show verification database statistics after run" in
+    Arg.(value & flag & info [ "db-stats" ] ~doc)
 end
 
 module Lemma_flags = struct
@@ -371,6 +420,10 @@ let verify_t : unit Term.t =
   $ Flags.profile
   $ Flags.enable_query_cache
   $ Flags.clear_query_cache
+  $ Flags.use_db
+  $ Flags.db_path
+  $ Flags.clear_db
+  $ Flags.db_stats
 
 
 let cmd =
