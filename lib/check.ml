@@ -2893,26 +2893,6 @@ let check_c_functions_all (funs : c_function list) : (string * TypeErrors.t) lis
   return (List.rev errors)
 
 
-(** Downselect from the provided functions with [select_functions] and check the
-    results. Errors in checking are captured, collected, and returned, along
-    with the name of the function in which they occurred. When [fail_fast] is
-    set, the first error encountered will halt checking. *)
-let check_c_functions skip_and_only (funs : c_function list)
-  : (string * TypeErrors.t) list m
-  =
-  let selected_fsyms =
-    select_functions skip_and_only (Sym.Set.of_list (List.map fst funs))
-  in
-  let selected_funs =
-    List.filter (fun (fsym, _) -> Sym.Set.mem fsym selected_fsyms) funs
-  in
-  match !fail_fast with
-  | true ->
-    let@ error_opt = check_c_functions_fast selected_funs in
-    return (Option.to_list error_opt)
-  | false -> check_c_functions_all selected_funs
-
-
 (* (Sym.t * (Locations.t * ArgumentTypes.lemmat)) list *)
 
 let wf_check_and_record_lemma (lemma_s, (loc, lemma_typ)) =
@@ -3098,9 +3078,10 @@ let check_decls_lemmata_fun_specs (file : unit Mu.file) =
   return (List.rev checked, global_var_constraints, lemmata)
 
 
-(** With CSV timing enabled, check the provided functions with
-    [check_c_functions]. See that function for more information on the
-    semantics of checking. *)
+(** With CSV timing enabled, check the provided functions. Filters by
+    [skip_and_only] and checks either with fail-fast or exhaustive mode
+    depending on the [fail_fast] ref. When [check_consistency] is true,
+    also performs consistency checking on predicates and procedures. *)
 let time_check_c_functions
       skip_and_only
       check_consistency
@@ -3111,6 +3092,13 @@ let time_check_c_functions
   let@ () = init_solver () in
   let here = Locations.other __LOC__ in
   let@ () = add_cs here global_var_constraints in
+  (* Apply --only/--skip filtering once upfront *)
+  let selected_fsyms =
+    select_functions skip_and_only (Sym.Set.of_list (List.map fst checked))
+  in
+  let selected_funs =
+    List.filter (fun (fsym, _) -> Sym.Set.mem fsym selected_fsyms) checked
+  in
   let@ global = get_global () in
   let@ consistency_errors =
     match check_consistency with
@@ -3137,7 +3125,7 @@ let time_check_c_functions
             let new_acc = match result with Ok () -> acc | Error err -> err :: acc in
             fold_procs new_acc rest
         in
-        fold_procs [] checked
+        fold_procs [] selected_funs
       in
       return (pred_errors @ proc_errors)
     | false -> return []
@@ -3151,7 +3139,13 @@ let time_check_c_functions
          (name, err))
       consistency_errors
   in
-  let@ errors = check_c_functions skip_and_only checked in
+  let@ errors =
+    match !fail_fast with
+    | true ->
+      let@ error_opt = check_c_functions_fast selected_funs in
+      return (Option.to_list error_opt)
+    | false -> check_c_functions_all selected_funs
+  in
   Cerb_debug.end_csv_timing "type checking functions";
   (* Combine consistency errors with regular errors *)
   return (consistency_error_list @ errors)
