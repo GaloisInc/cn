@@ -2861,33 +2861,36 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
       let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
       let checked = num_checked + 1 in
       (* Record result in database if enabled *)
-      (match db with
-       | Some db_handle ->
-         let sym_str = Sym.pp_string fsym in
-         let file_path = Pp.plain (Locations.pp loc) in
-         (* Use stub hash for now - TODO: implement proper hashing *)
-         let content_hash = "stub_content_" ^ sym_str in
-         let spec_hash = "stub_spec_" ^ sym_str in
-         (match outcome with
-          | Ok () ->
-            VerificationDb.record_function_verified
-              db_handle
-              ~sym:sym_str
-              ~name:fn_name
-              ~file_path
-              ~content_hash
-              ~spec_hash
-              ~time_ms
-          | Error err ->
-            let report = TypeErrors.pp_message err.TypeErrors.msg in
-            let error_msg = Pp.plain report.TypeErrors.short in
-            VerificationDb.record_function_failed
-              db_handle
-              ~sym:sym_str
-              ~content_hash
-              ~spec_hash
-              ~error:error_msg)
-       | None -> ());
+      let@ () =
+        match db with
+        | Some db_handle ->
+          let sym_str = Sym.pp_string fsym in
+          let file_path = Pp.plain (Locations.pp loc) in
+          (* TODO: Compute real content hashes once type inference issues are resolved *)
+          let spec_hash = ContentHash.hash_function_spec None in
+          let content_hash = spec_hash in
+          (match outcome with
+           | Ok () ->
+             VerificationDb.record_function_verified
+               db_handle
+               ~sym:sym_str
+               ~name:fn_name
+               ~file_path
+               ~content_hash
+               ~spec_hash
+               ~time_ms
+           | Error err ->
+             let report = TypeErrors.pp_message err.TypeErrors.msg in
+             let error_msg = Pp.plain report.TypeErrors.short in
+             VerificationDb.record_function_failed
+               db_handle
+               ~sym:sym_str
+               ~content_hash
+               ~spec_hash
+               ~error:error_msg);
+          return ()
+        | None -> return ()
+      in
       (match outcome with
        | Ok () ->
          progress_simple (of_total checked total) (fn_name ^ " -- pass");
@@ -2919,33 +2922,36 @@ let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t)
     let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
     let checked = num_checked + 1 in
     (* Record result in database if enabled *)
-    (match db with
-     | Some db_handle ->
-       let sym_str = Sym.pp_string fsym in
-       let file_path = Pp.plain (Locations.pp loc) in
-       (* Use stub hash for now - TODO: implement proper hashing *)
-       let content_hash = "stub_content_" ^ sym_str in
-       let spec_hash = "stub_spec_" ^ sym_str in
-       (match outcome with
-        | Ok () ->
-          VerificationDb.record_function_verified
-            db_handle
-            ~sym:sym_str
-            ~name:fn_name
-            ~file_path
-            ~content_hash
-            ~spec_hash
-            ~time_ms
-        | Error err ->
-          let report = TypeErrors.pp_message err.TypeErrors.msg in
-          let error_msg = Pp.plain report.TypeErrors.short in
-          VerificationDb.record_function_failed
-            db_handle
-            ~sym:sym_str
-            ~content_hash
-            ~spec_hash
-            ~error:error_msg)
-     | None -> ());
+    let@ () =
+      match db with
+      | Some db_handle ->
+        let sym_str = Sym.pp_string fsym in
+        let file_path = Pp.plain (Locations.pp loc) in
+        (* TODO: Compute real content hashes once type inference issues are resolved *)
+        let spec_hash = ContentHash.hash_function_spec None in
+        let content_hash = spec_hash in
+        (match outcome with
+         | Ok () ->
+           VerificationDb.record_function_verified
+             db_handle
+             ~sym:sym_str
+             ~name:fn_name
+             ~file_path
+             ~content_hash
+             ~spec_hash
+             ~time_ms
+         | Error err ->
+           let report = TypeErrors.pp_message err.TypeErrors.msg in
+           let error_msg = Pp.plain report.TypeErrors.short in
+           VerificationDb.record_function_failed
+             db_handle
+             ~sym:sym_str
+             ~content_hash
+             ~spec_hash
+             ~error:error_msg);
+        return ()
+      | None -> return ()
+    in
     match outcome with
     | Ok () ->
       progress_simple (of_total checked total) (fn_name ^ " -- pass");
