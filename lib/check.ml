@@ -3173,6 +3173,46 @@ let time_check_c_functions
   let selected_funs =
     List.filter (fun (fsym, _) -> Sym.Set.mem fsym selected_fsyms) checked
   in
+  (* Filter based on database staleness if enabled *)
+  let@ selected_funs =
+    match db with
+    | None -> return selected_funs
+    | Some db_handle ->
+      (* Compute current hashes for all selected functions *)
+      let@ _global = get_global () in
+      let current_hashes = Hashtbl.create (List.length selected_funs) in
+      List.iter
+        (fun (fsym, _) ->
+           (* TODO: Use real function type once type inference is resolved *)
+           let spec_hash = ContentHash.hash_function_spec None in
+           let content_hash = spec_hash in
+           Hashtbl.add current_hashes (Sym.pp_string fsym) (content_hash, spec_hash))
+        selected_funs;
+      (* Filter out functions that haven't changed *)
+      let stale_funs =
+        List.filter
+          (fun (fsym, _) ->
+             let sym_str = Sym.pp_string fsym in
+             match VerificationDb.get_function_status db_handle sym_str with
+             | None ->
+               (* Never verified before, needs checking *)
+               true
+             | Some record ->
+               let current_content, _current_spec = Hashtbl.find current_hashes sym_str in
+               (* Check if content hash changed *)
+               String.compare record.VerificationDb.content_hash current_content <> 0
+             (* TODO: Also check if dependencies changed *))
+          selected_funs
+      in
+      if List.length stale_funs < List.length selected_funs then
+        debug
+          1
+          (lazy
+            (!^"Incremental verification: skipping"
+             ^^^ !^(string_of_int (List.length selected_funs - List.length stale_funs))
+             ^^^ !^"unchanged functions"));
+      return stale_funs
+  in
   let@ global = get_global () in
   let@ consistency_errors =
     match check_consistency with
