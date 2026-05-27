@@ -26,6 +26,9 @@ val hash_logical_function
 (** Hash just the specification (pre/post) of a function *)
 val hash_function_spec : ArgumentTypes.ft option -> string
 
+(** Hash args_and_body including spec and full body with loop invariants *)
+val hash_args_and_body : BaseTypes.t Mucore.args_and_body -> string
+
 (** Hash a struct definition *)
 val hash_struct_definition
   :  Memory.struct_decl ->

@@ -2886,7 +2886,7 @@ let check_c_functions_fast
           (* Get function type and compute real hash *)
           let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
           let spec_hash = ContentHash.hash_function_spec ft_opt in
-          let content_hash = spec_hash in
+          let content_hash = ContentHash.hash_args_and_body args_and_body in
           (match outcome with
            | Ok () ->
              VerificationDb.record_function_verified
@@ -3014,7 +3014,7 @@ let check_c_functions_all
   =
   let total = Option.value total_override ~default:(List.length funs) in
   let check_and_record (num_checked, errors) c_fn =
-    let fsym, (loc, _args_and_body) = c_fn in
+    let fsym, (loc, args_and_body) = c_fn in
     let fn_name = c_function_name c_fn in
     let start_time = Unix.gettimeofday () in
     let@ outcome = sandbox (check_c_function c_fn) in
@@ -3032,7 +3032,7 @@ let check_c_functions_all
         (* Get function type and compute real hash *)
         let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
         let spec_hash = ContentHash.hash_function_spec ft_opt in
-        let content_hash = spec_hash in
+        let content_hash = ContentHash.hash_args_and_body args_and_body in
         (match outcome with
          | Ok () ->
            VerificationDb.record_function_verified
@@ -3357,10 +3357,10 @@ let time_check_c_functions
       let current_hashes = Hashtbl.create (List.length selected_funs) in
       let@ () =
         ListM.iterM
-          (fun (fsym, (loc, _)) ->
+          (fun (fsym, (loc, args_and_body)) ->
              let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
              let spec_hash = ContentHash.hash_function_spec ft_opt in
-             let content_hash = spec_hash in
+             let content_hash = ContentHash.hash_args_and_body args_and_body in
              Hashtbl.add current_hashes (Sym.pp_string fsym) (content_hash, spec_hash);
              return ())
           selected_funs

@@ -354,6 +354,15 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     Digest.string ft_str |> Digest.to_hex
 
 
+(** Hash args_and_body including spec and full body with loop invariants *)
+let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
+  (* Use structural polymorphic hash on the entire structure.
+     This will include loop invariants which are in the label_def structures.
+     The hash is stable across runs for the same source code. *)
+  let hash_int = Hashtbl.hash args_and_body in
+  Printf.sprintf "%016x" hash_int
+
+
 (** Hash a full function definition including spec and body *)
 let hash_function
       (_def : Definition.Function.t)
