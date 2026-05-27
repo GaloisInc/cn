@@ -397,6 +397,11 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     in
     (* Convert to string *)
     let str = Pp.plain doc in
+    (* Debug: Print serialized text if environment variable is set *)
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       Printf.eprintf "=== Serialized text for hashing ===\n%s\n=== End ===\n%!" str
+     | _ -> ());
     (* Hash the string *)
     Digest.string str |> Digest.to_hex
   with
