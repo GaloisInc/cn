@@ -395,8 +395,11 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
            ^^^ ReturnTypes.pp rt)
         args_and_body
     in
-    (* Convert to string *)
-    let str = Pp.plain doc in
+    (* Convert to string with fixed width to ensure deterministic output *)
+    (* PPrint.ToBuffer uses a default width that can vary - use a large fixed width *)
+    let buffer = Buffer.create 4096 in
+    PPrint.ToBuffer.pretty 1.0 1000000 buffer doc;
+    let str = Buffer.contents buffer in
     (* Debug: Print serialized text if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
