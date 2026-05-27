@@ -48,6 +48,10 @@ let open_db (path : string) : db_handle =
 
 (** Initialize schema if not exists *)
 let init_schema (db : db_handle) : unit =
+  (* Set busy timeout for concurrent access FIRST *)
+  (match exec db "PRAGMA busy_timeout = 5000" with
+   | Rc.OK -> ()
+   | rc -> failwith (Printf.sprintf "Failed to set busy timeout: %s" (Rc.to_string rc)));
   let schema =
     [ {|CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY
@@ -200,17 +204,30 @@ let init_schema (db : db_handle) : unit =
        ON functions(content_hash)|}
     ]
   in
-  (* Set busy timeout for concurrent access *)
-  ignore (exec db "PRAGMA busy_timeout = 5000");
+  (* Use a transaction to ensure atomicity *)
+  (match exec db "BEGIN IMMEDIATE" with
+   | Rc.OK -> ()
+   | Rc.BUSY ->
+     (* Another process is initializing, wait and retry *)
+     Unix.sleepf 0.1;
+     (match exec db "BEGIN IMMEDIATE" with
+      | Rc.OK -> ()
+      | rc -> failwith (Printf.sprintf "Schema init failed (BEGIN): %s" (Rc.to_string rc)))
+   | rc -> failwith (Printf.sprintf "Schema init failed (BEGIN): %s" (Rc.to_string rc)));
   List.iter
     (fun sql ->
        match exec db sql with
        | Rc.OK -> ()
        | rc ->
+         ignore (exec db "ROLLBACK");
          failwith (Printf.sprintf "Schema init failed: %s\nSQL: %s" (Rc.to_string rc) sql))
     schema;
   (* Insert or update schema version *)
-  ignore (exec db "INSERT OR REPLACE INTO schema_version (version) VALUES (1)")
+  ignore (exec db "INSERT OR REPLACE INTO schema_version (version) VALUES (1)");
+  (* Commit the transaction *)
+  match exec db "COMMIT" with
+  | Rc.OK -> ()
+  | rc -> failwith (Printf.sprintf "Schema init failed (COMMIT): %s" (Rc.to_string rc))
 
 
 (** Execute a prepared statement with parameters *)
