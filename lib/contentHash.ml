@@ -10,11 +10,12 @@ module IT = IndexTerms
 module LAT = LogicalArgumentTypes
 module Sym_map = Map.Make (Sym)
 
-(** Convert a PPrint document to string with fixed width for deterministic hashing.
-    Uses a large fixed width to prevent line wrapping from varying based on terminal size. *)
+(** Convert a PPrint document to string for deterministic hashing.
+    Uses compact format (no pretty-printing) to ensure fully canonical output
+    that doesn't depend on terminal width, isatty, or any other environment factors. *)
 let pp_to_string (doc : PPrint.document) : string =
   let buffer = Buffer.create 4096 in
-  PPrint.ToBuffer.pretty 1.0 1000000 buffer doc;
+  PPrint.ToBuffer.compact buffer doc;
   Buffer.contents buffer
 
 
