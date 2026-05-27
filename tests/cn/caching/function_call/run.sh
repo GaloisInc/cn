@@ -23,29 +23,32 @@ echo
 
 echo "2. Re-run with same file (should skip both):"
 RESULT2=$(cn verify --use-db foo.c 2>&1)
-echo "$RESULT2" | grep -E "^\[|pass|fail" || echo "   (all skipped)"
+echo "$RESULT2" | grep -E "^\[|cached|pass|fail"
 
-if echo "$RESULT2" | grep -q "pass\|fail"; then
+# Check that both were cached (not freshly verified)
+if echo "$RESULT2" | grep -q "helper.*cached" && echo "$RESULT2" | grep -q "caller.*cached"; then
+  echo "   ✓ Both skipped"
+else
   echo "   ✗ Should have skipped!"
   exit 1
-else
-  echo "   ✓ Both skipped"
 fi
 echo
 
 echo "3. Change helper SPEC (add extra ensures clause):"
 cp foo_2.c foo.c
 RESULT3=$(cn verify --use-db foo.c 2>&1)
-echo "$RESULT3" | grep -E "^\[|pass|fail" || echo "   (all skipped)"
+echo "$RESULT3" | grep -E "^\[|cached|pass|fail"
 
-if echo "$RESULT3" | grep -q "helper.*pass"; then
+# Check helper was re-verified (not cached)
+if echo "$RESULT3" | grep -q "helper.*pass" && ! echo "$RESULT3" | grep -q "helper.*cached"; then
   echo "   ✓ helper re-verified (spec changed)"
 else
   echo "   ✗ helper should have been re-verified!"
   exit 1
 fi
 
-if echo "$RESULT3" | grep -q "caller.*pass"; then
+# Check caller was re-verified (not cached)
+if echo "$RESULT3" | grep -q "caller.*pass" && ! echo "$RESULT3" | grep -q "caller.*cached"; then
   echo "   ✓ caller re-verified (callee spec changed)"
   echo
   echo "✓ SUCCESS: Function call dependency tracking works!"

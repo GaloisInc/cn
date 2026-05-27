@@ -354,13 +354,58 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     Digest.string ft_str |> Digest.to_hex
 
 
-(** Hash args_and_body including spec and full body with loop invariants *)
+(** Hash args_and_body using location-independent pretty-printing
+
+    We use Pp_mucore.Basic which has show_locations=false, giving us a
+    canonical string representation that excludes filenames and line numbers.
+
+    The pretty-printer outputs the complete function structure including:
+    - All arguments (computational and ghost)
+    - The function body
+    - Loop labels and invariants
+    - CN specifications
+
+    This is filename-independent and line-number-independent, so identical
+    functions in different files will hash the same.
+*)
 let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
-  (* Use structural polymorphic hash on the entire structure.
-     This will include loop invariants which are in the label_def structures.
-     The hash is stable across runs for the same source code. *)
-  let hash_int = Hashtbl.hash args_and_body in
-  Printf.sprintf "%016x" hash_int
+  try
+    (* Open infix operators for Pp *)
+    let open Pp.Infix in
+    (* Pretty-print using Basic module which doesn't show locations *)
+    let doc =
+      Pp_mucore.Basic.pp_arguments
+        (fun (body, labels, rt) ->
+           (* Print body *)
+           Pp_mucore.Basic.pp_expr None body
+           (* Include labels (loop invariants etc) *)
+           ^^^ Pmap.fold
+                 (fun _sym def acc ->
+                    acc
+                    ^^^
+                    match def with
+                    | Mucore.Loop (_loc, loop_args, _annots, _label_spec, _info) ->
+                      (* Include loop spec which has invariants *)
+                      Pp.string "loop_inv"
+                      ^^^ Pp_mucore.Basic.pp_arguments (fun _ -> Pp.empty) loop_args
+                    | _ -> Pp.empty)
+                 labels
+                 Pp.empty
+           (* Include return type *)
+           ^^^ ReturnTypes.pp rt)
+        args_and_body
+    in
+    (* Convert to string *)
+    let str = Pp.plain doc in
+    (* Hash the string *)
+    Digest.string str |> Digest.to_hex
+  with
+  | exn ->
+    (* Don't fall back - fail explicitly so we know about the problem *)
+    Printf.eprintf
+      "ERROR: Failed to pretty-print function for hashing: %s\n%!"
+      (Printexc.to_string exn);
+    raise exn
 
 
 (** Hash a full function definition including spec and body *)
