@@ -11,12 +11,21 @@ module LAT = LogicalArgumentTypes
 module Sym_map = Map.Make (Sym)
 
 (** Convert a PPrint document to string for deterministic hashing.
-    Uses compact format (no pretty-printing) to ensure fully canonical output
-    that doesn't depend on terminal width, isatty, or any other environment factors. *)
+    Problem: PPrint.ToBuffer.compact output differs between terminal and pipe.
+
+    Root cause hypothesis: ANSI escape codes or other terminal-specific formatting.
+
+    Solution: Render with compact, strip ANSI codes, normalize whitespace. *)
 let pp_to_string (doc : PPrint.document) : string =
-  let buffer = Buffer.create 4096 in
-  PPrint.ToBuffer.compact buffer doc;
-  Buffer.contents buffer
+  let buf = Buffer.create 4096 in
+  PPrint.ToBuffer.compact buf doc;
+  let str = Buffer.contents buf in
+  (* Strip ANSI escape codes (e.g., \x1b[...m for colors) *)
+  let no_ansi = Str.global_replace (Str.regexp "\x1b\\[[0-9;]*m") "" str in
+  (* Normalize all whitespace sequences to single space *)
+  let normalized = Str.global_replace (Str.regexp "[ \t\n\r]+") " " no_ansi in
+  (* Trim leading/trailing whitespace *)
+  String.trim normalized
 
 
 (** Check if a symbol name looks CN-generated (contains underscore followed by digits) *)
@@ -362,6 +371,13 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
        For now, use a simpler approach: serialize to string and hash.
        This won't have alpha-renaming yet, but it's better than the stub. *)
     let ft_str = pp_to_string (ArgumentTypes.pp ReturnTypes.pp ft) in
+    (* Debug: Print serialized spec if environment variable is set *)
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       Printf.eprintf
+         "=== Serialized SPEC for hashing ===\n%s\n=== End SPEC ===\n%!"
+         ft_str
+     | _ -> ());
     Digest.string ft_str |> Digest.to_hex
 
 
@@ -411,10 +427,22 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     (* Debug: Print serialized text if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
-       Printf.eprintf "=== Serialized text for hashing ===\n%s\n=== End ===\n%!" str
+       Printf.eprintf "=== Serialized text for hashing ===\n%s\n=== End ===\n%!" str;
+       Printf.eprintf "=== String length: %d bytes ===\n%!" (String.length str);
+       Printf.eprintf
+         "=== First 100 bytes (hex): %s ===\n%!"
+         (String.sub str 0 (min 100 (String.length str))
+          |> String.to_seq
+          |> Seq.map (fun c -> Printf.sprintf "%02x" (Char.code c))
+          |> List.of_seq
+          |> String.concat " ")
      | _ -> ());
     (* Hash the string *)
-    Digest.string str |> Digest.to_hex
+    let hash = Digest.string str |> Digest.to_hex in
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" -> Printf.eprintf "=== Hash: %s ===\n%!" hash
+     | _ -> ());
+    hash
   with
   | exn ->
     (* Don't fall back - fail explicitly so we know about the problem *)
