@@ -2880,7 +2880,9 @@ let check_c_functions_fast
         match db with
         | Some db_handle ->
           let sym_str = Sym.pp_string fsym in
-          let file_path = Pp.plain (Locations.pp loc) in
+          let file_path =
+            Option.value (Cerb_location.get_filename loc) ~default:"<unknown>"
+          in
           (* Get function type and compute real hash *)
           let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
           let spec_hash = ContentHash.hash_function_spec ft_opt in
@@ -3022,7 +3024,9 @@ let check_c_functions_all
       match db with
       | Some db_handle ->
         let sym_str = Sym.pp_string fsym in
-        let file_path = Pp.plain (Locations.pp loc) in
+        let file_path =
+          Option.value (Cerb_location.get_filename loc) ~default:"<unknown>"
+        in
         (* Get function type and compute real hash *)
         let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
         let spec_hash = ContentHash.hash_function_spec ft_opt in
