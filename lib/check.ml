@@ -2977,6 +2977,8 @@ let check_c_functions_fast
              VerificationDb.record_function_failed
                db_handle
                ~sym:sym_str
+               ~name:fn_name
+               ~file_path
                ~content_hash
                ~spec_hash
                ~error:error_msg;
@@ -3117,6 +3119,8 @@ let check_c_functions_all
            VerificationDb.record_function_failed
              db_handle
              ~sym:sym_str
+             ~name:fn_name
+             ~file_path
              ~content_hash
              ~spec_hash
              ~error:error_msg;

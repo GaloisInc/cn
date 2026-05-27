@@ -305,6 +305,8 @@ let record_function_verified
 let record_function_failed
       (db : db_handle)
       ~(sym : string)
+      ~(name : string)
+      ~(file_path : string)
       ~(content_hash : string)
       ~(spec_hash : string)
       ~(error : string)
@@ -325,10 +327,8 @@ let record_function_failed
     exec_stmt
       stmt
       [ Data.TEXT sym;
-        Data.TEXT sym;
-        (* name = sym for now *)
-        Data.TEXT "";
-        (* file_path unknown on failure *)
+        Data.TEXT name;
+        Data.TEXT file_path;
         Data.TEXT content_hash;
         Data.TEXT spec_hash;
         Data.FLOAT now;
@@ -1409,15 +1409,27 @@ let list_functions
       ()
   : function_record list
   =
+  let select_cols =
+    "sym, name, file_path, line_number, content_hash, spec_hash, last_verified_at, \
+     verification_status, verification_time_ms, error_message, consistency_checked, \
+     consistency_status"
+  in
   let sql =
     match (file_filter, status_filter) with
-    | None, None -> "SELECT * FROM functions ORDER BY name"
-    | Some _, None -> "SELECT * FROM functions WHERE file_path LIKE ? ORDER BY name"
+    | None, None -> Printf.sprintf "SELECT %s FROM functions ORDER BY name" select_cols
+    | Some _, None ->
+      Printf.sprintf
+        "SELECT %s FROM functions WHERE file_path LIKE ? ORDER BY name"
+        select_cols
     | None, Some _ ->
-      "SELECT * FROM functions WHERE verification_status = ? ORDER BY name"
+      Printf.sprintf
+        "SELECT %s FROM functions WHERE verification_status = ? ORDER BY name"
+        select_cols
     | Some _, Some _ ->
-      "SELECT * FROM functions WHERE file_path LIKE ? AND verification_status = ? ORDER \
-       BY name"
+      Printf.sprintf
+        "SELECT %s FROM functions WHERE file_path LIKE ? AND verification_status = ? \
+         ORDER BY name"
+        select_cols
   in
   let params =
     match (file_filter, status_filter) with
@@ -1432,32 +1444,45 @@ let list_functions
        let sym = match row.(0) with Data.TEXT s -> s | _ -> "" in
        let name = match row.(1) with Data.TEXT s -> s | _ -> "" in
        let file_path = match row.(2) with Data.TEXT s -> s | _ -> "" in
-       let content_hash = match row.(3) with Data.TEXT s -> s | _ -> "" in
-       let spec_hash = match row.(4) with Data.TEXT s -> s | _ -> "" in
+       let line_number =
+         match row.(3) with Data.INT i -> Some (Int64.to_int i) | _ -> None
+       in
+       let content_hash = match row.(4) with Data.TEXT s -> s | _ -> "" in
+       let spec_hash = match row.(5) with Data.TEXT s -> s | _ -> "" in
+       let last_verified_at = match row.(6) with Data.FLOAT f -> Some f | _ -> None in
        let verification_status =
-         match row.(5) with
+         match row.(7) with
          | Data.TEXT "pass" -> Pass
          | Data.TEXT "fail" -> Fail
          | Data.TEXT "stale" -> Stale
          | _ -> Unknown
        in
-       let last_verified_at = match row.(6) with Data.FLOAT f -> Some f | _ -> None in
        let verification_time_ms =
-         match row.(7) with Data.INT i -> Some (Int64.to_int i) | _ -> None
+         match row.(8) with Data.INT i -> Some (Int64.to_int i) | _ -> None
        in
-       let error_message = match row.(8) with Data.TEXT s -> Some s | _ -> None in
+       let error_message = match row.(9) with Data.TEXT s -> Some s | _ -> None in
+       let consistency_checked =
+         match row.(10) with Data.INT i -> Int64.compare i 0L <> 0 | _ -> false
+       in
+       let consistency_status =
+         match row.(11) with
+         | Data.TEXT "pass" -> Some Pass
+         | Data.TEXT "fail" -> Some Fail
+         | Data.TEXT "stale" -> Some Stale
+         | _ -> None
+       in
        { sym;
          name;
          file_path;
-         line_number = None;
+         line_number;
          content_hash;
          spec_hash;
          last_verified_at;
          status = verification_status;
          verification_time_ms;
          error_message;
-         consistency_checked = false;
-         consistency_status = None
+         consistency_checked;
+         consistency_status
        })
     rows
 

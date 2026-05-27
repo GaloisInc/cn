@@ -44,6 +44,8 @@ val record_function_verified
 val record_function_failed
   :  db_handle ->
   sym:string ->
+  name:string ->
+  file_path:string ->
   content_hash:string ->
   spec_hash:string ->
   error:string ->
