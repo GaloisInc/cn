@@ -5,11 +5,15 @@ echo "CN Incremental Verification Test Suite"
 echo "========================================="
 echo
 
-for test_dir in spec_change body_change predicate_change logical_function_change comment_change argument_rename transitive_predicate function_call logical_function lemma struct_change datatype_change broken_implementation cached_failure predicate_uses_logical_function predicate_uses_struct predicate_uses_datatype logical_function_recursive logical_function_uses_struct logical_function_uses_datatype lemma_uses_logical_function lemma_uses_struct lemma_uses_datatype; do
+for test_dir in spec_change body_change loop_invariant_change assert_change split_case_change predicate_change logical_function_change comment_change argument_rename transitive_predicate function_call logical_function lemma struct_change datatype_change broken_implementation cached_failure predicate_uses_logical_function predicate_uses_struct predicate_uses_datatype logical_function_recursive logical_function_uses_struct logical_function_uses_datatype lemma_uses_logical_function lemma_uses_struct lemma_uses_datatype; do
   echo
   echo "========================================="
   cd "$test_dir"
-  bash run.sh
+  if [ -f run.sh ]; then
+    bash run.sh
+  elif [ -f test.sh ]; then
+    bash test.sh
+  fi
   cd ..
   echo "========================================="
 done

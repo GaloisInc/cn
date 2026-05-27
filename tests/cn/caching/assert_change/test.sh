@@ -15,10 +15,10 @@ echo "[1/1]: increment -- pass"
 echo ""
 echo "Second run (same file, should be cached)..."
 output=$(cn verify --use-db --db-path=$DB_PATH foo_1.c 2>&1)
-if [ -z "$output" ]; then
-  echo "✓ Cached (no output)"
+if echo "$output" | grep -q "cached (pass)"; then
+  echo "✓ Cached (shows: cached (pass))"
 else
-  echo "✗ FAILED: Expected cache hit but got output:"
+  echo "✗ FAILED: Expected cache hit (cached (pass)) but got:"
   echo "$output"
   exit 1
 fi
