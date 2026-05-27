@@ -7,6 +7,7 @@
 
 module BT = BaseTypes
 module IT = IndexTerms
+module LAT = LogicalArgumentTypes
 module Sym_map = Map.Make (Sym)
 
 (** Check if a symbol name looks CN-generated (contains underscore followed by digits) *)
@@ -23,9 +24,7 @@ type norm_ctx =
     type_counters : (BT.t, int) Hashtbl.t (* Counter per type for ordering *)
   }
 
-let empty_ctx () =
-  { renaming = Sym_map.empty; type_counters = Hashtbl.create 20 }
-
+let empty_ctx () = { renaming = Sym_map.empty; type_counters = Hashtbl.create 20 }
 
 (** Generate canonical name for a variable based on type and order *)
 let canonical_sym (bt : BT.t) (order : int) (_loc : Locations.t) : Sym.t =
@@ -56,23 +55,20 @@ let canonical_sym (bt : BT.t) (order : int) (_loc : Locations.t) : Sym.t =
 let get_canonical (ctx : norm_ctx) (sym : Sym.t) (bt : BT.t) (loc : Locations.t)
   : Sym.t * norm_ctx
   =
-  if not (is_generated_sym sym) then
-    (* User-written variable, keep as-is *)
+  if not (is_generated_sym sym) then (* User-written variable, keep as-is *)
     (sym, ctx)
-  else
+  else (
     match Sym_map.find_opt sym ctx.renaming with
     | Some canonical -> (canonical, ctx)
     | None ->
       (* Generate new canonical name *)
       let count =
-        match Hashtbl.find_opt ctx.type_counters bt with
-        | Some n -> n
-        | None -> 0
+        match Hashtbl.find_opt ctx.type_counters bt with Some n -> n | None -> 0
       in
       Hashtbl.replace ctx.type_counters bt (count + 1);
       let canonical = canonical_sym bt count loc in
       let new_renaming = Sym_map.add sym canonical ctx.renaming in
-      (canonical, { ctx with renaming = new_renaming })
+      (canonical, { ctx with renaming = new_renaming }))
 
 
 (** Normalize an index term by alpha-renaming generated variables *)
@@ -211,6 +207,7 @@ let rec normalize_it (ctx : norm_ctx) (it : IT.t) : IT.t * norm_ctx =
   in
   (IT (term', bt, loc), ctx')
 
+
 and normalize_list ctx ts =
   List.fold_left
     (fun (acc, ctx) t ->
@@ -220,6 +217,7 @@ and normalize_list ctx ts =
     ts
   |> fun (ts, ctx) -> (List.rev ts, ctx)
 
+
 and normalize_members ctx members =
   List.fold_left
     (fun (acc, ctx) (id, t) ->
@@ -228,6 +226,7 @@ and normalize_members ctx members =
     ([], ctx)
     members
   |> fun (ms, ctx) -> (List.rev ms, ctx)
+
 
 and normalize_cases ctx cases =
   List.fold_left
@@ -239,6 +238,7 @@ and normalize_cases ctx cases =
     ([], ctx)
     cases
   |> fun (cs, ctx) -> (List.rev cs, ctx)
+
 
 and normalize_pattern ctx (Terms.Pat (pat_, bt, loc)) =
   let pat'', ctx' =
@@ -284,9 +284,7 @@ let hash_logical_function (def : Definition.Function.t) : string =
   in
   (* Include argument types in hash *)
   let args_str =
-    List.map
-      (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt))
-      def.args
+    List.map (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt)) def.args
     |> String.concat ","
   in
   let combined = args_str ^ "|" ^ body_str in
@@ -300,21 +298,20 @@ let hash_predicate (def : Definition.Predicate.t) : string =
     match def.clauses with
     | None -> "no_clauses"
     | Some clauses ->
-      (* Hash each clause *)
+      (* Hash each clause - include both guard and packing_ft *)
       List.map
         (fun (clause : Definition.Clause.t) ->
            let it_norm, _ = normalize_it ctx clause.guard in
            let guard_str = Pp.plain (IT.pp it_norm) in
-           (* Normalize the resources/outputs - simplified for now *)
-           "guard:" ^ guard_str)
+           (* Also hash the packing_ft (return type) *)
+           let packing_str = Pp.plain (LAT.pp IT.pp clause.packing_ft) in
+           "guard:" ^ guard_str ^ ";packing:" ^ packing_str)
         clauses
       |> String.concat "|"
   in
   (* Include argument types *)
   let args_str =
-    List.map
-      (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt))
-      def.iargs
+    List.map (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt)) def.iargs
     |> String.concat ","
   in
   let combined = args_str ^ "|" ^ clauses_str in
@@ -326,8 +323,7 @@ let hash_struct_definition (decl : Memory.struct_decl) : string =
   (* Hash field names, types, and order *)
   let fields_str =
     Memory.member_types decl
-    |> List.map (fun (id, ct) ->
-      Id.get_string id ^ ":" ^ Pp.plain (Sctypes.pp ct))
+    |> List.map (fun (id, ct) -> Id.get_string id ^ ":" ^ Pp.plain (Sctypes.pp ct))
     |> String.concat ","
   in
   Digest.string fields_str |> Digest.to_hex
@@ -336,8 +332,7 @@ let hash_struct_definition (decl : Memory.struct_decl) : string =
 (** Hash a datatype definition *)
 let hash_datatype_definition (dt_info : BT.dt_info) : string =
   (* Hash constructor names and all parameters *)
-  let ctors_str =
-    List.map Sym.pp_string dt_info.constrs |> String.concat "," in
+  let ctors_str = List.map Sym.pp_string dt_info.constrs |> String.concat "," in
   let params_str =
     List.map
       (fun (id, bt) -> Id.get_string id ^ ":" ^ Pp.plain (BT.pp bt))
@@ -351,10 +346,12 @@ let hash_datatype_definition (dt_info : BT.dt_info) : string =
 let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
   match ft_opt with
   | None -> Digest.string "no_spec" |> Digest.to_hex
-  | Some _ft ->
-    (* TODO: implement proper normalization and hashing of function specs *)
-    (* For now, just use a stub that indicates a spec exists *)
-    Digest.string "has_spec" |> Digest.to_hex
+  | Some ft ->
+    (* We need to traverse the ft structure and normalize all index terms within it.
+       For now, use a simpler approach: serialize to string and hash.
+       This won't have alpha-renaming yet, but it's better than the stub. *)
+    let ft_str = Pp.plain (ArgumentTypes.pp ReturnTypes.pp ft) in
+    Digest.string ft_str |> Digest.to_hex
 
 
 (** Hash a full function definition including spec and body *)
@@ -367,3 +364,10 @@ let hash_function
   (* For now, just hash the spec - body hashing would require Mucore traversal *)
   (* TODO: implement proper body hashing *)
   hash_function_spec ft_opt
+
+
+(** Hash a lemma definition *)
+let hash_lemma (lemma_typ : ArgumentTypes.lemmat) : string =
+  (* Similar to hash_function_spec, hash the lemma type *)
+  let lemma_str = Pp.plain (ArgumentTypes.pp LogicalReturnTypes.pp lemma_typ) in
+  Digest.string lemma_str |> Digest.to_hex

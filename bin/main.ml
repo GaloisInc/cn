@@ -1,7 +1,14 @@
 open Cmdliner
 
 let subcommands =
-  [ Wf.cmd; Verify.cmd; Test.cmd; Instrument.cmd; SeqTest.cmd; Preprocess.cmd ]
+  [ Wf.cmd;
+    Verify.cmd;
+    Test.cmd;
+    Instrument.cmd;
+    SeqTest.cmd;
+    Preprocess.cmd;
+    Cache.cache_cmd
+  ]
 
 
 let () =

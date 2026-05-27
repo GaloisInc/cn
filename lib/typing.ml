@@ -513,6 +513,15 @@ let add_c_internal lc =
   | None ->
     (* Regular constraint: simplify and add to context and solver *)
     let lc = Simplify.LogicalConstraints.simp simp_ctxt lc in
+    (* Extract logical function uses from the constraint for dependency tracking *)
+    (* Note: We record ALL Apply symbols here (predicates and logical functions).
+       The distinction will be made later when recording dependencies. *)
+    let syms = LC.preds_of lc |> Sym.Set.elements in
+    List.iter
+      (fun sym ->
+         (* Store in a global ref that check.ml can access *)
+         Dependencies.record_logical_function_use sym)
+      syms;
     let s = Context.add_c lc s in
     let () = Solver.assume solver lc in
     let@ _ = add_sym_eqs (List.filter_map LC.is_sym_lhs_equality [ lc ]) in

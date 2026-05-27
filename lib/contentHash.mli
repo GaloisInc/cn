@@ -40,3 +40,6 @@ val hash_datatype_definition
 
 (** Normalize and hash an index term (with alpha-renaming) *)
 val hash_index_term : IndexTerms.t -> string
+
+(** Hash a lemma definition *)
+val hash_lemma : ArgumentTypes.lemmat -> string

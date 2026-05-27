@@ -1477,6 +1477,9 @@ let call_prefix = function
   | Subtyping -> "return"
 
 
+(** Thread-local storage for collecting function calls during type checking *)
+let current_function_calls : Sym.t list ref = ref []
+
 (* TODO: De-CPS'ify check_expr and remove the function below.  *)
 let check_pexpr (pe : BT.t Mu.pexpr) (k : IT.t -> unit m) : unit m =
   let@ lvt = check_pexpr [] pe in
@@ -2074,6 +2077,8 @@ let rec check_expr labels (e : BT.t Mu.expr) (k : IT.t -> unit m) : unit m =
       match known with
       | `Inconsistent_context -> return ()
       | `Known fsym ->
+        (* Record this function call for dependency tracking *)
+        current_function_calls := fsym :: !current_function_calls;
         let@ _loc, opt_ft, _ = Global.get_fun_decl loc fsym in
         let@ ft =
           match opt_ft with
@@ -2334,6 +2339,8 @@ let rec check_expr labels (e : BT.t Mu.expr) (k : IT.t -> unit m) : unit m =
            fail (fun _ -> { loc; msg = Generic msg [@alert "-deprecated"] })
          | Some body -> add_c loc (LC.T (eq_ (apply_ f args def.return_bt loc, body) loc)))
       | Apply (lemma, args) ->
+        (* Record lemma use for dependency tracking *)
+        Dependencies.record_lemma_use lemma;
         let@ _loc, lemma_typ = Global.get_lemma loc lemma in
         Spine.calltype_lemma
           loc
@@ -2840,6 +2847,9 @@ let select_functions
 
 (** Check a single C function. Failure of the check is encoded monadically. *)
 let check_c_function ((fsym, (loc, args_and_body)) : c_function) : unit m =
+  current_function_calls := [];
+  Dependencies.reset_logical_function_uses ();
+  Dependencies.reset_lemma_uses ();
   check_procedure loc fsym args_and_body
 
 
@@ -2853,7 +2863,7 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
     match prev_error with
     | Some _ -> return (num_checked, prev_error)
     | None ->
-      let fsym, (loc, _args_and_body) = c_fn in
+      let fsym, (loc, args_and_body) = c_fn in
       let fn_name = c_function_name c_fn in
       let start_time = Unix.gettimeofday () in
       let@ outcome = sandbox (check_c_function c_fn) in
@@ -2866,8 +2876,9 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
         | Some db_handle ->
           let sym_str = Sym.pp_string fsym in
           let file_path = Pp.plain (Locations.pp loc) in
-          (* TODO: Compute real content hashes once type inference issues are resolved *)
-          let spec_hash = ContentHash.hash_function_spec None in
+          (* Get function type and compute real hash *)
+          let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
+          let spec_hash = ContentHash.hash_function_spec ft_opt in
           let content_hash = spec_hash in
           (match outcome with
            | Ok () ->
@@ -2878,7 +2889,81 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
                ~file_path
                ~content_hash
                ~spec_hash
-               ~time_ms
+               ~time_ms;
+             (* Extract and record predicate dependencies *)
+             let pred_deps =
+               DependencyExtractor.extract_predicate_uses_from_spec ft_opt
+             in
+             List.iter
+               (fun pred_sym ->
+                  VerificationDb.record_predicate_usage
+                    db_handle
+                    ~function_sym:sym_str
+                    ~predicate_sym:(Sym.pp_string pred_sym))
+               pred_deps;
+             (* Extract and record logical function dependencies *)
+             let@ global = get_global () in
+             let lf_deps_spec =
+               DependencyExtractor.extract_logical_function_uses_from_spec global ft_opt
+             in
+             (* Logical functions collected during type checking (from assertions, loop invariants, etc.) *)
+             (* Note: Dependencies.get_logical_function_uses() returns ALL Apply symbols,
+                so we need to filter to only logical functions *)
+             let collected_syms = Dependencies.get_logical_function_uses () in
+             let lf_deps_body =
+               List.filter
+                 (fun sym -> Sym.Map.mem sym global.logical_functions)
+                 collected_syms
+             in
+             let lf_deps = List.sort_uniq Sym.compare (lf_deps_spec @ lf_deps_body) in
+             List.iter
+               (fun lf_sym ->
+                  VerificationDb.record_function_logical_function_usage
+                    db_handle
+                    ~function_sym:sym_str
+                    ~logical_function_sym:(Sym.pp_string lf_sym))
+               lf_deps;
+             (* Extract and record struct/datatype dependencies *)
+             let struct_deps, datatype_deps =
+               DependencyExtractor.extract_struct_datatype_uses_from_spec ft_opt
+             in
+             List.iter
+               (fun struct_sym ->
+                  VerificationDb.record_struct_usage
+                    db_handle
+                    ~function_sym:sym_str
+                    ~struct_name:(Sym.pp_string struct_sym))
+               struct_deps;
+             List.iter
+               (fun datatype_sym ->
+                  VerificationDb.record_datatype_usage
+                    db_handle
+                    ~function_sym:sym_str
+                    ~datatype_name:(Sym.pp_string datatype_sym))
+               datatype_deps;
+             (* Extract and record function call dependencies *)
+             let call_deps =
+               DependencyExtractor.extract_function_calls_from_body args_and_body
+             in
+             List.iter
+               (fun callee_sym ->
+                  VerificationDb.record_call_dependency
+                    db_handle
+                    ~caller:sym_str
+                    ~callee:(Sym.pp_string callee_sym))
+               call_deps;
+             (* Record lemma dependencies collected during type checking *)
+             let lemma_deps =
+               Dependencies.get_lemma_uses () |> List.sort_uniq Sym.compare
+             in
+             List.iter
+               (fun lemma_sym ->
+                  VerificationDb.record_function_lemma_usage
+                    db_handle
+                    ~function_sym:sym_str
+                    ~lemma_sym:(Sym.pp_string lemma_sym))
+               lemma_deps;
+             return ()
            | Error err ->
              let report = TypeErrors.pp_message err.TypeErrors.msg in
              let error_msg = Pp.plain report.TypeErrors.short in
@@ -2887,8 +2972,8 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
                ~sym:sym_str
                ~content_hash
                ~spec_hash
-               ~error:error_msg);
-          return ()
+               ~error:error_msg;
+             return ())
         | None -> return ()
       in
       (match outcome with
@@ -2927,8 +3012,9 @@ let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t)
       | Some db_handle ->
         let sym_str = Sym.pp_string fsym in
         let file_path = Pp.plain (Locations.pp loc) in
-        (* TODO: Compute real content hashes once type inference issues are resolved *)
-        let spec_hash = ContentHash.hash_function_spec None in
+        (* Get function type and compute real hash *)
+        let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
+        let spec_hash = ContentHash.hash_function_spec ft_opt in
         let content_hash = spec_hash in
         (match outcome with
          | Ok () ->
@@ -2939,7 +3025,77 @@ let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t)
              ~file_path
              ~content_hash
              ~spec_hash
-             ~time_ms
+             ~time_ms;
+           (* Extract and record predicate dependencies *)
+           let pred_deps = DependencyExtractor.extract_predicate_uses_from_spec ft_opt in
+           List.iter
+             (fun pred_sym ->
+                VerificationDb.record_predicate_usage
+                  db_handle
+                  ~function_sym:sym_str
+                  ~predicate_sym:(Sym.pp_string pred_sym))
+             pred_deps;
+           (* Extract and record logical function dependencies *)
+           let@ global = get_global () in
+           let lf_deps_spec =
+             DependencyExtractor.extract_logical_function_uses_from_spec global ft_opt
+           in
+           (* Logical functions collected during type checking (from assertions, loop invariants, etc.) *)
+           (* Note: Dependencies.get_logical_function_uses() returns ALL Apply symbols,
+              so we need to filter to only logical functions *)
+           let collected_syms = Dependencies.get_logical_function_uses () in
+           let lf_deps_body =
+             List.filter
+               (fun sym -> Sym.Map.mem sym global.logical_functions)
+               collected_syms
+           in
+           let lf_deps = List.sort_uniq Sym.compare (lf_deps_spec @ lf_deps_body) in
+           List.iter
+             (fun lf_sym ->
+                VerificationDb.record_function_logical_function_usage
+                  db_handle
+                  ~function_sym:sym_str
+                  ~logical_function_sym:(Sym.pp_string lf_sym))
+             lf_deps;
+           (* Extract and record struct/datatype dependencies *)
+           let struct_deps, datatype_deps =
+             DependencyExtractor.extract_struct_datatype_uses_from_spec ft_opt
+           in
+           List.iter
+             (fun struct_sym ->
+                VerificationDb.record_struct_usage
+                  db_handle
+                  ~function_sym:sym_str
+                  ~struct_name:(Sym.pp_string struct_sym))
+             struct_deps;
+           List.iter
+             (fun datatype_sym ->
+                VerificationDb.record_datatype_usage
+                  db_handle
+                  ~function_sym:sym_str
+                  ~datatype_name:(Sym.pp_string datatype_sym))
+             datatype_deps;
+           (* Record function call dependencies collected during type checking *)
+           let call_deps = List.sort_uniq Sym.compare !current_function_calls in
+           List.iter
+             (fun callee_sym ->
+                VerificationDb.record_call_dependency
+                  db_handle
+                  ~caller:sym_str
+                  ~callee:(Sym.pp_string callee_sym))
+             call_deps;
+           (* Record lemma dependencies collected during type checking *)
+           let lemma_deps =
+             Dependencies.get_lemma_uses () |> List.sort_uniq Sym.compare
+           in
+           List.iter
+             (fun lemma_sym ->
+                VerificationDb.record_function_lemma_usage
+                  db_handle
+                  ~function_sym:sym_str
+                  ~lemma_sym:(Sym.pp_string lemma_sym))
+             lemma_deps;
+           return ()
          | Error err ->
            let report = TypeErrors.pp_message err.TypeErrors.msg in
            let error_msg = Pp.plain report.TypeErrors.short in
@@ -2948,8 +3104,8 @@ let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t)
              ~sym:sym_str
              ~content_hash
              ~spec_hash
-             ~error:error_msg);
-        return ()
+             ~error:error_msg;
+           return ())
       | None -> return ()
     in
     match outcome with
@@ -3179,15 +3335,60 @@ let time_check_c_functions
     | None -> return selected_funs
     | Some db_handle ->
       (* Compute current hashes for all selected functions *)
-      let@ _global = get_global () in
       let current_hashes = Hashtbl.create (List.length selected_funs) in
-      List.iter
-        (fun (fsym, _) ->
-           (* TODO: Use real function type once type inference is resolved *)
-           let spec_hash = ContentHash.hash_function_spec None in
-           let content_hash = spec_hash in
-           Hashtbl.add current_hashes (Sym.pp_string fsym) (content_hash, spec_hash))
-        selected_funs;
+      let@ () =
+        ListM.iterM
+          (fun (fsym, (loc, _)) ->
+             let@ _loc, ft_opt, _sig = Global.get_fun_decl loc fsym in
+             let spec_hash = ContentHash.hash_function_spec ft_opt in
+             let content_hash = spec_hash in
+             Hashtbl.add current_hashes (Sym.pp_string fsym) (content_hash, spec_hash);
+             return ())
+          selected_funs
+      in
+      (* Compute current hashes for all predicates *)
+      let@ global = get_global () in
+      let current_pred_hashes =
+        Hashtbl.create (Sym.Map.cardinal global.resource_predicates)
+      in
+      let@ () =
+        Sym.Map.fold
+          (fun pred_sym pred_def acc ->
+             let@ () = acc in
+             let pred_hash = ContentHash.hash_predicate pred_def in
+             Hashtbl.add current_pred_hashes (Sym.pp_string pred_sym) pred_hash;
+             return ())
+          global.resource_predicates
+          (return ())
+      in
+      (* Compute current hashes for all logical functions *)
+      let current_lf_hashes =
+        Hashtbl.create (Sym.Map.cardinal global.logical_functions)
+      in
+      let@ () =
+        Sym.Map.fold
+          (fun lf_sym lf_def acc ->
+             let@ () = acc in
+             let lf_hash = ContentHash.hash_logical_function lf_def in
+             Hashtbl.add current_lf_hashes (Sym.pp_string lf_sym) lf_hash;
+             return ())
+          global.logical_functions
+          (return ())
+      in
+      (* Compute current hashes for all structs *)
+      let current_struct_hashes = Hashtbl.create (Sym.Map.cardinal global.struct_decls) in
+      Sym.Map.iter
+        (fun struct_sym struct_decl ->
+           let struct_hash = ContentHash.hash_struct_definition struct_decl in
+           Hashtbl.add current_struct_hashes (Sym.pp_string struct_sym) struct_hash)
+        global.struct_decls;
+      (* Compute current hashes for all datatypes *)
+      let current_datatype_hashes = Hashtbl.create (Sym.Map.cardinal global.datatypes) in
+      Sym.Map.iter
+        (fun dt_sym dt_info ->
+           let dt_hash = ContentHash.hash_datatype_definition dt_info in
+           Hashtbl.add current_datatype_hashes (Sym.pp_string dt_sym) dt_hash)
+        global.datatypes;
       (* Filter out functions that haven't changed *)
       let stale_funs =
         List.filter
@@ -3200,8 +3401,121 @@ let time_check_c_functions
              | Some record ->
                let current_content, _current_spec = Hashtbl.find current_hashes sym_str in
                (* Check if content hash changed *)
-               String.compare record.VerificationDb.content_hash current_content <> 0
-             (* TODO: Also check if dependencies changed *))
+               let content_changed =
+                 String.compare record.VerificationDb.content_hash current_content <> 0
+               in
+               if content_changed then
+                 true
+               else (
+                 (* Check if any predicate dependencies changed (recursively) *)
+                 let pred_deps =
+                   VerificationDb.get_predicate_dependencies db_handle sym_str
+                 in
+                 let pred_changed =
+                   List.exists
+                     (fun pred_sym ->
+                        let visited = ref [] in
+                        not
+                          (VerificationDb.is_predicate_up_to_date
+                             db_handle
+                             pred_sym
+                             current_pred_hashes
+                             current_lf_hashes
+                             ~visited))
+                     pred_deps
+                 in
+                 if pred_changed then
+                   true
+                 else (
+                   (* Check if any struct dependencies changed *)
+                   let struct_deps =
+                     VerificationDb.get_struct_dependencies db_handle sym_str
+                   in
+                   let struct_changed =
+                     List.exists
+                       (fun struct_name ->
+                          match
+                            ( VerificationDb.get_struct_definition db_handle struct_name,
+                              Hashtbl.find_opt current_struct_hashes struct_name )
+                          with
+                          | None, _ -> true
+                          | _, None -> true
+                          | Some stored, Some current_hash ->
+                            String.compare stored.VerificationDb.content_hash current_hash
+                            <> 0)
+                       struct_deps
+                   in
+                   if struct_changed then
+                     true
+                   else (
+                     (* Check if any datatype dependencies changed *)
+                     let datatype_deps =
+                       VerificationDb.get_datatype_dependencies db_handle sym_str
+                     in
+                     let datatype_changed =
+                       List.exists
+                         (fun datatype_name ->
+                            match
+                              ( VerificationDb.get_datatype_definition
+                                  db_handle
+                                  datatype_name,
+                                Hashtbl.find_opt current_datatype_hashes datatype_name )
+                            with
+                            | None, _ -> true
+                            | _, None -> true
+                            | Some stored, Some current_hash ->
+                              String.compare
+                                stored.VerificationDb.content_hash
+                                current_hash
+                              <> 0)
+                         datatype_deps
+                     in
+                     if datatype_changed then
+                       true
+                     else (
+                       (* Check if any function call dependencies changed (callee SPEC only) *)
+                       let call_deps =
+                         VerificationDb.get_call_dependencies db_handle sym_str
+                       in
+                       let call_changed =
+                         List.exists
+                           (fun callee_sym ->
+                              match
+                                ( VerificationDb.get_function_status db_handle callee_sym,
+                                  Hashtbl.find_opt current_hashes callee_sym )
+                              with
+                              | None, _ -> true (* Callee not in database *)
+                              | _, None -> true (* Callee not in current hashes *)
+                              | Some stored, Some (_, current_spec_hash) ->
+                                (* Compare SPEC hash only, not content hash *)
+                                String.compare
+                                  stored.VerificationDb.spec_hash
+                                  current_spec_hash
+                                <> 0)
+                           call_deps
+                       in
+                       if call_changed then
+                         true
+                       else (
+                         (* Check if any logical function dependencies changed (recursively) *)
+                         let lf_deps =
+                           VerificationDb.get_function_logical_function_dependencies
+                             db_handle
+                             sym_str
+                         in
+                         let lf_changed =
+                           List.exists
+                             (fun lf_sym ->
+                                let visited = ref [] in
+                                not
+                                  (VerificationDb.is_logical_function_up_to_date
+                                     db_handle
+                                     lf_sym
+                                     current_lf_hashes
+                                     ~visited))
+                             lf_deps
+                         in
+                         lf_changed))))))
           selected_funs
       in
       if List.length stale_funs < List.length selected_funs then
@@ -3261,6 +3575,220 @@ let time_check_c_functions
     | false -> check_c_functions_all ?db selected_funs
   in
   Cerb_debug.end_csv_timing "type checking functions";
+  (* Store predicate and logical function hashes in database *)
+  let@ () =
+    match db with
+    | None -> return ()
+    | Some db_handle ->
+      (* Collect all predicate symbols used by verified functions *)
+      let pred_syms =
+        Sym.Map.fold
+          (fun sym _ acc -> Sym.Set.add sym acc)
+          global.resource_predicates
+          Sym.Set.empty
+      in
+      (* Hash and store each predicate *)
+      let@ () =
+        Sym.Set.fold
+          (fun pred_sym acc ->
+             let@ () = acc in
+             match Sym.Map.find_opt pred_sym global.resource_predicates with
+             | None -> return ()
+             | Some pred_def ->
+               let pred_hash = ContentHash.hash_predicate pred_def in
+               VerificationDb.record_predicate_verified
+                 db_handle
+                 ~sym:(Sym.pp_string pred_sym)
+                 ~name:(Sym.pp_string pred_sym)
+                 ~content_hash:pred_hash;
+               (* Extract and record predicate dependencies *)
+               let pred_deps =
+                 DependencyExtractor.extract_predicate_dependencies global pred_sym
+               in
+               List.iter
+                 (fun used_pred_sym ->
+                    VerificationDb.record_predicate_predicate_usage
+                      db_handle
+                      ~user_sym:(Sym.pp_string pred_sym)
+                      ~used_sym:(Sym.pp_string used_pred_sym))
+                 pred_deps;
+               (* Extract and record logical function dependencies for predicate *)
+               let pred_lf_deps =
+                 DependencyExtractor.extract_logical_function_uses_from_predicate
+                   global
+                   pred_def
+               in
+               List.iter
+                 (fun lf_sym ->
+                    VerificationDb.record_predicate_logical_function_usage
+                      db_handle
+                      ~predicate_sym:(Sym.pp_string pred_sym)
+                      ~logical_function_sym:(Sym.pp_string lf_sym))
+                 pred_lf_deps;
+               (* Extract and record struct/datatype dependencies for predicate *)
+               let pred_struct_deps, pred_datatype_deps =
+                 DependencyExtractor.extract_struct_datatype_uses_from_predicate pred_def
+               in
+               List.iter
+                 (fun struct_sym ->
+                    VerificationDb.record_predicate_struct_usage
+                      db_handle
+                      ~predicate_sym:(Sym.pp_string pred_sym)
+                      ~struct_name:(Sym.pp_string struct_sym))
+                 pred_struct_deps;
+               List.iter
+                 (fun datatype_sym ->
+                    VerificationDb.record_predicate_datatype_usage
+                      db_handle
+                      ~predicate_sym:(Sym.pp_string pred_sym)
+                      ~datatype_name:(Sym.pp_string datatype_sym))
+                 pred_datatype_deps;
+               return ())
+          pred_syms
+          (return ())
+      in
+      (* Collect all logical function symbols *)
+      let lf_syms =
+        Sym.Map.fold
+          (fun sym _ acc -> Sym.Set.add sym acc)
+          global.logical_functions
+          Sym.Set.empty
+      in
+      (* Hash and store each logical function *)
+      let@ () =
+        Sym.Set.fold
+          (fun lf_sym acc ->
+             let@ () = acc in
+             match Sym.Map.find_opt lf_sym global.logical_functions with
+             | None -> return ()
+             | Some lf_def ->
+               let lf_hash = ContentHash.hash_logical_function lf_def in
+               VerificationDb.record_logical_function_verified
+                 db_handle
+                 ~sym:(Sym.pp_string lf_sym)
+                 ~name:(Sym.pp_string lf_sym)
+                 ~content_hash:lf_hash;
+               (* Extract and record logical function dependencies *)
+               let lf_deps =
+                 DependencyExtractor.extract_logical_function_dependencies global lf_sym
+               in
+               List.iter
+                 (fun used_lf_sym ->
+                    VerificationDb.record_logical_function_usage
+                      db_handle
+                      ~user_sym:(Sym.pp_string lf_sym)
+                      ~used_sym:(Sym.pp_string used_lf_sym))
+                 lf_deps;
+               (* Extract and record struct/datatype dependencies for logical function *)
+               let lf_struct_deps, lf_datatype_deps =
+                 DependencyExtractor.extract_struct_datatype_uses_from_logical_function
+                   lf_def
+               in
+               List.iter
+                 (fun struct_sym ->
+                    VerificationDb.record_logical_function_struct_usage
+                      db_handle
+                      ~logical_function_sym:(Sym.pp_string lf_sym)
+                      ~struct_name:(Sym.pp_string struct_sym))
+                 lf_struct_deps;
+               List.iter
+                 (fun datatype_sym ->
+                    VerificationDb.record_logical_function_datatype_usage
+                      db_handle
+                      ~logical_function_sym:(Sym.pp_string lf_sym)
+                      ~datatype_name:(Sym.pp_string datatype_sym))
+                 lf_datatype_deps;
+               return ())
+          lf_syms
+          (return ())
+      in
+      (* Hash and store lemmata *)
+      let@ () =
+        Sym.Map.fold
+          (fun lemma_sym (_lemma_loc, lemma_typ) acc ->
+             let@ () = acc in
+             let lemma_hash = ContentHash.hash_lemma lemma_typ in
+             VerificationDb.record_lemma_verified
+               db_handle
+               ~sym:(Sym.pp_string lemma_sym)
+               ~name:(Sym.pp_string lemma_sym)
+               ~content_hash:lemma_hash;
+             (* Extract and record predicate dependencies for lemma *)
+             let lemma_pred_deps =
+               DependencyExtractor.extract_predicate_uses_from_lemma lemma_typ
+             in
+             List.iter
+               (fun pred_sym ->
+                  VerificationDb.record_lemma_predicate_usage
+                    db_handle
+                    ~lemma_sym:(Sym.pp_string lemma_sym)
+                    ~predicate_sym:(Sym.pp_string pred_sym))
+               lemma_pred_deps;
+             (* Extract and record logical function dependencies for lemma *)
+             let lemma_lf_deps =
+               DependencyExtractor.extract_logical_function_uses_from_lemma
+                 global
+                 lemma_typ
+             in
+             List.iter
+               (fun lf_sym ->
+                  VerificationDb.record_lemma_logical_function_usage
+                    db_handle
+                    ~lemma_sym:(Sym.pp_string lemma_sym)
+                    ~logical_function_sym:(Sym.pp_string lf_sym))
+               lemma_lf_deps;
+             (* Extract and record struct/datatype dependencies for lemma *)
+             let lemma_struct_deps, lemma_datatype_deps =
+               DependencyExtractor.extract_struct_datatype_uses_from_lemma lemma_typ
+             in
+             List.iter
+               (fun struct_sym ->
+                  VerificationDb.record_lemma_struct_usage
+                    db_handle
+                    ~lemma_sym:(Sym.pp_string lemma_sym)
+                    ~struct_name:(Sym.pp_string struct_sym))
+               lemma_struct_deps;
+             List.iter
+               (fun datatype_sym ->
+                  VerificationDb.record_lemma_datatype_usage
+                    db_handle
+                    ~lemma_sym:(Sym.pp_string lemma_sym)
+                    ~datatype_name:(Sym.pp_string datatype_sym))
+               lemma_datatype_deps;
+             return ())
+          global.lemmata
+          (return ())
+      in
+      (* Hash and store struct definitions *)
+      let@ () =
+        Sym.Map.fold
+          (fun struct_tag struct_decl acc ->
+             let@ () = acc in
+             let struct_hash = ContentHash.hash_struct_definition struct_decl in
+             VerificationDb.record_struct_definition
+               db_handle
+               ~name:(Sym.pp_string struct_tag)
+               ~content_hash:struct_hash;
+             return ())
+          global.struct_decls
+          (return ())
+      in
+      (* Hash and store datatype definitions *)
+      let@ () =
+        Sym.Map.fold
+          (fun datatype_name dt_info acc ->
+             let@ () = acc in
+             let datatype_hash = ContentHash.hash_datatype_definition dt_info in
+             VerificationDb.record_datatype_definition
+               db_handle
+               ~name:(Sym.pp_string datatype_name)
+               ~content_hash:datatype_hash;
+             return ())
+          global.datatypes
+          (return ())
+      in
+      return ()
+  in
   (* Combine consistency errors with regular errors *)
   return (consistency_error_list @ errors)
 

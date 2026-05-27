@@ -4,6 +4,23 @@ open CB.Pipeline
 open Cn
 open Setup
 
+(** Expand ~ to home directory in file paths *)
+let expand_home path =
+  if String.length path > 0 && Char.equal path.[0] '~' then (
+    let home =
+      try Sys.getenv "HOME" with
+      | Not_found -> (try Sys.getenv "USERPROFILE" with Not_found -> "")
+    in
+    if String.length path = 1 then
+      home
+    else if Char.equal path.[1] '/' then
+      home ^ String.sub path 1 (String.length path - 1)
+    else
+      path)
+  else
+    path
+
+
 let print_log_file =
   let print_count = ref 0 in
   let print_file filename = function
