@@ -10,6 +10,14 @@ module IT = IndexTerms
 module LAT = LogicalArgumentTypes
 module Sym_map = Map.Make (Sym)
 
+(** Convert a PPrint document to string with fixed width for deterministic hashing.
+    Uses a large fixed width to prevent line wrapping from varying based on terminal size. *)
+let pp_to_string (doc : PPrint.document) : string =
+  let buffer = Buffer.create 4096 in
+  PPrint.ToBuffer.pretty 1.0 1000000 buffer doc;
+  Buffer.contents buffer
+
+
 (** Check if a symbol name looks CN-generated (contains underscore followed by digits) *)
 let is_generated_sym (sym : Sym.t) : bool =
   let name = Sym.pp_string sym in
@@ -265,7 +273,7 @@ and normalize_pattern ctx (Terms.Pat (pat_, bt, loc)) =
 let hash_index_term (it : IndexTerms.t) : string =
   let ctx = empty_ctx () in
   let it_norm, _ = normalize_it ctx it in
-  let str = Pp.plain (IT.pp it_norm) in
+  let str = pp_to_string (IT.pp it_norm) in
   Digest.string str |> Digest.to_hex
 
 
@@ -276,15 +284,15 @@ let hash_logical_function (def : Definition.Function.t) : string =
     match def.body with
     | Definition.Function.Def it ->
       let it_norm, _ = normalize_it ctx it in
-      "def:" ^ Pp.plain (IT.pp it_norm)
+      "def:" ^ pp_to_string (IT.pp it_norm)
     | Definition.Function.Rec_Def it ->
       let it_norm, _ = normalize_it ctx it in
-      "rec_def:" ^ Pp.plain (IT.pp it_norm)
+      "rec_def:" ^ pp_to_string (IT.pp it_norm)
     | Definition.Function.Uninterp -> "uninterp"
   in
   (* Include argument types in hash *)
   let args_str =
-    List.map (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt)) def.args
+    List.map (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ pp_to_string (BT.pp bt)) def.args
     |> String.concat ","
   in
   let combined = args_str ^ "|" ^ body_str in
@@ -302,16 +310,18 @@ let hash_predicate (def : Definition.Predicate.t) : string =
       List.map
         (fun (clause : Definition.Clause.t) ->
            let it_norm, _ = normalize_it ctx clause.guard in
-           let guard_str = Pp.plain (IT.pp it_norm) in
+           let guard_str = pp_to_string (IT.pp it_norm) in
            (* Also hash the packing_ft (return type) *)
-           let packing_str = Pp.plain (LAT.pp IT.pp clause.packing_ft) in
+           let packing_str = pp_to_string (LAT.pp IT.pp clause.packing_ft) in
            "guard:" ^ guard_str ^ ";packing:" ^ packing_str)
         clauses
       |> String.concat "|"
   in
   (* Include argument types *)
   let args_str =
-    List.map (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ Pp.plain (BT.pp bt)) def.iargs
+    List.map
+      (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ pp_to_string (BT.pp bt))
+      def.iargs
     |> String.concat ","
   in
   let combined = args_str ^ "|" ^ clauses_str in
@@ -323,7 +333,7 @@ let hash_struct_definition (decl : Memory.struct_decl) : string =
   (* Hash field names, types, and order *)
   let fields_str =
     Memory.member_types decl
-    |> List.map (fun (id, ct) -> Id.get_string id ^ ":" ^ Pp.plain (Sctypes.pp ct))
+    |> List.map (fun (id, ct) -> Id.get_string id ^ ":" ^ pp_to_string (Sctypes.pp ct))
     |> String.concat ","
   in
   Digest.string fields_str |> Digest.to_hex
@@ -335,7 +345,7 @@ let hash_datatype_definition (dt_info : BT.dt_info) : string =
   let ctors_str = List.map Sym.pp_string dt_info.constrs |> String.concat "," in
   let params_str =
     List.map
-      (fun (id, bt) -> Id.get_string id ^ ":" ^ Pp.plain (BT.pp bt))
+      (fun (id, bt) -> Id.get_string id ^ ":" ^ pp_to_string (BT.pp bt))
       dt_info.all_params
     |> String.concat ","
   in
@@ -350,7 +360,7 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     (* We need to traverse the ft structure and normalize all index terms within it.
        For now, use a simpler approach: serialize to string and hash.
        This won't have alpha-renaming yet, but it's better than the stub. *)
-    let ft_str = Pp.plain (ArgumentTypes.pp ReturnTypes.pp ft) in
+    let ft_str = pp_to_string (ArgumentTypes.pp ReturnTypes.pp ft) in
     Digest.string ft_str |> Digest.to_hex
 
 
@@ -396,10 +406,7 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
         args_and_body
     in
     (* Convert to string with fixed width to ensure deterministic output *)
-    (* PPrint.ToBuffer uses a default width that can vary - use a large fixed width *)
-    let buffer = Buffer.create 4096 in
-    PPrint.ToBuffer.pretty 1.0 1000000 buffer doc;
-    let str = Buffer.contents buffer in
+    let str = pp_to_string doc in
     (* Debug: Print serialized text if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
@@ -431,5 +438,5 @@ let hash_function
 (** Hash a lemma definition *)
 let hash_lemma (lemma_typ : ArgumentTypes.lemmat) : string =
   (* Similar to hash_function_spec, hash the lemma type *)
-  let lemma_str = Pp.plain (ArgumentTypes.pp LogicalReturnTypes.pp lemma_typ) in
+  let lemma_str = pp_to_string (ArgumentTypes.pp LogicalReturnTypes.pp lemma_typ) in
   Digest.string lemma_str |> Digest.to_hex
