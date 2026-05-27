@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Test: Body Change (should NOT re-verify) ==="
+echo "=== Test: Body Change (should re-verify) ==="
 echo
 
 rm -f .cn/verification.db foo.c
@@ -17,7 +17,7 @@ echo
 
 echo "3. Change body (return x → int tmp=x; return tmp) and re-run:"
 cp foo_2.c foo.c
-cn verify --use-db foo.c 2>&1 | grep -E "^\[|pass|fail" || echo "(all skipped)"
+cn verify --use-db foo.c 2>&1 | grep -E "^\[|pass|fail" || echo "(unexpected result)"
 echo
 
-echo "✓ Expected: skipped in steps 2 and 3 (body changes don't affect spec hash)"
+echo "✓ Expected: re-verified in step 3 (body changes affect content hash)"
