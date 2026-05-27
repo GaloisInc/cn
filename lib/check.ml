@@ -2856,9 +2856,14 @@ let check_c_function ((fsym, (loc, args_and_body)) : c_function) : unit m =
 (** Check the provided C functions. The first failed check will short-circuit
     the remainder of the checks, and the associated error will be returned as
     [Some], along with the name of the function in which it occurred. *)
-let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t) option m
+let check_c_functions_fast
+      ?db
+      ?(total_override = None)
+      ?(offset = 0)
+      (funs : c_function list)
+  : (string * TypeErrors.t) option m
   =
-  let total = List.length funs in
+  let total = Option.value total_override ~default:(List.length funs) in
   let check_and_record (num_checked, prev_error) c_fn =
     match prev_error with
     | Some _ -> return (num_checked, prev_error)
@@ -2869,7 +2874,7 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
       let@ outcome = sandbox (check_c_function c_fn) in
       let end_time = Unix.gettimeofday () in
       let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
-      let checked = num_checked + 1 in
+      let checked = offset + num_checked + 1 in
       (* Record result in database if enabled *)
       let@ () =
         match db with
@@ -2996,8 +3001,14 @@ let check_c_functions_fast ?db (funs : c_function list) : (string * TypeErrors.t
     The result's order is determined by the input's order: if function [f]
     appears before function [g], then function [f]'s error (if any) will appear
     before function [g]'s error (if any). *)
-let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t) list m =
-  let total = List.length funs in
+let check_c_functions_all
+      ?db
+      ?(total_override = None)
+      ?(offset = 0)
+      (funs : c_function list)
+  : (string * TypeErrors.t) list m
+  =
+  let total = Option.value total_override ~default:(List.length funs) in
   let check_and_record (num_checked, errors) c_fn =
     let fsym, (loc, _args_and_body) = c_fn in
     let fn_name = c_function_name c_fn in
@@ -3005,7 +3016,7 @@ let check_c_functions_all ?db (funs : c_function list) : (string * TypeErrors.t)
     let@ outcome = sandbox (check_c_function c_fn) in
     let end_time = Unix.gettimeofday () in
     let time_ms = int_of_float ((end_time -. start_time) *. 1000.) in
-    let checked = num_checked + 1 in
+    let checked = offset + num_checked + 1 in
     (* Record result in database if enabled *)
     let@ () =
       match db with
@@ -3330,9 +3341,9 @@ let time_check_c_functions
     List.filter (fun (fsym, _) -> Sym.Set.mem fsym selected_fsyms) checked
   in
   (* Filter based on database staleness if enabled *)
-  let@ selected_funs =
+  let@ selected_funs, total_funs, cached_count =
     match db with
-    | None -> return selected_funs
+    | None -> return (selected_funs, List.length selected_funs, 0)
     | Some db_handle ->
       (* Compute current hashes for all selected functions *)
       let current_hashes = Hashtbl.create (List.length selected_funs) in
@@ -3518,14 +3529,44 @@ let time_check_c_functions
                          lf_changed))))))
           selected_funs
       in
-      if List.length stale_funs < List.length selected_funs then
-        debug
-          1
-          (lazy
-            (!^"Incremental verification: skipping"
-             ^^^ !^(string_of_int (List.length selected_funs - List.length stale_funs))
-             ^^^ !^"unchanged functions"));
-      return stale_funs
+      (* Print progress for cached functions *)
+      let cached_funs =
+        List.filter
+          (fun (fsym, _) ->
+             not (List.exists (fun (fsym2, _) -> Sym.equal fsym fsym2) stale_funs))
+          selected_funs
+      in
+      let total = List.length selected_funs in
+      let num_cached = List.length cached_funs in
+      let@ () =
+        if num_cached > 0 then (
+          debug
+            1
+            (lazy
+              (!^"Incremental verification: skipping"
+               ^^^ !^(string_of_int num_cached)
+               ^^^ !^"unchanged functions"));
+          ListM.iteriM
+            (fun i (fsym, _) ->
+               let fn_name = Sym.pp_string fsym in
+               let checked = i + 1 in
+               let sym_str = Sym.pp_string fsym in
+               let status_str =
+                 match VerificationDb.get_function_status db_handle sym_str with
+                 | Some record ->
+                   (match record.VerificationDb.status with
+                    | VerificationDb.Pass -> "cached (pass)"
+                    | VerificationDb.Fail -> "cached (fail)"
+                    | _ -> "cached")
+                 | None -> "cached"
+               in
+               progress_simple (of_total checked total) (fn_name ^ " -- " ^ status_str);
+               return ())
+            cached_funs)
+        else
+          return ()
+      in
+      return (stale_funs, total, num_cached)
   in
   let@ global = get_global () in
   let@ consistency_errors =
@@ -3570,9 +3611,20 @@ let time_check_c_functions
   let@ errors =
     match !fail_fast with
     | true ->
-      let@ error_opt = check_c_functions_fast ?db selected_funs in
+      let@ error_opt =
+        check_c_functions_fast
+          ?db
+          ~total_override:(Some total_funs)
+          ~offset:cached_count
+          selected_funs
+      in
       return (Option.to_list error_opt)
-    | false -> check_c_functions_all ?db selected_funs
+    | false ->
+      check_c_functions_all
+        ?db
+        ~total_override:(Some total_funs)
+        ~offset:cached_count
+        selected_funs
   in
   Cerb_debug.end_csv_timing "type checking functions";
   (* Store predicate and logical function hashes in database *)

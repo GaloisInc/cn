@@ -109,6 +109,29 @@ let clear_cache db_path force =
     Printf.printf "Cache cleared.\n")
 
 
+(** Merge another database into the current one *)
+let merge_cache db_path source_path =
+  let db_path = Common.expand_home db_path in
+  let source_path = Common.expand_home source_path in
+  if not (Sys.file_exists source_path) then
+    Printf.printf "Source database not found at %s\n" source_path
+  else (
+    (* Open or create target database *)
+    let target_db = VerificationDb.open_db db_path in
+    VerificationDb.init_schema target_db;
+    (* Attach source database and merge *)
+    let merge_result = VerificationDb.merge_from_db target_db source_path in
+    VerificationDb.close_db target_db |> ignore;
+    match merge_result with
+    | Ok (funcs, preds, lfs, lemmas) ->
+      Printf.printf "Merged from %s:\n" source_path;
+      Printf.printf "  Functions: %d\n" funcs;
+      Printf.printf "  Predicates: %d\n" preds;
+      Printf.printf "  Logical functions: %d\n" lfs;
+      Printf.printf "  Lemmata: %d\n" lemmas
+    | Error msg -> Printf.printf "Error merging databases: %s\n" msg)
+
+
 (* CLI commands *)
 let db_path_arg =
   Arg.(
@@ -173,6 +196,27 @@ let clear_cmd =
   Cmd.v info term
 
 
+let merge_cmd =
+  let source_file =
+    Arg.(
+      required
+      & pos 0 (some string) None
+      & info [] ~docv:"FILE" ~doc:"Source database to merge")
+  in
+  let term = Term.(const merge_cache $ db_path_arg $ source_file) in
+  let info =
+    Cmd.info
+      "merge"
+      ~doc:"Merge another cache database"
+      ~man:
+        [ `S Manpage.s_description;
+          `P
+            "Merge verification results from another cache database into the current one."
+        ]
+  in
+  Cmd.v info term
+
+
 let cache_cmd =
   let info =
     Cmd.info
@@ -185,7 +229,8 @@ let cache_cmd =
           `P "summary - Show cache statistics";
           `P "failures - List failed functions";
           `P "file <name> - Show functions from a file";
+          `P "merge <file> - Merge another cache database";
           `P "clear - Clear the cache"
         ]
   in
-  Cmd.group info [ summary_cmd; failures_cmd; file_cmd; clear_cmd ]
+  Cmd.group info [ summary_cmd; failures_cmd; file_cmd; merge_cmd; clear_cmd ]

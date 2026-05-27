@@ -1489,3 +1489,124 @@ let get_entity_counts (db : db_handle) : int * int * int * int =
     |> function Data.INT i -> Int64.to_int i | _ -> 0
   in
   (pred_count, lf_count, lemma_count, struct_count)
+
+
+(** Merge another database into this one *)
+let merge_from_db (db : db_handle) (source_path : string)
+  : (int * int * int * int, string) result
+  =
+  try
+    (* Attach the source database *)
+    let attach_sql = Printf.sprintf "ATTACH DATABASE '%s' AS source" source_path in
+    let attach_stmt = prepare db attach_sql in
+    exec_stmt attach_stmt [];
+    ignore (finalize attach_stmt);
+    (* Merge functions (INSERT OR REPLACE to overwrite if newer) *)
+    let merge_funcs_sql =
+      {|
+      INSERT OR REPLACE INTO functions
+      SELECT * FROM source.functions
+    |}
+    in
+    let merge_funcs_stmt = prepare db merge_funcs_sql in
+    exec_stmt merge_funcs_stmt [];
+    ignore (finalize merge_funcs_stmt);
+    let func_count =
+      query db "SELECT COUNT(*) FROM source.functions" []
+      |> List.hd
+      |> (fun row -> row.(0))
+      |> function Data.INT i -> Int64.to_int i | _ -> 0
+    in
+    (* Merge predicates *)
+    let pred_stmt =
+      prepare db "INSERT OR REPLACE INTO predicates SELECT * FROM source.predicates"
+    in
+    exec_stmt pred_stmt [];
+    ignore (finalize pred_stmt);
+    let pred_count =
+      query db "SELECT COUNT(*) FROM source.predicates" []
+      |> List.hd
+      |> (fun row -> row.(0))
+      |> function Data.INT i -> Int64.to_int i | _ -> 0
+    in
+    (* Merge logical functions *)
+    let lf_stmt =
+      prepare
+        db
+        "INSERT OR REPLACE INTO logical_functions SELECT * FROM source.logical_functions"
+    in
+    exec_stmt lf_stmt [];
+    ignore (finalize lf_stmt);
+    let lf_count =
+      query db "SELECT COUNT(*) FROM source.logical_functions" []
+      |> List.hd
+      |> (fun row -> row.(0))
+      |> function Data.INT i -> Int64.to_int i | _ -> 0
+    in
+    (* Merge lemmata *)
+    let lemma_stmt =
+      prepare db "INSERT OR REPLACE INTO lemmata SELECT * FROM source.lemmata"
+    in
+    exec_stmt lemma_stmt [];
+    ignore (finalize lemma_stmt);
+    let lemma_count =
+      query db "SELECT COUNT(*) FROM source.lemmata" []
+      |> List.hd
+      |> (fun row -> row.(0))
+      |> function Data.INT i -> Int64.to_int i | _ -> 0
+    in
+    (* Merge struct definitions *)
+    let struct_stmt =
+      prepare
+        db
+        "INSERT OR REPLACE INTO struct_definitions SELECT * FROM \
+         source.struct_definitions"
+    in
+    exec_stmt struct_stmt [];
+    ignore (finalize struct_stmt);
+    (* Merge datatype definitions *)
+    let dt_stmt =
+      prepare
+        db
+        "INSERT OR REPLACE INTO datatype_definitions SELECT * FROM \
+         source.datatype_definitions"
+    in
+    exec_stmt dt_stmt [];
+    ignore (finalize dt_stmt);
+    (* Merge all dependency tables *)
+    let dep_tables =
+      [ "function_calls_function";
+        "function_uses_predicate";
+        "function_uses_logical_function";
+        "function_uses_struct";
+        "function_uses_datatype";
+        "function_uses_lemma";
+        "predicate_uses_predicate";
+        "predicate_uses_logical_function";
+        "predicate_uses_struct";
+        "predicate_uses_datatype";
+        "logical_function_uses_logical_function";
+        "logical_function_uses_struct";
+        "logical_function_uses_datatype";
+        "lemma_uses_predicate";
+        "lemma_uses_logical_function";
+        "lemma_uses_struct";
+        "lemma_uses_datatype"
+      ]
+    in
+    List.iter
+      (fun table ->
+         let sql =
+           Printf.sprintf "INSERT OR IGNORE INTO %s SELECT * FROM source.%s" table table
+         in
+         let stmt = prepare db sql in
+         exec_stmt stmt [];
+         ignore (finalize stmt))
+      dep_tables;
+    (* Detach source database *)
+    let detach_stmt = prepare db "DETACH DATABASE source" in
+    exec_stmt detach_stmt [];
+    ignore (finalize detach_stmt);
+    Ok (func_count, pred_count, lf_count, lemma_count)
+  with
+  | exn -> Error (Printexc.to_string exn)

@@ -314,3 +314,6 @@ val list_functions
 
 (** Get count of entities (predicates, logical_functions, lemmata, structs) *)
 val get_entity_counts : db_handle -> int * int * int * int
+
+(** Merge another database into this one, returns (funcs, preds, lfs, lemmas) counts *)
+val merge_from_db : db_handle -> string -> (int * int * int * int, string) result
