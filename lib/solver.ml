@@ -1764,8 +1764,8 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
          if !portfolio_always then
            (* Always use portfolio - bypass incremental completely *)
            check_with_pure_portfolio cmds
-         else if !use_portfolio && !inc_enabled then
-           (* Adaptive: try incremental, failover to portfolio *)
+         else if !use_portfolio then
+           (* Adaptive: try incremental if enabled, failover to portfolio *)
            check_with_adaptive_portfolio solver solver.smt_solver.config cmds
          else
            (* Standard: incremental or fresh single solver *)
