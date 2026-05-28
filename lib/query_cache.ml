@@ -11,8 +11,6 @@ let hits = ref 0
 
 let misses = ref 0
 
-let disk_hits = ref 0
-
 let total_lookup_time = ref 0.0
 
 let enabled = ref true
@@ -65,9 +63,8 @@ let load_disk_cache () =
                close_in ic;
                match result_from_string line with
                | Some result ->
-                 if not (Hashtbl.mem cache hash) then (
-                   Hashtbl.add cache hash result;
-                   incr disk_hits)
+                 if not (Hashtbl.mem cache hash) then
+                   Hashtbl.add cache hash result
                | None -> ()
              with
              | _ -> ())
@@ -148,19 +145,16 @@ let store_smt_commands
 
 (* Print cache statistics *)
 let print_stats () =
-  let total = !hits + !disk_hits + !misses in
+  let total = !hits + !misses in
   if total > 0 then (
     Printf.eprintf "\n=== Query Cache Statistics ===\n";
-    Printf.eprintf "Enabled:  %b\n" !enabled;
-    Printf.eprintf "Memory hits:  %6d\n" !hits;
-    Printf.eprintf "Disk hits:    %6d\n" !disk_hits;
+    Printf.eprintf "Enabled:      %b\n" !enabled;
+    Printf.eprintf "Hits:         %6d\n" !hits;
     Printf.eprintf "Misses:       %6d\n" !misses;
     Printf.eprintf "Total:        %6d\n" total;
-    Printf.eprintf
-      "Hit rate:     %5.1f%%\n"
-      (100.0 *. float (!hits + !disk_hits) /. float total);
-    Printf.eprintf "Memory cache: %d entries\n" (Hashtbl.length cache);
-    Printf.eprintf "Disk cache:   %s\n" (cache_dir ());
+    Printf.eprintf "Hit rate:     %5.1f%%\n" (100.0 *. float !hits /. float total);
+    Printf.eprintf "Cache entries: %d\n" (Hashtbl.length cache);
+    Printf.eprintf "Cache dir:    %s\n" (cache_dir ());
     Printf.eprintf "Lookup time:  %.3fs\n" !total_lookup_time;
     Printf.eprintf "=============================\n")
 
@@ -170,7 +164,6 @@ let clear () =
   Hashtbl.clear cache;
   disk_cache_loaded := false;
   hits := 0;
-  disk_hits := 0;
   misses := 0;
   total_lookup_time := 0.0;
   (* Clear disk cache *)
