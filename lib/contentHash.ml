@@ -73,8 +73,14 @@ let canonical_sym (bt : BT.t) (order : int) (_loc : Locations.t) : Sym.t =
 let get_canonical (ctx : norm_ctx) (sym : Sym.t) (bt : BT.t) (loc : Locations.t)
   : Sym.t * norm_ctx
   =
-  if not (is_generated_sym sym) then (* User-written variable, keep as-is *)
-    (sym, ctx)
+  if not (is_generated_sym sym) then (
+    (* User-written variable, keep as-is *)
+    (* Debug: show user variable names *)
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       Printf.eprintf "  User var: %s (num=%d)\n%!" (Sym.pp_string sym) (Sym.num sym)
+     | _ -> ());
+    (sym, ctx))
   else (
     match Sym_map.find_opt sym ctx.renaming with
     | Some canonical -> (canonical, ctx)
@@ -85,6 +91,16 @@ let get_canonical (ctx : norm_ctx) (sym : Sym.t) (bt : BT.t) (loc : Locations.t)
       in
       Hashtbl.replace ctx.type_counters bt (count + 1);
       let canonical = canonical_sym bt count loc in
+      (* Debug: show renaming *)
+      (match Sys.getenv_opt "CN_DEBUG_HASH" with
+       | Some "1" ->
+         Printf.eprintf
+           "  Renaming: %s (num=%d) -> %s (num=%d)\n%!"
+           (Sym.pp_string sym)
+           (Sym.num sym)
+           (Sym.pp_string canonical)
+           (Sym.num canonical)
+       | _ -> ());
       let new_renaming = Sym_map.add sym canonical ctx.renaming in
       (canonical, { ctx with renaming = new_renaming }))
 
@@ -381,6 +397,24 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     Digest.string ft_str |> Digest.to_hex
 
 
+(** Normalize generated symbol names by removing numeric suffixes.
+
+    Generated symbols like x_524, a_532, ret_525_525 get converted to
+    canonical names x_N, a_N, ret_N_N to make hashing independent
+    of symbol ID allocation order.
+
+    User-written symbols (without underscore-number pattern) are unchanged.
+*)
+let normalize_symbol_ids (str : string) : string =
+  (* Replace all _DIGITS patterns with _N, regardless of what comes before.
+     Pattern: underscore followed by one or more digits.
+
+     Note: We don't use \b (word boundary) at the end because it prevents matching
+     in compound identifiers like ret_525_525. Without \b, both _525 instances are
+     matched in a single pass, giving us ret_N_N directly. *)
+  Str.global_replace (Str.regexp "_[0-9]+") "_N" str
+
+
 (** Hash args_and_body using location-independent pretty-printing
 
     We use Pp_mucore.Basic which has show_locations=false, giving us a
@@ -392,8 +426,11 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     - Loop labels and invariants
     - CN specifications
 
-    This is filename-independent and line-number-independent, so identical
-    functions in different files will hash the same.
+    Symbol IDs are normalized (x_524 -> x_NNN) to make hashing independent
+    of the order functions appear in the file.
+
+    This is filename-independent, line-number-independent, and symbol-ID-independent,
+    so identical functions in different files will hash the same.
 *)
 let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
   try
@@ -424,21 +461,25 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     in
     (* Convert to string with fixed width to ensure deterministic output *)
     let str = pp_to_string doc in
+    (* Normalize symbol IDs to remove order-dependence *)
+    let normalized = normalize_symbol_ids str in
     (* Debug: Print serialized text if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
-       Printf.eprintf "=== Serialized text for hashing ===\n%s\n=== End ===\n%!" str;
-       Printf.eprintf "=== String length: %d bytes ===\n%!" (String.length str);
+       Printf.eprintf
+         "=== Serialized text for hashing ===\n%s\n=== End ===\n%!"
+         normalized;
+       Printf.eprintf "=== String length: %d bytes ===\n%!" (String.length normalized);
        Printf.eprintf
          "=== First 100 bytes (hex): %s ===\n%!"
-         (String.sub str 0 (min 100 (String.length str))
+         (String.sub normalized 0 (min 100 (String.length normalized))
           |> String.to_seq
           |> Seq.map (fun c -> Printf.sprintf "%02x" (Char.code c))
           |> List.of_seq
           |> String.concat " ")
      | _ -> ());
-    (* Hash the string *)
-    let hash = Digest.string str |> Digest.to_hex in
+    (* Hash the normalized string *)
+    let hash = Digest.string normalized |> Digest.to_hex in
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" -> Printf.eprintf "=== Hash: %s ===\n%!" hash
      | _ -> ());
