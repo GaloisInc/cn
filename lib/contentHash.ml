@@ -378,14 +378,54 @@ let hash_datatype_definition (dt_info : BT.dt_info) : string =
   Digest.string (ctors_str ^ "|" ^ params_str) |> Digest.to_hex
 
 
+(** Simple string-based alpha-renaming by replacing symbol occurrences in order.
+
+    We scan the pretty-printed string for symbol patterns and replace them with
+    canonical names based on first occurrence order. This is simpler than AST
+    traversal but less precise (might rename things that aren't actually symbols).
+
+    Algorithm:
+    1. Find all symbol-like patterns: word_digits (e.g., x_527, a_528, ret_529)
+    2. Build a replacement map based on first occurrence order
+    3. Replace all occurrences with canonical names (v_0, v_1, v_2, ...)
+*)
+let normalize_symbols_in_string (str : string) : string =
+  (* Find all symbol-like patterns: identifier_digits *)
+  let symbol_pattern = Str.regexp "\\([a-zA-Z_][a-zA-Z0-9_]*\\)_\\([0-9]+\\)" in
+  (* Collect all unique symbols in order of first appearance *)
+  let symbols = ref [] in
+  let seen = Hashtbl.create 100 in
+  let pos = ref 0 in
+  try
+    while true do
+      let _ = Str.search_forward symbol_pattern str !pos in
+      let matched = Str.matched_string str in
+      if not (Hashtbl.mem seen matched) then (
+        Hashtbl.add seen matched (List.length !symbols);
+        symbols := matched :: !symbols);
+      pos := Str.match_end ()
+    done;
+    str (* unreachable *)
+  with
+  | Not_found ->
+    (* Build replacement map *)
+    let replacements =
+      List.mapi (fun i sym -> (sym, Printf.sprintf "v_%d" i)) (List.rev !symbols)
+    in
+    (* Apply replacements *)
+    List.fold_left
+      (fun s (old_name, new_name) ->
+         Str.global_replace (Str.regexp_string old_name) new_name s)
+      str
+      replacements
+
+
 (** Hash just the specification (pre/post) of a function *)
 let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
   match ft_opt with
   | None -> Digest.string "no_spec" |> Digest.to_hex
   | Some ft ->
-    (* We need to traverse the ft structure and normalize all index terms within it.
-       For now, use a simpler approach: serialize to string and hash.
-       This won't have alpha-renaming yet, but it's better than the stub. *)
+    (* Serialize spec to string *)
     let ft_str = pp_to_string (ArgumentTypes.pp ReturnTypes.pp ft) in
     (* Debug: Print serialized spec if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
@@ -394,25 +434,15 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
          "=== Serialized SPEC for hashing ===\n%s\n=== End SPEC ===\n%!"
          ft_str
      | _ -> ());
-    Digest.string ft_str |> Digest.to_hex
-
-
-(** Normalize generated symbol names by removing numeric suffixes.
-
-    Generated symbols like x_524, a_532, ret_525_525 get converted to
-    canonical names x_N, a_N, ret_N_N to make hashing independent
-    of symbol ID allocation order.
-
-    User-written symbols (without underscore-number pattern) are unchanged.
-*)
-let normalize_symbol_ids (str : string) : string =
-  (* Replace all _DIGITS patterns with _N, regardless of what comes before.
-     Pattern: underscore followed by one or more digits.
-
-     Note: We don't use \b (word boundary) at the end because it prevents matching
-     in compound identifiers like ret_525_525. Without \b, both _525 instances are
-     matched in a single pass, giving us ret_N_N directly. *)
-  Str.global_replace (Str.regexp "_[0-9]+") "_N" str
+    (* Alpha-rename symbols in spec for canonical hashing *)
+    let normalized = normalize_symbols_in_string ft_str in
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       Printf.eprintf
+         "=== Normalized SPEC for hashing ===\n%s\n=== End SPEC ===\n%!"
+         normalized
+     | _ -> ());
+    Digest.string normalized |> Digest.to_hex
 
 
 (** Hash args_and_body using location-independent pretty-printing
@@ -470,8 +500,15 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     in
     (* Convert to string with fixed width to ensure deterministic output *)
     let str = pp_to_string doc in
-    (* Normalize symbol IDs to remove order-dependence *)
-    let normalized = normalize_symbol_ids str in
+    (* Debug: show pre-normalization text *)
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       Printf.eprintf
+         "=== Pre-normalization sample (first 500 chars) ===\n%s\n%!"
+         (String.sub str 0 (min 500 (String.length str)))
+     | _ -> ());
+    (* Alpha-rename all symbols based on binding order *)
+    let normalized = normalize_symbols_in_string str in
     (* Debug: Print serialized text if environment variable is set *)
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
