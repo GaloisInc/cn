@@ -15,6 +15,7 @@
   result
   sqlite3
   str
+  threads.posix
   unix
   yojson)
  (preprocess

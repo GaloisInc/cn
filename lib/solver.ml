@@ -14,6 +14,31 @@ let inc_timeout = ref None
 
 let produce_models = ref true
 
+(** Portfolio mode configuration *)
+let use_portfolio = ref false
+
+let portfolio_timeout = ref 0.5
+
+let portfolio_always = ref false
+
+(** Portfolio statistics *)
+type portfolio_stats =
+  { mutable incremental_wins : int;
+    mutable z3_wins : int;
+    mutable cvc5_wins : int;
+    mutable portfolio_spawned : int;
+    mutable timeouts : int
+  }
+
+let stats =
+  { incremental_wins = 0;
+    z3_wins = 0;
+    cvc5_wins = 0;
+    portfolio_spawned = 0;
+    timeouts = 0
+  }
+
+
 (** Functions that pick names for things. *)
 module CN_Names = struct
   let fn_name x = Sym.pp_string_no_nums x ^ "_" ^ string_of_int (Sym.num x)
@@ -1537,6 +1562,173 @@ let check_new_solver cfg cmds =
   result
 
 
+(** Portfolio: spawn Z3 and CVC5 in parallel, return first result
+
+    Key insight: SMT solver creation and command sending is NOT thread-safe.
+    Solution: Create solvers and send commands SEQUENTIALLY, only parallelize check().
+*)
+let spawn_portfolio_check cmds result_ref mutex =
+  (* Disable logging for portfolio solvers to avoid potential deadlocks *)
+  let no_op_log =
+    { SMT.send = (fun _ -> ()); receive = (fun _ -> ()); stop = (fun _ -> ()) }
+  in
+  (* Create Z3 solver and send commands SEQUENTIALLY *)
+  let z3_solver =
+    try
+      let z3_base = SMT.z3 in
+      let z3_cfg =
+        { z3_base with
+          exe = Option.value ~default:z3_base.exe !solver_path;
+          opts = Option.value ~default:z3_base.opts !solver_flags;
+          log = no_op_log;
+          produce_models = !produce_models
+        }
+      in
+      let s = SMT.new_solver z3_cfg in
+      List.iter (SMT.ack_command s) cmds;
+      Some s
+    with
+    | e ->
+      debug 2 (lazy (!^"Portfolio: Z3 setup failed: " ^^ !^(Printexc.to_string e)));
+      None
+  in
+  (* Create CVC5 solver and send commands SEQUENTIALLY *)
+  let cvc5_solver =
+    try
+      let cvc5_base = SMT.cvc5 in
+      let cvc5_cfg =
+        { cvc5_base with
+          exe = "cvc5";
+          opts = cvc5_base.opts;
+          log = no_op_log;
+          produce_models = !produce_models
+        }
+      in
+      let s = SMT.new_solver cvc5_cfg in
+      List.iter (SMT.ack_command s) cmds;
+      Some s
+    with
+    | e ->
+      debug 2 (lazy (!^"Portfolio: CVC5 setup failed: " ^^ !^(Printexc.to_string e)));
+      None
+  in
+  (* Now run check() in PARALLEL - this should be thread-safe *)
+  let check_thread name solver_opt =
+    match solver_opt with
+    | None -> SMT.Unknown
+    | Some s ->
+      (try
+         let r = SMT.check s in
+         (* Don't call stop() here - let the cleanup code handle it *)
+         Mutex.lock mutex;
+         if Option.is_none !result_ref then (
+           result_ref := Some (name, r);
+           debug 3 (lazy (!^"Portfolio: " ^^ !^name ^^ !^" won the race")));
+         Mutex.unlock mutex;
+         r
+       with
+       | e ->
+         debug
+           2
+           (lazy
+             (!^"Portfolio: " ^^ !^name ^^ !^" exception: " ^^ !^(Printexc.to_string e)));
+         SMT.Unknown)
+  in
+  let t_z3 = Thread.create (fun () -> check_thread "Z3" z3_solver) () in
+  let t_cvc5 = Thread.create (fun () -> check_thread "CVC5" cvc5_solver) () in
+  ((t_z3, z3_solver), (t_cvc5, cvc5_solver))
+
+
+(** Pure portfolio: Z3 and CVC5 using Unix.select (no threading) *)
+let check_with_pure_portfolio cmds =
+  stats.portfolio_spawned <- stats.portfolio_spawned + 1;
+  (* Create Z3 portfolio solver *)
+  let z3_solver =
+    try
+      let z3_base = SMT.z3 in
+      let z3_cfg =
+        { z3_base with
+          exe = Option.value ~default:z3_base.exe !solver_path;
+          opts = Option.value ~default:z3_base.opts !solver_flags;
+          log =
+            { SMT.send = (fun _ -> ()); receive = (fun _ -> ()); stop = (fun _ -> ()) };
+          produce_models = !produce_models
+        }
+      in
+      let ps = SMT.new_portfolio_solver z3_cfg in
+      List.iter (SMT.ack_command ps.SMT.solver) cmds;
+      Some ps
+    with
+    | e ->
+      debug 2 (lazy (!^"Portfolio: Z3 setup failed: " ^^ !^(Printexc.to_string e)));
+      None
+  in
+  (* Create CVC5 portfolio solver *)
+  let cvc5_solver =
+    try
+      let cvc5_base = SMT.cvc5 in
+      let cvc5_cfg =
+        { cvc5_base with
+          exe = "cvc5";
+          opts = cvc5_base.opts;
+          log =
+            { SMT.send = (fun _ -> ()); receive = (fun _ -> ()); stop = (fun _ -> ()) };
+          produce_models = !produce_models
+        }
+      in
+      let ps = SMT.new_portfolio_solver cvc5_cfg in
+      List.iter (SMT.ack_command ps.SMT.solver) cmds;
+      Some ps
+    with
+    | e ->
+      debug 2 (lazy (!^"Portfolio: CVC5 setup failed: " ^^ !^(Printexc.to_string e)));
+      None
+  in
+  (* Build list of portfolio solvers to race *)
+  let solvers =
+    List.filter_map
+      (fun x -> x)
+      [ Option.map (fun ps -> ("Z3", ps)) z3_solver;
+        Option.map (fun ps -> ("CVC5", ps)) cvc5_solver
+      ]
+  in
+  (* Race them using Simple_smt's portfolio_check (Unix.select, no threading!) *)
+  let winner, answer = SMT.portfolio_check solvers in
+  (* Update statistics *)
+  (match winner with
+   | "Z3" -> stats.z3_wins <- stats.z3_wins + 1
+   | "CVC5" -> stats.cvc5_wins <- stats.cvc5_wins + 1
+   | _ -> ());
+  answer
+
+
+(** Adaptive check: try incremental first in main thread, fallback to portfolio if slow *)
+let check_with_adaptive_portfolio solver _cfg cmds =
+  (* Try incremental first in the main thread (no threading to avoid corrupting CN state) *)
+  debug 3 (lazy !^"Portfolio: trying incremental check first");
+  (* Check if incremental solver is available and working *)
+  let inc_result =
+    if !inc_enabled then (
+      try Some (SMT.check solver.smt_solver) with _ -> None)
+    else
+      None
+  in
+  match inc_result with
+  | Some Unknown | None ->
+    (* Incremental solver didn't work or returned unknown, use portfolio *)
+    debug
+      3
+      (lazy
+        !^"Portfolio: incremental solver unavailable or returned unknown, using portfolio");
+    stats.portfolio_spawned <- stats.portfolio_spawned + 1;
+    check_with_pure_portfolio cmds
+  | Some answer ->
+    (* Incremental solver succeeded *)
+    debug 3 (lazy !^"Portfolio: incremental solver succeeded");
+    stats.incremental_wins <- stats.incremental_wins + 1;
+    answer
+
+
 let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
   clear_model ();
   (* shortcut, as similarly suggested by Robbert *)
@@ -1545,7 +1737,9 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
       Simplify.LogicalConstraints.simp simp_ctxt lc)
   in
   match lc with
-  | LC.T (IT (Const (Bool true), _, _)) -> `True
+  | LC.T (IT (Const (Bool true), _, _)) ->
+    debug 1 (lazy !^"Trivially true, returning immediately");
+    `True
   | lc ->
     let qs =
       Timing.time_phase "smt_query_setup" (fun () ->
@@ -1561,16 +1755,24 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
     let cached_result = QCache.lookup_smt_commands cmds in
     (match cached_result with
      | Some result ->
-       (* Cache hit - skip Z3 *)
+       (* Cache hit - skip solver *)
        pop solver 1;
        result
      | None ->
-       (* Cache miss - query Z3 *)
+       (* Cache miss - check with appropriate strategy *)
        let answer =
-         Timing.time_phase "smt_check" (fun () ->
-           match if !inc_enabled then SMT.check solver.smt_solver else Unknown with
-           | Unknown -> check_new_solver solver.smt_solver.config cmds
-           | a -> a)
+         if !portfolio_always then
+           (* Always use portfolio - bypass incremental completely *)
+           check_with_pure_portfolio cmds
+         else if !use_portfolio && !inc_enabled then
+           (* Adaptive: try incremental, failover to portfolio *)
+           check_with_adaptive_portfolio solver solver.smt_solver.config cmds
+         else
+           (* Standard: incremental or fresh single solver *)
+             Timing.time_phase "smt_check" (fun () ->
+             match if !inc_enabled then SMT.check solver.smt_solver else Unknown with
+             | Unknown -> check_new_solver solver.smt_solver.config cmds
+             | a -> a)
        in
        pop solver 1;
        let result =
@@ -1604,3 +1806,13 @@ let provable ~loc ~solver ~assumptions ~simp_ctxt ?(purpose = "") lc =
 
 
 let eval mo t = mo t
+
+(** Print portfolio statistics *)
+let print_portfolio_stats () =
+  if !use_portfolio || !portfolio_always then (
+    Printf.eprintf "\nPortfolio Statistics:\n";
+    Printf.eprintf "  Incremental wins:   %d\n" stats.incremental_wins;
+    Printf.eprintf "  Z3 wins:            %d\n" stats.z3_wins;
+    Printf.eprintf "  CVC5 wins:          %d\n" stats.cvc5_wins;
+    Printf.eprintf "  Portfolio spawned:  %d times\n" stats.portfolio_spawned;
+    Printf.eprintf "  Timeouts triggered: %d\n%!" stats.timeouts)

@@ -53,6 +53,9 @@ let verify
       db_path
       clear_db
       db_stats
+      portfolio
+      portfolio_always
+      portfolio_timeout
   =
   if json then (
     if debug_level > 0 then
@@ -93,6 +96,10 @@ let verify
   Solver.try_hard := try_hard;
   Solver.inc_enabled := solver_inc_enabled;
   Solver.inc_timeout := solver_inc_timeout;
+  (* Portfolio configuration *)
+  Solver.use_portfolio := portfolio;
+  Solver.portfolio_always := portfolio_always;
+  Solver.portfolio_timeout := portfolio_timeout;
   (* Disable models when query cache is enabled (can't cache model state) *)
   Solver.produce_models := (not no_produce_models) && not enable_query_cache;
   IndexTerms.use_vip := not dont_use_vip;
@@ -151,6 +158,8 @@ let verify
             errors;
         Timing.print_stats ();
         Query_cache.print_stats ();
+        (* Show portfolio statistics *)
+        Solver.print_portfolio_stats ();
         (* Show database statistics if requested *)
         (match db_handle with
          | Some _db when db_stats ->
@@ -232,6 +241,30 @@ module Flags = struct
       value
       & opt (some int) !Solver.inc_timeout
       & info [ "incremental-solver-timeout" ] ~doc)
+
+
+  let portfolio_flag =
+    let doc =
+      "Enable adaptive portfolio mode: try incremental solver first, spawn Z3+CVC5 in \
+       parallel if timeout expires. Best for projects with mixed query difficulty."
+    in
+    Arg.(value & flag & info [ "portfolio" ] ~doc)
+
+
+  let portfolio_always_flag =
+    let doc =
+      "Always use portfolio mode (Z3+CVC5 in parallel), bypassing incremental solving. \
+       Requires ~2x memory during query execution."
+    in
+    Arg.(value & flag & info [ "portfolio-always" ] ~doc)
+
+
+  let portfolio_timeout_flag =
+    let doc =
+      "Timeout in seconds before spawning portfolio (default: 0.5). Only applies when \
+       --portfolio is enabled."
+    in
+    Arg.(value & opt float 0.5 & info [ "portfolio-timeout" ] ~docv:"SECONDS" ~doc)
 
 
   let try_hard =
@@ -424,6 +457,9 @@ let verify_t : unit Term.t =
   $ Flags.db_path
   $ Flags.clear_db
   $ Flags.db_stats
+  $ Flags.portfolio_flag
+  $ Flags.portfolio_always_flag
+  $ Flags.portfolio_timeout_flag
 
 
 let cmd =

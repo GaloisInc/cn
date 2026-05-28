@@ -821,8 +821,13 @@ let new_solver (cfg : solver_config) : solver =
     cfg.log.stop ()
   in
   let force_stop_command () =
-    Unix.kill pid 9;
-    let _ = Unix.close_process_full proc in
+    (* Kill the process with SIGKILL *)
+    (try Unix.kill pid 9 with _ -> ());
+    (* Close the channels explicitly - don't call Unix.close_process_full
+       after SIGKILL as it might block trying to wait for the process *)
+    (try close_out out_chan with _ -> ());
+    (try close_in in_chan with _ -> ());
+    (try close_in in_err_chan with _ -> ());
     cfg.log.stop ()
   in
   let s =
@@ -958,3 +963,123 @@ let timeout cfg n =
 
 
 let otimeout cfg = function None -> [] | Some n -> timeout cfg n
+
+(** Portfolio-enabled solver with exposed channels for Unix.select *)
+type portfolio_solver =
+  { solver : solver;
+    in_channel : in_channel;
+    out_channel : out_channel;
+    in_buf : Lexing.lexbuf;
+    pid : int
+  }
+
+(** Create a portfolio solver with exposed channels *)
+let new_portfolio_solver (cfg : solver_config) : portfolio_solver =
+  let args = Array.of_list (cfg.exe :: cfg.opts) in
+  let proc = Unix.open_process_args_full cfg.exe args [||] in
+  let pid = Unix.process_full_pid proc in
+  let in_chan, out_chan, in_err_chan = proc in
+  let in_buf = Lexing.from_channel in_chan in
+  let send_string s =
+    cfg.log.send s;
+    fprintf out_chan "%s\n%!" s
+  in
+  let send_command c =
+    send_string (Sexp.to_string_hum c);
+    let ans =
+      match Sexp.scan_sexp_opt in_buf with
+      | Some x -> x
+      | None -> Sexp.Atom (In_channel.input_all in_err_chan)
+    in
+    cfg.log.receive (Sexp.to_string_hum ans);
+    ans
+  in
+  let stop_command () =
+    send_string "(exit)";
+    let _ = Unix.close_process_full proc in
+    cfg.log.stop ()
+  in
+  let force_stop_command () =
+    (* Kill the process with SIGKILL *)
+    (try Unix.kill pid 9 with _ -> ());
+    (* Close the channels explicitly - don't call Unix.close_process_full
+       after SIGKILL as it might block trying to wait for the process *)
+    (try close_out out_chan with _ -> ());
+    (try close_in in_chan with _ -> ());
+    (try close_in in_err_chan with _ -> ());
+    cfg.log.stop ()
+  in
+  let s =
+    { command = send_command;
+      stop = stop_command;
+      force_stop = force_stop_command;
+      config = cfg
+    }
+  in
+  ack_command s (set_option ":print-success" "true");
+  ack_command
+    s
+    (set_option ":produce-models" (if cfg.produce_models then "true" else "false"));
+  List.iter (ack_command s) cfg.setup;
+  { solver = s; in_channel = in_chan; out_channel = out_chan; in_buf; pid }
+
+
+(** Portfolio check using Unix.select - no threading! *)
+let portfolio_check (solvers : (string * portfolio_solver) list) : string * result =
+  if List.length solvers = 0 then
+    ("None", Unknown)
+  else if List.length solvers = 1 then (
+    (* Only one solver, just check it *)
+    let name, ps = List.hd solvers in
+    let res = check ps.solver in
+    ps.solver.force_stop ();
+    (name, res))
+  else (
+    (* Send check-sat to all solvers without waiting *)
+    List.iter
+      (fun (_name, ps) ->
+         fprintf ps.out_channel "(check-sat)\n%!";
+         ps.solver.config.log.send "(check-sat)")
+      solvers;
+    (* Use Unix.select to wait for first response *)
+    let in_fds =
+      List.map (fun (_, ps) -> Unix.descr_of_in_channel ps.in_channel) solvers
+    in
+    let rec wait_for_response () =
+      (* Use 60s timeout instead of infinite (-1.0) to avoid Unix.select bug after many calls *)
+      let ready, _, _ = Unix.select in_fds [] [] 60.0 in
+      if List.length ready = 0 then (
+        (* Timeout - kill all solvers and return Unknown *)
+        List.iter (fun (_, ps) -> ps.solver.force_stop ()) solvers;
+        ("Timeout", Unknown))
+      else (
+        (* Find which solver responded *)
+          match
+            List.find_opt
+              (fun (_name, ps) ->
+                 let fd = Unix.descr_of_in_channel ps.in_channel in
+                 List.exists (fun ready_fd -> ready_fd == fd) ready)
+              solvers
+          with
+          | None -> wait_for_response () (* Shouldn't happen *)
+          | Some (name, ps) ->
+            (* Read the response *)
+            let ans =
+              match Sexp.scan_sexp_opt ps.in_buf with
+              | Some x -> x
+              | None -> Sexp.Atom "error"
+            in
+            ps.solver.config.log.receive (Sexp.to_string_hum ans);
+            (* Parse result *)
+            let res =
+              match ans with
+              | Sexp.Atom "unsat" -> Unsat
+              | Sexp.Atom "sat" -> Sat
+              | Sexp.Atom "unknown" -> Unknown
+              | _ -> Unknown
+            in
+            (* Kill all solver processes *)
+            List.iter (fun (_, ps) -> ps.solver.force_stop ()) solvers;
+            (name, res))
+    in
+    wait_for_response ())

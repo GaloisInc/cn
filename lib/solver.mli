@@ -26,6 +26,16 @@ val inc_timeout : int option ref
 
 val produce_models : bool ref
 
+(** Portfolio mode configuration *)
+val use_portfolio : bool ref
+
+val portfolio_timeout : float ref
+
+val portfolio_always : bool ref
+
+(** Print portfolio statistics *)
+val print_portfolio_stats : unit -> unit
+
 (* Create a solver *)
 val make : Global.t -> (Sym.t * BaseTypes.t) list -> solver
 
