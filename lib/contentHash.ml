@@ -442,17 +442,26 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
         (fun (body, labels, rt) ->
            (* Print body *)
            Pp_mucore.Basic.pp_expr None body
-           (* Include labels (loop invariants etc) *)
+           (* Include labels (loop bodies, return points, etc) *)
            ^^^ Pmap.fold
-                 (fun _sym def acc ->
+                 (fun sym def acc ->
                     acc
                     ^^^
                     match def with
                     | Mucore.Loop (_loc, loop_args, _annots, _label_spec, _info) ->
-                      (* Include loop spec which has invariants *)
-                      Pp.string "loop_inv"
-                      ^^^ Pp_mucore.Basic.pp_arguments (fun _ -> Pp.empty) loop_args
-                    | _ -> Pp.empty)
+                      (* Include loop body - loop_args wraps just the expr, not (expr, labels, rt) *)
+                      Pp.string "loop_"
+                      ^^^ Pp.string (Sym.pp_string sym)
+                      ^^^ Pp.string "_body{"
+                      ^^^ Pp_mucore.Basic.pp_arguments
+                            (fun loop_body_expr ->
+                               (* Print the loop body expression - this includes asserts, split_case, etc *)
+                               Pp_mucore.Basic.pp_expr None loop_body_expr)
+                            loop_args
+                      ^^^ Pp.string "}"
+                    | _ ->
+                      (* Non-loop labels (Return, Non_inlined) don't need special handling *)
+                      Pp.empty)
                  labels
                  Pp.empty
            (* Include return type *)
