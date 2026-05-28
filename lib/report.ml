@@ -810,11 +810,16 @@ let mk_html ~title ~pages ~file_content ~n_pages =
 
 
 let read_file filename =
-  try
-    let ic = open_in filename in
-    Some (In_channel.input_all ic)
-  with
-  | _ -> None
+  (* Try cached version first to avoid reading stale content *)
+  match Source_cache.lookup filename with
+  | Some content -> Some content
+  | None ->
+    (* Fall back to reading from disk if not cached *)
+    (try
+       let ic = open_in filename in
+       Some (In_channel.input_all ic)
+     with
+     | _ -> None)
 
 
 let make filename source_filename_opt (report : report) =

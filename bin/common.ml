@@ -194,6 +194,14 @@ let with_well_formedness_check
          ~disable_linemarkers
          ~skip_label_inlining)
   in
+  (* Cache source file content for error reporting *)
+  (try
+     let ic = open_in filename in
+     let content = In_channel.input_all ic in
+     close_in ic;
+     Source_cache.store filename content
+   with
+   | _ -> ());
   Cerb_debug.maybe_open_csv_timing_file ();
   Pp.maybe_open_times_channel
     (match csv_times with Some times -> Some (times, "csv") | _ -> None);
