@@ -11,7 +11,7 @@ on:
       - '**docker.yml'
 
 env:
-  CN_IMAGE_ID: ghcr.io/rems-project/cn
+  CN_IMAGE_ID: ghcr.io/galoisinc/cn
 
 # Cancelling an in-progress job when a new push is performed causes the CI to
 # show up as failed: https://github.com/orgs/community/discussions/8336
