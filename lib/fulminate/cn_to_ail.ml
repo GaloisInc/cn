@@ -1709,7 +1709,24 @@ let rec cn_to_ail_expr_aux
                 t
                 (AssignVar (Option.get res_sym_opt)))
          | [] -> failwith (__LOC__ ^ ": Incomplete pattern match")
-         | (_ :: _, _e) :: _rest -> failwith (__LOC__ ^ ": Redundant patterns"))
+         | remaining_cases ->
+           (* Check if all remaining cases are wildcards - if so, they're not redundant *)
+           let all_wildcards =
+             List.for_all
+               (fun (ps, _) ->
+                  match ps with T.(Pat (PWild, _, _)) :: _ -> true | _ -> false)
+               remaining_cases
+           in
+           if all_wildcards then (
+             (* Wildcard patterns covering remaining constructors - not redundant *)
+             (* Take the first wildcard case *)
+               match remaining_cases with
+               | (_ :: ps', t) :: _ ->
+                 (* Remove the wildcard pattern and continue *)
+                 translate count [] [ (ps', t) ] res_sym_opt
+               | _ -> failwith (__LOC__ ^ ": Unexpected pattern structure"))
+           else
+             failwith (__LOC__ ^ ": Redundant patterns"))
       | term :: vs ->
         let cases = List.map (simplify_leading_variable term) cases in
         if List.for_all leading_wildcard cases then (
