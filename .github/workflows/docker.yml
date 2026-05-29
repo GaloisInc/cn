@@ -89,23 +89,23 @@ jobs:
           --amend ${{ env.CN_IMAGE_ID }}:release-${{ matrix.os }}-24.04-arm
         docker manifest push ${{ env.CN_IMAGE_ID }}:release-${{ matrix.os }}
 
-# Other CI is testing anyway - if need be, can run tests in Dockerfile itself
-  test-docker-images:
+# # Other CI is testing anyway - if need be, can run tests in Dockerfile itself
+#   test-docker-images:
 
-    name: Docker -- Test Docker Images
+#     name: Docker -- Test Docker Images
 
-    if: ${{ github.event_name != 'pull_request' }}
+#     if: ${{ github.event_name != 'pull_request' }}
 
-    strategy:
-      matrix:
-        os: [redhat]
-    runs-on: ubuntu-latest
-    needs: [combine-multiplatform]
+#     strategy:
+#       matrix:
+#         os: [redhat]
+#     runs-on: ubuntu-latest
+#     needs: [combine-multiplatform]
 
-    steps:
-    - uses: actions/checkout@v4
+#     steps:
+#     - uses: actions/checkout@v4
 
-    - name: Run CI tests
-      run: |
-        docker pull ${{env.CN_IMAGE_ID}}:release-${{ matrix.os }}
-        docker run -v $PWD:/work -w /work ${{env.CN_IMAGE_ID}}:release-${{ matrix.os }} tests/diff-prog.py cn tests/cn/verify.json
+#     - name: Run CI tests
+#       run: |
+#         docker pull ${{env.CN_IMAGE_ID}}:release-${{ matrix.os }}
+#         docker run -v $PWD:/work -w /work ${{env.CN_IMAGE_ID}}:release-${{ matrix.os }} tests/diff-prog.py cn tests/cn/verify.json
