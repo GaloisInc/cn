@@ -305,6 +305,9 @@ let hash_index_term (it : IndexTerms.t) : string =
 
 (** Hash a logical function definition *)
 let hash_logical_function (def : Definition.Function.t) : string =
+  (match Sys.getenv_opt "CN_DEBUG_HASH" with
+   | Some "1" -> Printf.eprintf "\n=== Hashing logical function ===\n%!"
+   | _ -> ());
   let ctx = empty_ctx () in
   let body_str =
     match def.body with
@@ -322,11 +325,20 @@ let hash_logical_function (def : Definition.Function.t) : string =
     |> String.concat ","
   in
   let combined = args_str ^ "|" ^ body_str in
-  Digest.string combined |> Digest.to_hex
+  match Sys.getenv_opt "CN_DEBUG_HASH" with
+  | Some "1" ->
+    Printf.eprintf "Text to hash:\n%s\n%!" combined;
+    let hash = Digest.string combined |> Digest.to_hex in
+    Printf.eprintf "Hash: %s\n%!" hash;
+    hash
+  | _ -> Digest.string combined |> Digest.to_hex
 
 
 (** Hash a predicate definition *)
 let hash_predicate (def : Definition.Predicate.t) : string =
+  (match Sys.getenv_opt "CN_DEBUG_HASH" with
+   | Some "1" -> Printf.eprintf "\n=== Hashing predicate ===\n%!"
+   | _ -> ());
   let ctx = empty_ctx () in
   let clauses_str =
     match def.clauses with
@@ -343,15 +355,29 @@ let hash_predicate (def : Definition.Predicate.t) : string =
         clauses
       |> String.concat "|"
   in
-  (* Include argument types *)
-  let args_str =
+  (* Include argument types (pointer, index args, and output arg) *)
+  let pointer_str = "ptr:" ^ Sym.pp_string def.pointer in
+  let iargs_str =
     List.map
       (fun (sym, bt) -> Sym.pp_string sym ^ ":" ^ pp_to_string (BT.pp bt))
       def.iargs
     |> String.concat ","
   in
+  let oarg_str = "oarg:" ^ pp_to_string (BT.pp (snd def.oarg)) in
+  let args_str =
+    pointer_str
+    ^ (if List.length def.iargs > 0 then "," ^ iargs_str else "")
+    ^ ";"
+    ^ oarg_str
+  in
   let combined = args_str ^ "|" ^ clauses_str in
-  Digest.string combined |> Digest.to_hex
+  match Sys.getenv_opt "CN_DEBUG_HASH" with
+  | Some "1" ->
+    Printf.eprintf "Text to hash:\n%s\n%!" combined;
+    let hash = Digest.string combined |> Digest.to_hex in
+    Printf.eprintf "Hash: %s\n%!" hash;
+    hash
+  | _ -> Digest.string combined |> Digest.to_hex
 
 
 (** Hash a struct definition *)
