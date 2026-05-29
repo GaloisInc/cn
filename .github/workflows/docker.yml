@@ -1,14 +1,15 @@
 name: Docker
 
 on:
+  push:
   # Run this action every day
-  schedule:
-    - cron: '30 18 * * *'
+  #schedule:
+  #  - cron: '30 18 * * *'
   # Run this action any time any dockerfile changes
-  pull_request:
-    paths:
-      - 'Dockerfile.**'
-      - '**docker.yml'
+  #pull_request:
+  #  paths:
+  #    - 'Dockerfile.**'
+  #    - '**docker.yml'
 
 env:
   CN_IMAGE_ID: ghcr.io/galoisinc/cn
