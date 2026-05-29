@@ -75,6 +75,18 @@ let well_formed
             Sym.Map.iter
               (fun sym dt_info -> Hashtbl.add datatype_map (Sym.pp_string sym) dt_info)
               global.datatypes;
+            (* Build predicate name -> definition map *)
+            let pred_name_map = Hashtbl.create 100 in
+            Sym.Map.iter
+              (fun sym pred_def ->
+                 Hashtbl.add pred_name_map (Sym.pp_string sym) (sym, pred_def))
+              global.resource_predicates;
+            (* Build logical function name -> definition map *)
+            let logfn_name_map = Hashtbl.create 100 in
+            Sym.Map.iter
+              (fun sym logfn_def ->
+                 Hashtbl.add logfn_name_map (Sym.pp_string sym) (sym, logfn_def))
+              global.logical_functions;
             (* Analyze each function *)
             List.iter
               (fun (sym, (loc, args_and_body)) ->
@@ -163,11 +175,21 @@ let well_formed
                        List.filter_map
                          (fun pred ->
                             match VerificationDb.get_predicate_status db pred with
-                            | Some _pred_rec ->
+                            | Some pred_rec ->
                               (* For predicates, check if content hash changed *)
-                              (* We'd need to compute current hash from global.predicates *)
-                              (* For now, assume stable if in cache *)
-                              None
+                              (match Hashtbl.find_opt pred_name_map pred with
+                               | Some (_pred_sym, pred_def) ->
+                                 let current_hash = ContentHash.hash_predicate pred_def in
+                                 if
+                                   String.compare
+                                     pred_rec.VerificationDb.content_hash
+                                     current_hash
+                                   <> 0
+                                 then
+                                   Some (pred, "predicate definition changed")
+                                 else
+                                   None
+                               | None -> None (* External or not in current file *))
                             | None -> None (* External or not tracked yet *))
                          pred_deps
                      in
@@ -175,10 +197,23 @@ let well_formed
                        List.filter_map
                          (fun logfn ->
                             match VerificationDb.get_logical_function_status db logfn with
-                            | Some _logfn_rec ->
+                            | Some logfn_rec ->
                               (* For logical functions, check if content hash changed *)
-                              None
-                              (* Assume stable for now *)
+                              (match Hashtbl.find_opt logfn_name_map logfn with
+                               | Some (_logfn_sym, logfn_def) ->
+                                 let current_hash =
+                                   ContentHash.hash_logical_function logfn_def
+                                 in
+                                 if
+                                   String.compare
+                                     logfn_rec.VerificationDb.content_hash
+                                     current_hash
+                                   <> 0
+                                 then
+                                   Some (logfn, "logical function definition changed")
+                                 else
+                                   None
+                               | None -> None (* External or not in current file *))
                             | None -> None)
                          logfn_deps
                      in
