@@ -3418,12 +3418,15 @@ let time_check_c_functions
                (* Never verified before, needs checking *)
                true
              | Some record ->
-               let current_content, _current_spec = Hashtbl.find current_hashes sym_str in
-               (* Check if content hash changed *)
+               let current_content, current_spec = Hashtbl.find current_hashes sym_str in
+               (* Check if content hash or spec hash changed *)
                let content_changed =
                  String.compare record.VerificationDb.content_hash current_content <> 0
                in
-               if content_changed then
+               let spec_changed =
+                 String.compare record.VerificationDb.spec_hash current_spec <> 0
+               in
+               if content_changed || spec_changed then
                  true
                else (
                  (* Check if any predicate dependencies changed (recursively) *)
