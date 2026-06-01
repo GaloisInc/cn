@@ -485,7 +485,7 @@ let rec n_expr
     let@ ghost_args =
       match parsed_ghosts with
       | None -> return None
-      | Some (ghost_loc, (args, _ids)) ->
+      | Some (ghost_loc, args) ->
         let marker_id = Option.get (CF.Annot.get_marker annots) in
         let marker_id_object_types =
           Option.get (CF.Annot.get_marker_object_types annots)
