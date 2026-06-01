@@ -3353,7 +3353,22 @@ let time_check_c_functions
     match db with
     | None -> return (selected_funs, List.length selected_funs, 0)
     | Some db_handle ->
-      (* Compute current hashes for all selected functions *)
+      (* Compute current hashes for all selected functions
+
+         VERIFICATION DEPENDENCY DEFINITION:
+         A verification of a function uses:
+         - The function's spec
+         - The function's body
+         - The spec (meaning definition) of logical functions, datatypes, structs,
+           predicates, and lemmata used in the body annotations or spec, RECURSIVELY
+         - Only the SPEC of any called functions (not their body), also with any
+           specs etc it depends on recursively
+
+         A verification is out of date if the hash of any of these used things has changed.
+
+         Hashes are computed on alpha-renamed versions, so argument name changes should
+         not cause re-verification. This is a consequence of the definition, not part
+         of the definition itself. *)
       let current_hashes = Hashtbl.create (List.length selected_funs) in
       let@ () =
         ListM.iterM
@@ -3419,14 +3434,15 @@ let time_check_c_functions
                true
              | Some record ->
                let current_content, current_spec = Hashtbl.find current_hashes sym_str in
-               (* Check if content hash or spec hash changed *)
-               let content_changed =
-                 String.compare record.VerificationDb.content_hash current_content <> 0
-               in
+               (* Check if SPEC or CONTENT hash changed. Both are alpha-renamed so
+                  argument name changes won't trigger re-verification. *)
                let spec_changed =
                  String.compare record.VerificationDb.spec_hash current_spec <> 0
                in
-               if content_changed || spec_changed then
+               let content_changed =
+                 String.compare record.VerificationDb.content_hash current_content <> 0
+               in
+               if spec_changed || content_changed then
                  true
                else (
                  (* Check if any predicate dependencies changed (recursively) *)

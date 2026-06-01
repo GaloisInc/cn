@@ -20,8 +20,8 @@ module type CONFIG = sig
   val show_locations : bool
 end
 
-let pp_symbol sym = !^(Pp_symbol.to_string sym)
-(* NOTE: Used to distinguish struct/unions globally *)
+let pp_symbol sym = !^(Pp_symbol.to_string_pretty_cn ~print_nums:false sym)
+(* NOTE: Used to distinguish struct/unions globally, but for hashing we use SD_CN_Id without nums *)
 
 module Pp_typ = struct
   let pp_bt = BaseTypes.pp
