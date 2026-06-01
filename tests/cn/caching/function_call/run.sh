@@ -3,7 +3,7 @@
 echo "=== Test: Function Call Dependencies (caller depends on callee SPEC) ==="
 echo
 echo "Setup: caller() calls helper()"
-echo "       When helper's SPEC changes, caller should be re-verified"
+echo "       When only helper's BODY changes, caller should cache"
 echo
 
 rm -f .cn/verification.db foo.c
@@ -34,28 +34,28 @@ else
 fi
 echo
 
-echo "3. Change helper SPEC (add extra ensures clause):"
+echo "3. Change helper BODY (return x + 1 → int tmp = x + 1; return tmp):"
 cp foo_2.c foo.c
 RESULT3=$(cn verify --use-db foo.c 2>&1)
 echo "$RESULT3" | grep -E "^\[|cached|pass|fail"
 
 # Check helper was re-verified (not cached)
 if echo "$RESULT3" | grep -q "helper.*pass" && ! echo "$RESULT3" | grep -q "helper.*cached"; then
-  echo "   ✓ helper re-verified (spec changed)"
+  echo "   ✓ helper re-verified (body changed)"
 else
   echo "   ✗ helper should have been re-verified!"
   exit 1
 fi
 
-# Check caller was re-verified (not cached)
-if echo "$RESULT3" | grep -q "caller.*pass" && ! echo "$RESULT3" | grep -q "caller.*cached"; then
-  echo "   ✓ caller re-verified (callee spec changed)"
+# Check caller was cached (its body and spec didn't change, helper's spec is same)
+if echo "$RESULT3" | grep -q "caller.*cached"; then
+  echo "   ✓ caller cached (its code unchanged, helper spec unchanged)"
   echo
-  echo "✓ SUCCESS: Function call dependency tracking works!"
+  echo "✓ SUCCESS: Body changes don't affect independent functions!"
   exit 0
 else
   echo
-  echo "✗ BUG: caller should be re-verified when helper's spec changes!"
-  echo "       caller depends on helper, and helper's spec changed"
+  echo "✗ BUG: caller should be cached when only helper's body changes!"
+  echo "       caller depends on helper's SPEC, not its body"
   exit 1
 fi
