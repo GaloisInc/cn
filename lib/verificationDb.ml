@@ -287,6 +287,7 @@ let record_function_verified
       ~(content_hash : string)
       ~(spec_hash : string)
       ~(time_ms : int)
+      ~(consistency_checked : bool)
   : unit
   =
   let sql =
@@ -294,8 +295,8 @@ let record_function_verified
     INSERT OR REPLACE INTO functions
       (sym, name, file_path, content_hash, spec_hash,
        last_verified_at, verification_status, verification_time_ms,
-       consistency_checked)
-    VALUES (?, ?, ?, ?, ?, ?, 'pass', ?, 0)
+       consistency_checked, consistency_status)
+    VALUES (?, ?, ?, ?, ?, ?, 'pass', ?, ?, ?)
   |}
   in
   try
@@ -309,13 +310,35 @@ let record_function_verified
         Data.TEXT content_hash;
         Data.TEXT spec_hash;
         Data.FLOAT now;
-        Data.INT (Int64.of_int time_ms)
+        Data.INT (Int64.of_int time_ms);
+        Data.INT (if consistency_checked then Int64.one else Int64.zero);
+        Data.TEXT (if consistency_checked then "pass" else "not_checked")
       ];
     ignore (finalize stmt)
   with
   | exn ->
     failwith
       (Printf.sprintf "Failed to record function verified: %s" (Printexc.to_string exn))
+
+
+(** Update consistency_checked flag for a function *)
+let update_function_consistency_checked (db : db_handle) ~(sym : string) : unit =
+  let sql =
+    {|
+    UPDATE functions
+    SET consistency_checked = 1, consistency_status = 'pass'
+    WHERE sym = ?
+  |}
+  in
+  try
+    let stmt = prepare db sql in
+    exec_stmt stmt [ Data.TEXT sym ];
+    ignore (finalize stmt)
+  with
+  | exn ->
+    let msg = Sqlite3.Rc.to_string (Sqlite3.errcode db) in
+    failwith
+      (Printf.sprintf "Failed to update function consistency: %s (%s)" msg (Printexc.to_string exn))
 
 
 (** Record verification failure *)
@@ -400,6 +423,7 @@ let record_predicate_verified
       ~(sym : string)
       ~(name : string)
       ~(content_hash : string)
+      ~(consistency_checked : bool)
   : unit
   =
   let sql =
@@ -408,14 +432,20 @@ let record_predicate_verified
       (sym, name, file_path, line_number, content_hash, last_verified_at,
        verification_status, verification_time_ms, error_message,
        consistency_checked, consistency_status)
-    VALUES (?, ?, '', NULL, ?, ?, 'pass', NULL, NULL, 0, NULL)
+    VALUES (?, ?, '', NULL, ?, ?, 'pass', NULL, NULL, ?, ?)
   |}
   in
   try
     let stmt = prepare db sql in
     exec_stmt
       stmt
-      [ Data.TEXT sym; Data.TEXT name; Data.TEXT content_hash; Data.FLOAT (Unix.time ()) ];
+      [ Data.TEXT sym;
+        Data.TEXT name;
+        Data.TEXT content_hash;
+        Data.FLOAT (Unix.time ());
+        Data.INT (if consistency_checked then Int64.one else Int64.zero);
+        Data.TEXT (if consistency_checked then "pass" else "not_checked")
+      ];
     ignore (finalize stmt)
   with
   | exn ->

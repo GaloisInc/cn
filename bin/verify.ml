@@ -134,7 +134,7 @@ let verify
         let@ errors =
           Check.time_check_c_functions
             (skip, only)
-            check_consistency
+            ~check_consistency
             ?db:db_handle
             (global_var_constraints, functions)
         in

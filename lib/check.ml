@@ -2896,7 +2896,8 @@ let check_c_functions_fast
                ~file_path
                ~content_hash
                ~spec_hash
-               ~time_ms;
+               ~time_ms
+               ~consistency_checked:false;
              (* Extract and record predicate dependencies *)
              let pred_deps =
                DependencyExtractor.extract_predicate_uses_from_spec ft_opt
@@ -3042,7 +3043,8 @@ let check_c_functions_all
              ~file_path
              ~content_hash
              ~spec_hash
-             ~time_ms;
+             ~time_ms
+             ~consistency_checked:false;
            (* Extract and record predicate dependencies *)
            let pred_deps = DependencyExtractor.extract_predicate_uses_from_spec ft_opt in
            List.iter
@@ -3324,13 +3326,142 @@ let check_decls_lemmata_fun_specs (file : unit Mu.file) =
   return (List.rev checked, global_var_constraints, lemmata)
 
 
+(** Separate pass for consistency checking. Checks predicates, function specs,
+    and procedure implementations for internal logical consistency (e.g., that
+    preconditions don't imply false). Returns a list of errors.
+    When [db] is provided, caches consistency results per-entity.
+    NOTE: Assumes init_solver and add_cs have already been called. *)
+let check_consistency_pass
+      skip_and_only
+      ?db
+      (_global_var_constraints, (checked : c_function list))
+  : (string * TypeErrors.t) list m
+  =
+  let@ global = get_global () in
+  (* Apply --only/--skip filtering *)
+  let selected_fsyms =
+    select_functions skip_and_only (Sym.Set.of_list (List.map fst checked))
+  in
+  let selected_funs =
+    List.filter (fun (fsym, _) -> Sym.Set.mem fsym selected_fsyms) checked
+  in
+
+  (* Check predicates *)
+  let@ pred_errors =
+    Sym.Map.fold
+      (fun pred_sym def acc ->
+         let@ errors = acc in
+         (* Check if already cached *)
+         let needs_check =
+           match db with
+           | None -> true
+           | Some db_handle ->
+             let sym_str = Sym.pp_string pred_sym in
+             let current_hash = ContentHash.hash_predicate def in
+             (match VerificationDb.get_predicate_status db_handle sym_str with
+              | None -> true (* Not in database *)
+              | Some record ->
+                (* Re-check if hash changed or consistency wasn't checked before *)
+                String.compare record.VerificationDb.content_hash current_hash <> 0
+                || not record.VerificationDb.consistency_checked)
+         in
+         if not needs_check then
+           return errors
+         else (
+           let@ result = sandbox (Consistent.predicate def) in
+           match result with
+           | Ok () ->
+             (* Record successful consistency check *)
+             (match db with
+              | Some db_handle ->
+                let pred_hash = ContentHash.hash_predicate def in
+                VerificationDb.record_predicate_verified
+                  db_handle
+                  ~sym:(Sym.pp_string pred_sym)
+                  ~name:(Sym.pp_string pred_sym)
+                  ~content_hash:pred_hash
+                  ~consistency_checked:true
+              | None -> ());
+             return errors
+           | Error err ->
+             let name = "predicate_" ^ Sym.pp_string pred_sym in
+             return ((name, err) :: errors)))
+      global.resource_predicates
+      (return [])
+  in
+
+  (* Check function specifications *)
+  let@ spec_errors =
+    Sym.Map.fold
+      (fun fsym (loc, def, _) acc ->
+         let@ errors = acc in
+         match def with
+         | None -> return errors
+         | Some def ->
+           (* Only check if this function is selected *)
+           if not (Sym.Set.mem fsym selected_fsyms) then
+             return errors
+           else (
+             let@ result = sandbox (Consistent.function_type "proc/fun" loc def) in
+             match result with
+             | Ok () -> return errors
+             | Error err ->
+               let name = "spec_" ^ Sym.pp_string fsym in
+               return ((name, err) :: errors)))
+      global.fun_decls
+      (return [])
+  in
+
+  (* Check procedure implementations *)
+  let@ proc_errors =
+    let rec check_procedures acc = function
+      | [] -> return acc
+      | (fsym, (loc, args_and_body)) :: rest ->
+        (* Check if already cached *)
+        let needs_check =
+          match db with
+          | None -> true
+          | Some db_handle ->
+            let sym_str = Sym.pp_string fsym in
+            (match VerificationDb.get_function_status db_handle sym_str with
+             | None -> true (* Not in database *)
+             | Some record ->
+               (* Re-check if consistency wasn't checked before or if spec/content changed *)
+               not record.VerificationDb.consistency_checked)
+        in
+        if not needs_check then
+          check_procedures acc rest
+        else (
+          let@ result = sandbox (Consistent.procedure loc args_and_body) in
+          (* Update database if consistency check succeeded *)
+          (match result, db with
+           | Ok (), Some db_handle ->
+             VerificationDb.update_function_consistency_checked
+               db_handle
+               ~sym:(Sym.pp_string fsym)
+           | _, _ -> ());
+          let new_acc =
+            match result with
+            | Ok () -> acc
+            | Error err ->
+              let name = "procedure_" ^ Sym.pp_string fsym in
+              (name, err) :: acc
+          in
+          check_procedures new_acc rest)
+    in
+    check_procedures [] selected_funs
+  in
+
+  return (pred_errors @ spec_errors @ proc_errors)
+
+
 (** With CSV timing enabled, check the provided functions. Filters by
     [skip_and_only] and checks either with fail-fast or exhaustive mode
-    depending on the [fail_fast] ref. When [check_consistency] is true,
-    also performs consistency checking on predicates and procedures. *)
+    depending on the [fail_fast] ref. Optionally runs consistency checking
+    first if [check_consistency] is true. *)
 let time_check_c_functions
       skip_and_only
-      check_consistency
+      ?(check_consistency = false)
       ?db
       (global_var_constraints, (checked : c_function list))
   : (string * TypeErrors.t) list m
@@ -3341,6 +3472,17 @@ let time_check_c_functions
   let@ () = init_solver () in
   let here = Locations.other __LOC__ in
   let@ () = add_cs here global_var_constraints in
+  (* Run consistency checking pass first if requested *)
+  let@ consistency_errors =
+    if check_consistency then
+      check_consistency_pass skip_and_only ?db (global_var_constraints, checked)
+    else
+      return []
+  in
+  (* If there are consistency errors, return them and skip verification *)
+  match consistency_errors with
+  | _ :: _ -> return consistency_errors
+  | [] ->
   (* Apply --only/--skip filtering once upfront *)
   let selected_fsyms =
     select_functions skip_and_only (Sym.Set.of_list (List.map fst checked))
@@ -3596,45 +3738,6 @@ let time_check_c_functions
       return (stale_funs, total, num_cached)
   in
   let@ global = get_global () in
-  let@ consistency_errors =
-    match check_consistency with
-    | true ->
-      (* Collect all consistency errors instead of stopping at the first one *)
-      let@ pred_errors =
-        Sym.Map.fold
-          (fun _name def acc ->
-             let@ errors = acc in
-             let@ result = sandbox (Consistent.predicate def) in
-             match result with
-             | Ok () -> return errors
-             | Error err -> return (err :: errors))
-          global.resource_predicates
-          (return [])
-      in
-      (* Only check procedures (function implementations), not function declarations,
-         to avoid duplicate error reporting. The procedure check includes the spec check. *)
-      let@ proc_errors =
-        let rec fold_procs acc = function
-          | [] -> return acc
-          | (_, (loc, args_and_body)) :: rest ->
-            let@ result = sandbox (Consistent.procedure loc args_and_body) in
-            let new_acc = match result with Ok () -> acc | Error err -> err :: acc in
-            fold_procs new_acc rest
-        in
-        fold_procs [] selected_funs
-      in
-      return (pred_errors @ proc_errors)
-    | false -> return []
-  in
-  (* Convert consistency errors to the same format as check_c_functions errors *)
-  let consistency_error_list =
-    List.mapi
-      (fun i err ->
-         (* Use a simple name that won't cause filesystem issues *)
-         let name = "consistency_check_" ^ string_of_int i in
-         (name, err))
-      consistency_errors
-  in
   let@ errors =
     match !fail_fast with
     | true ->
@@ -3679,7 +3782,8 @@ let time_check_c_functions
                  db_handle
                  ~sym:(Sym.pp_string pred_sym)
                  ~name:(Sym.pp_string pred_sym)
-                 ~content_hash:pred_hash;
+                 ~content_hash:pred_hash
+                 ~consistency_checked:false;
                (* Extract and record predicate dependencies *)
                let pred_deps =
                  DependencyExtractor.extract_predicate_dependencies global pred_sym
@@ -3869,7 +3973,8 @@ let time_check_c_functions
       return ()
   in
   (* Combine consistency errors with regular errors *)
-  return (consistency_error_list @ errors)
+  (* Consistency errors are now reported inline with function verification *)
+  return errors
 
 
 let generate_lemmas lemmata o_lemma_mode =
