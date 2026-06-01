@@ -458,7 +458,11 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
        Printf.eprintf
-         "=== Serialized SPEC for hashing ===\n%s\n=== End SPEC ===\n=== SPEC Hash: %s ===\n%!"
+         "=== Serialized SPEC for hashing ===\n\
+          %s\n\
+          === End SPEC ===\n\
+          === SPEC Hash: %s ===\n\
+          %!"
          ft_str
          hash
      | _ -> ());
@@ -488,16 +492,22 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
        let show_symbol_full (Cerb_frontend.Symbol.Symbol (dig, n, sd) as sym) =
-         let sd_str = match sd with
+         let sd_str =
+           match sd with
            | Cerb_frontend.Symbol.SD_None -> "SD_None"
            | Cerb_frontend.Symbol.SD_Id s -> Printf.sprintf "SD_Id %S" s
            | Cerb_frontend.Symbol.SD_CN_Id s -> Printf.sprintf "SD_CN_Id %S" s
-           | Cerb_frontend.Symbol.SD_ObjectAddress s -> Printf.sprintf "SD_ObjectAddress %S" s
+           | Cerb_frontend.Symbol.SD_ObjectAddress s ->
+             Printf.sprintf "SD_ObjectAddress %S" s
            | Cerb_frontend.Symbol.SD_FunArgValue s -> Printf.sprintf "SD_FunArgValue %S" s
            | _ -> "SD_other"
          in
-         Printf.eprintf "  Symbol(digest=%d, id=%d, %s) -> prints as %S\n%!"
-           (Hashtbl.hash dig) n sd_str (Sym.pp_string sym)
+         Printf.eprintf
+           "  Symbol(digest=%d, id=%d, %s) -> prints as %S\n%!"
+           (Hashtbl.hash dig)
+           n
+           sd_str
+           (Sym.pp_string sym)
        in
        let rec show_original = function
          | Mucore.Computational ((name, _), _, rest) ->
@@ -520,9 +530,9 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
                Printf.eprintf "Resource binding:\n%!";
                show_symbol_full sym;
                process_lat rest
-             | Mucore.Constraint (_, _, rest) ->
-               process_lat rest
-           and find_syms_in_expr (Mucore.Expr (_, _, _, e)) = match e with
+             | Mucore.Constraint (_, _, rest) -> process_lat rest
+           and find_syms_in_expr (Mucore.Expr (_, _, _, e)) =
+             match e with
              | Mucore.Elet (pat, pe, rest) ->
                (match pat with
                 | Mucore.Pattern (_, _, _, Mucore.CaseBase (Some sym, _)) ->
@@ -541,7 +551,8 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
                find_syms_in_expr e1;
                find_syms_in_expr e2
              | _ -> ()
-           and find_syms_in_pexpr (Mucore.Pexpr (_, _, _, pe)) = match pe with
+           and find_syms_in_pexpr (Mucore.Pexpr (_, _, _, pe)) =
+             match pe with
              | Mucore.PEsym sym ->
                Printf.eprintf "PEsym reference:\n%!";
                show_symbol_full sym
@@ -579,8 +590,7 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
          | Mucore.Resource ((name, _), _, rest) ->
            Printf.eprintf "Resource: %s\n%!" (Sym.pp_string name);
            show_logical_args rest
-         | Mucore.Constraint (_, _, rest) ->
-           show_logical_args rest
+         | Mucore.Constraint (_, _, rest) -> show_logical_args rest
          | Mucore.I _ -> ()
        in
        Printf.eprintf "=== Renamed argument names ===\n%!";
