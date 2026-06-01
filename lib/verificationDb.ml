@@ -338,7 +338,10 @@ let update_function_consistency_checked (db : db_handle) ~(sym : string) : unit 
   | exn ->
     let msg = Sqlite3.Rc.to_string (Sqlite3.errcode db) in
     failwith
-      (Printf.sprintf "Failed to update function consistency: %s (%s)" msg (Printexc.to_string exn))
+      (Printf.sprintf
+         "Failed to update function consistency: %s (%s)"
+         msg
+         (Printexc.to_string exn))
 
 
 (** Record verification failure *)
