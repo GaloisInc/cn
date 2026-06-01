@@ -3440,8 +3440,14 @@ let check_function_staleness
                          ( VerificationDb.get_function_status db_handle callee_sym,
                            Hashtbl.find_opt current_hashes callee_sym )
                        with
-                       | None, _ -> true (* Callee not in database *)
-                       | _, None -> true (* Callee not in current hashes *)
+                       | None, None ->
+                         true (* Callee not in database NOR current file - deleted? *)
+                       | None, Some _ ->
+                         (* Callee not in database but in current file (e.g., trusted function).
+                            This is not a change - the spec is stable. *)
+                         false
+                       | Some _, None ->
+                         true (* Callee was verified before but not in current file *)
                        | Some stored, Some (_, current_spec_hash) ->
                          (* Compare SPEC hash only, not content hash *)
                          String.compare stored.VerificationDb.spec_hash current_spec_hash
@@ -3659,7 +3665,12 @@ let time_check_c_functions
          Hashes are computed on alpha-renamed versions, so argument name changes should
          not cause re-verification. This is a consequence of the definition, not part
          of the definition itself. *)
-        let current_hashes = Hashtbl.create (List.length selected_funs) in
+        let@ global = get_global () in
+        (* Compute current hashes for ALL functions (including trusted ones).
+           For verified functions we use their actual content hash.
+           For trusted functions we compute the spec hash but use a fixed content hash
+           since they're not verified. *)
+        let current_hashes = Hashtbl.create (Sym.Map.cardinal global.fun_decls) in
         let@ () =
           ListM.iterM
             (fun (fsym, (loc, args_and_body)) ->
@@ -3670,8 +3681,16 @@ let time_check_c_functions
                return ())
             selected_funs
         in
+        (* Also add trusted functions and other functions not being verified *)
+        Sym.Map.iter
+          (fun fsym (_, ft_opt, _) ->
+             let sym_str = Sym.pp_string fsym in
+             if not (Hashtbl.mem current_hashes sym_str) then (
+               let spec_hash = ContentHash.hash_function_spec ft_opt in
+               (* Use a fixed content hash for functions not being verified (e.g., trusted) *)
+               Hashtbl.add current_hashes sym_str ("not_verified", spec_hash)))
+          global.fun_decls;
         (* Compute current hashes for all predicates *)
-        let@ global = get_global () in
         let current_pred_hashes =
           Hashtbl.create (Sym.Map.cardinal global.resource_predicates)
         in
@@ -4010,6 +4029,35 @@ let time_check_c_functions
                  ~content_hash:datatype_hash;
                return ())
             global.datatypes
+            (return ())
+        in
+        (* Store ALL function specs (including trusted functions) so call dependency
+           checking can find them. We use INSERT OR REPLACE so verified functions
+           keep their actual data, and trusted functions get stored with dummy data. *)
+        let@ () =
+          Sym.Map.fold
+            (fun fsym (_, ft_opt, _) acc ->
+               let@ () = acc in
+               let sym_str = Sym.pp_string fsym in
+               (* Check if already stored by verification (which has real data) *)
+               match VerificationDb.get_function_status db_handle sym_str with
+               | Some _ ->
+                 (* Already stored by verification with real data - skip *)
+                 return ()
+               | None ->
+                 (* Not verified (e.g., trusted function) - store spec hash *)
+                 let spec_hash = ContentHash.hash_function_spec ft_opt in
+                 VerificationDb.record_function_verified
+                   db_handle
+                   ~sym:sym_str
+                   ~name:sym_str
+                   ~file_path:""
+                   ~content_hash:"not_verified"
+                   ~spec_hash
+                   ~time_ms:0
+                   ~consistency_checked:false;
+                 return ())
+            global.fun_decls
             (return ())
         in
         return ()

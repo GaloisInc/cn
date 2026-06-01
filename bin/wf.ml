@@ -60,8 +60,8 @@ let well_formed
             Printf.printf "Database: %s\n" db_path;
             Printf.printf "File: %s\n" filename;
             Printf.printf "Functions analyzed: %d\n\n" (List.length c_functions);
-            (* Compute all current hashes like verify does *)
-            let current_hashes = Hashtbl.create (List.length c_functions) in
+            (* Compute all current hashes like verify does - for ALL functions including trusted *)
+            let current_hashes = Hashtbl.create (Sym.Map.cardinal global.fun_decls) in
             let@ () =
               let rec compute_hashes = function
                 | [] -> return ()
@@ -74,6 +74,14 @@ let well_formed
               in
               compute_hashes c_functions
             in
+            (* Also add trusted functions and other functions not in c_functions *)
+            Sym.Map.iter
+              (fun fsym (_, ft_opt, _) ->
+                 let sym_str = Sym.pp_string fsym in
+                 if not (Hashtbl.mem current_hashes sym_str) then (
+                   let spec_hash = ContentHash.hash_function_spec ft_opt in
+                   Hashtbl.add current_hashes sym_str ("not_verified", spec_hash)))
+              global.fun_decls;
             (* Compute current hashes for all predicates *)
             let current_pred_hashes =
               Hashtbl.create (Sym.Map.cardinal global.resource_predicates)
