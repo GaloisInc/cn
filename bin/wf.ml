@@ -12,6 +12,7 @@ let well_formed
       json
       json_trace
       output_dir
+      only
       csv_times
       astprints
       no_inherit_loc
@@ -56,6 +57,17 @@ let well_formed
             let db = VerificationDb.open_db db_path in
             VerificationDb.init_schema db;
             let@ global = get_global () in
+            (* Filter functions based on --only flag *)
+            let selected_funs =
+              match only with
+              | [] -> c_functions
+              | names ->
+                List.filter
+                  (fun (fsym, _) ->
+                     let sym_str = Sym.pp_string fsym in
+                     List.exists (fun name -> String.equal name sym_str) names)
+                  c_functions
+            in
             Printf.printf "Cache Status Report\n";
             Printf.printf "===================\n\n";
             Printf.printf "Database: %s\n" db_path;
@@ -464,6 +476,10 @@ open Cmdliner
 
 let cmd =
   let open Term in
+  let only_flag =
+    let doc = "Only analyze this function (or comma-separated names) for cache status" in
+    Arg.(value & opt (list string) [] & info [ "only" ] ~doc)
+  in
   let cache_status_flag =
     Arg.(
       value
@@ -500,6 +516,7 @@ let cmd =
     $ Verify.Flags.json
     $ Verify.Flags.json_trace
     $ Verify.Flags.output_dir
+    $ only_flag
     $ Common.Flags.csv_times
     $ Common.Flags.astprints
     $ Common.Flags.no_inherit_loc
