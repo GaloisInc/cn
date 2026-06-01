@@ -297,8 +297,7 @@ and normalize_pattern ctx (Terms.Pat (pat_, bt, loc)) =
 
 (** Hash an index term with alpha-renaming normalization *)
 let hash_index_term (it : IndexTerms.t) : string =
-  let ctx = empty_ctx () in
-  let it_norm, _ = normalize_it ctx it in
+  let it_norm, _ = AlphaRenaming.rename_it AlphaRenaming.empty_ctx it in
   let str = pp_to_string (IT.pp it_norm) in
   Digest.string str |> Digest.to_hex
 
@@ -451,24 +450,23 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
   match ft_opt with
   | None -> Digest.string "no_spec" |> Digest.to_hex
   | Some ft ->
-    (* Serialize spec to string *)
-    let ft_str = pp_to_string (ArgumentTypes.pp ReturnTypes.pp ft) in
+    (* Apply canonical alpha-renaming before serialization *)
+    let ft_renamed = AlphaRenaming.rename_ft ft in
+    let ft_str = pp_to_string (ArgumentTypes.pp ReturnTypes.pp ft_renamed) in
     (* Debug: Print serialized spec if environment variable is set *)
+    let hash = Digest.string ft_str |> Digest.to_hex in
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
        Printf.eprintf
-         "=== Serialized SPEC for hashing ===\n%s\n=== End SPEC ===\n%!"
+         "=== Serialized SPEC for hashing ===\n\
+          %s\n\
+          === End SPEC ===\n\
+          === SPEC Hash: %s ===\n\
+          %!"
          ft_str
+         hash
      | _ -> ());
-    (* Alpha-rename symbols in spec for canonical hashing *)
-    let normalized = normalize_symbols_in_string ft_str in
-    (match Sys.getenv_opt "CN_DEBUG_HASH" with
-     | Some "1" ->
-       Printf.eprintf
-         "=== Normalized SPEC for hashing ===\n%s\n=== End SPEC ===\n%!"
-         normalized
-     | _ -> ());
-    Digest.string normalized |> Digest.to_hex
+    hash
 
 
 (** Hash args_and_body using location-independent pretty-printing
@@ -488,8 +486,131 @@ let hash_function_spec (ft_opt : ArgumentTypes.ft option) : string =
     This is filename-independent, line-number-independent, and symbol-ID-independent,
     so identical functions in different files will hash the same.
 *)
+
 let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
   try
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       let show_symbol_full (Cerb_frontend.Symbol.Symbol (dig, n, sd) as sym) =
+         let sd_str =
+           match sd with
+           | Cerb_frontend.Symbol.SD_None -> "SD_None"
+           | Cerb_frontend.Symbol.SD_Id s -> Printf.sprintf "SD_Id %S" s
+           | Cerb_frontend.Symbol.SD_CN_Id s -> Printf.sprintf "SD_CN_Id %S" s
+           | Cerb_frontend.Symbol.SD_ObjectAddress s ->
+             Printf.sprintf "SD_ObjectAddress %S" s
+           | Cerb_frontend.Symbol.SD_FunArgValue s -> Printf.sprintf "SD_FunArgValue %S" s
+           | _ -> "SD_other"
+         in
+         Printf.eprintf
+           "  Symbol(digest=%d, id=%d, %s) -> prints as %S\n%!"
+           (Hashtbl.hash dig)
+           n
+           sd_str
+           (Sym.pp_string sym)
+       in
+       let rec show_original = function
+         | Mucore.Computational ((name, _), _, rest) ->
+           Printf.eprintf "Computational argument:\n%!";
+           show_symbol_full name;
+           show_original rest
+         | Mucore.Ghost ((name, _), _, rest) ->
+           Printf.eprintf "Ghost argument:\n%!";
+           show_symbol_full name;
+           show_original rest
+         | Mucore.L lat ->
+           Printf.eprintf "Examining body for symbols...\n%!";
+           let rec process_lat = function
+             | Mucore.I (expr, _, _) -> find_syms_in_expr expr
+             | Mucore.Define ((sym, _), _, rest) ->
+               Printf.eprintf "Define binding:\n%!";
+               show_symbol_full sym;
+               process_lat rest
+             | Mucore.Resource ((sym, _), _, rest) ->
+               Printf.eprintf "Resource binding:\n%!";
+               show_symbol_full sym;
+               process_lat rest
+             | Mucore.Constraint (_, _, rest) -> process_lat rest
+           and find_syms_in_expr (Mucore.Expr (_, _, _, e)) =
+             match e with
+             | Mucore.Elet (pat, pe, rest) ->
+               (match pat with
+                | Mucore.Pattern (_, _, _, Mucore.CaseBase (Some sym, _)) ->
+                  Printf.eprintf "Elet pattern binding:\n%!";
+                  show_symbol_full sym
+                | _ -> ());
+               find_syms_in_pexpr pe;
+               find_syms_in_expr rest
+             | Mucore.Epure pe -> find_syms_in_pexpr pe
+             | Mucore.Ewseq (pat, e1, e2) | Mucore.Esseq (pat, e1, e2) ->
+               (match pat with
+                | Mucore.Pattern (_, _, _, Mucore.CaseBase (Some sym, _)) ->
+                  Printf.eprintf "Seq pattern binding:\n%!";
+                  show_symbol_full sym
+                | _ -> ());
+               find_syms_in_expr e1;
+               find_syms_in_expr e2
+             | _ -> ()
+           and find_syms_in_pexpr (Mucore.Pexpr (_, _, _, pe)) =
+             match pe with
+             | Mucore.PEsym sym ->
+               Printf.eprintf "PEsym reference:\n%!";
+               show_symbol_full sym
+             | Mucore.PElet (pat, pe1, pe2) ->
+               (match pat with
+                | Mucore.Pattern (_, _, _, Mucore.CaseBase (Some sym, _)) ->
+                  Printf.eprintf "PElet pattern binding:\n%!";
+                  show_symbol_full sym
+                | _ -> ());
+               find_syms_in_pexpr pe1;
+               find_syms_in_pexpr pe2
+             | _ -> ()
+           in
+           process_lat lat
+       in
+       Printf.eprintf "=== FULL SYMBOL ANALYSIS ===\n%!";
+       show_original args_and_body
+     | _ -> ());
+    (* Alpha-rename the arguments and body for deterministic hashing *)
+    let args_and_body_renamed = AlphaRenaming.rename_args_and_body args_and_body in
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       let rec show_arg_names = function
+         | Mucore.Computational ((name, _), _, rest) ->
+           Printf.eprintf "Comp arg: %s\n%!" (Sym.pp_string name);
+           show_arg_names rest
+         | Mucore.Ghost ((name, _), _, rest) ->
+           Printf.eprintf "Ghost arg: %s\n%!" (Sym.pp_string name);
+           show_arg_names rest
+         | Mucore.L lat -> show_logical_args lat
+       and show_logical_args = function
+         | Mucore.Define ((name, _), _, rest) ->
+           Printf.eprintf "Define: %s\n%!" (Sym.pp_string name);
+           show_logical_args rest
+         | Mucore.Resource ((name, _), _, rest) ->
+           Printf.eprintf "Resource: %s\n%!" (Sym.pp_string name);
+           show_logical_args rest
+         | Mucore.Constraint (_, _, rest) -> show_logical_args rest
+         | Mucore.I _ -> ()
+       in
+       Printf.eprintf "=== Renamed argument names ===\n%!";
+       show_arg_names args_and_body_renamed
+     | _ -> ());
+    (* Double-check: show what pp_arguments sees *)
+    (match Sys.getenv_opt "CN_DEBUG_HASH" with
+     | Some "1" ->
+       let rec show_being_printed = function
+         | Mucore.Computational ((name, _), _, rest) ->
+           Printf.eprintf "PP sees Comp: %s\n%!" (Sym.pp_string name);
+           show_being_printed rest
+         | Mucore.Ghost ((name, _), _, rest) ->
+           Printf.eprintf "PP sees Ghost: %s\n%!" (Sym.pp_string name);
+           show_being_printed rest
+         | Mucore.L _ -> ()
+       in
+       Printf.eprintf "=== About to pretty-print ===\n%!";
+       show_being_printed args_and_body_renamed
+     | _ -> ());
     (* Open infix operators for Pp *)
     let open Pp.Infix in
     (* Pretty-print using Basic module which doesn't show locations *)
@@ -522,7 +643,7 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
                  Pp.empty
            (* Include return type *)
            ^^^ ReturnTypes.pp rt)
-        args_and_body
+        args_and_body_renamed
     in
     (* Convert to string with fixed width to ensure deterministic output *)
     let str = pp_to_string doc in
@@ -579,6 +700,7 @@ let hash_function
 
 (** Hash a lemma definition *)
 let hash_lemma (lemma_typ : ArgumentTypes.lemmat) : string =
-  (* Similar to hash_function_spec, hash the lemma type *)
-  let lemma_str = pp_to_string (ArgumentTypes.pp LogicalReturnTypes.pp lemma_typ) in
+  (* Apply canonical alpha-renaming before serialization *)
+  let lemma_renamed = AlphaRenaming.rename_lemmat lemma_typ in
+  let lemma_str = pp_to_string (ArgumentTypes.pp LogicalReturnTypes.pp lemma_renamed) in
   Digest.string lemma_str |> Digest.to_hex
