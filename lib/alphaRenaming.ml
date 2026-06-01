@@ -831,6 +831,40 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
     collect_syms it;
     (* Now use IT.subst which will handle the full traversal and substitution *)
     IT.subst (build_it_subst ()) it
+  (* Helper to rename Cnprog.t with IndexTerms payload *)
+  and rename_cnprog_it (prog : IT.t Cnprog.t) : IT.t Cnprog.t =
+    let rec aux = function
+      | Cnprog.Let (loc, (sym, load), rest) ->
+        let sym' = canonicalize_symbol sym in
+        let pointer' = rename_it load.Cnprog.pointer in
+        let rest' = aux rest in
+        Cnprog.Let (loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
+      | Cnprog.Pure (loc, it) -> Cnprog.Pure (loc, rename_it it)
+    in
+    aux prog
+  (* Helper to rename Cnprog.t with Cnstatement.statement payload *)
+  and rename_cnprog_stmt (prog : Cnstatement.statement Cnprog.t)
+    : Cnstatement.statement Cnprog.t
+    =
+    let rec aux = function
+      | Cnprog.Let (loc, (sym, load), rest) ->
+        let sym' = canonicalize_symbol sym in
+        let pointer' = rename_it load.Cnprog.pointer in
+        let rest' = aux rest in
+        Cnprog.Let (loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
+      | Cnprog.Pure (loc, stmt) ->
+        (* Use Cnstatement.subst to rename all IT.t and LC.t fields in the statement.
+           We need to apply all the renamings we've collected. *)
+        let stmt' =
+          List.fold_left
+            (fun acc_stmt (from_sym, to_sym) ->
+               Cnstatement.subst (IT.make_rename ~from:from_sym ~to_:to_sym) acc_stmt)
+            stmt
+            (Hashtbl.fold (fun k v acc -> (k, v) :: acc) symbol_map [])
+        in
+        Cnprog.Pure (loc, stmt')
+    in
+    aux prog
   and rename_request = function
     | Request.P p ->
       Request.P
@@ -908,9 +942,15 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.Eaction pact -> Mucore.Eaction (rename_paction pact)
       | Mucore.Eskip -> Mucore.Eskip
       | Mucore.Eccall (act, pe, pes, opt) ->
-        (* TODO: opt contains Cnprog.t list with IndexTerms that should be renamed,
-           but they're rare and complex. Skip for now. *)
-        Mucore.Eccall (act, rename_pexpr pe, List.map rename_pexpr pes, opt)
+        let opt' =
+          match opt with
+          | None -> None
+          | Some (loc, ghost_progs) ->
+            (* Rename IndexTerms in ghost argument programs *)
+            let ghost_progs' = List.map rename_cnprog_it ghost_progs in
+            Some (loc, ghost_progs')
+        in
+        Mucore.Eccall (act, rename_pexpr pe, List.map rename_pexpr pes, opt')
       | Mucore.Eproc (name, pes) -> Mucore.Eproc (name, List.map rename_pexpr pes)
       | Mucore.Elet (pat, pe, e1) ->
         Mucore.Elet (rename_pattern pat, rename_pexpr pe, rename_expr e1)
@@ -926,9 +966,9 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.Erun (sym, pes) ->
         Mucore.Erun (canonicalize_symbol sym, List.map rename_pexpr pes)
       | Mucore.CN_progs (stmts, progs) ->
-        (* TODO: progs contain Cnstatement.statement with IndexTerms that should be renamed,
-           but they're rare and complex. Skip for now. *)
-        Mucore.CN_progs (stmts, progs)
+        (* Rename symbols in CN statement programs *)
+        let progs' = List.map rename_cnprog_stmt progs in
+        Mucore.CN_progs (stmts, progs')
     in
     Mucore.Expr (loc, annots, ty, e')
   and rename_pexpr (Mucore.Pexpr (loc, annots, ty, pe)) =
