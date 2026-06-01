@@ -24,8 +24,7 @@ module Sym_map = Map.Make (Sym)
 type ctx =
   { bindings : Sym.t Sym_map.t;
     (* Map from original to canonical *)
-    counter : int
-    (* Counter for generating canonical names *)
+    counter : int (* Counter for generating canonical names *)
   }
 
 let empty_ctx = { bindings = Sym_map.empty; counter = 0 }
@@ -61,9 +60,7 @@ let bind_canonical (ctx : ctx) (sym : Sym.t) : Sym.t * ctx =
 (** Lookup a symbol in the renaming context.
     If not found, return the original symbol (it might be a global or builtin) *)
 let lookup (ctx : ctx) (sym : Sym.t) : Sym.t =
-  match Sym_map.find_opt sym ctx.bindings with
-  | Some s -> s
-  | None -> sym
+  match Sym_map.find_opt sym ctx.bindings with Some s -> s | None -> sym
 
 
 (** Alpha-rename an index term *)
@@ -209,8 +206,8 @@ let rec rename_it (ctx : ctx) (it : IT.t) : IT.t * ctx =
 and rename_list ctx ts =
   List.fold_left
     (fun (acc, ctx) t ->
-      let t', ctx' = rename_it ctx t in
-      (t' :: acc, ctx'))
+       let t', ctx' = rename_it ctx t in
+       (t' :: acc, ctx'))
     ([], ctx)
     ts
   |> fun (ts, ctx) -> (List.rev ts, ctx)
@@ -219,8 +216,8 @@ and rename_list ctx ts =
 and rename_members ctx members =
   List.fold_left
     (fun (acc, ctx) (id, t) ->
-      let t', ctx' = rename_it ctx t in
-      ((id, t') :: acc, ctx'))
+       let t', ctx' = rename_it ctx t in
+       ((id, t') :: acc, ctx'))
     ([], ctx)
     members
   |> fun (ms, ctx) -> (List.rev ms, ctx)
@@ -229,12 +226,12 @@ and rename_members ctx members =
 and rename_cases ctx cases =
   List.fold_left
     (fun (acc, ctx_outer) (pat, t) ->
-      (* Each case has its own binding scope, so we need to track bindings
+       (* Each case has its own binding scope, so we need to track bindings
          but then restore the outer context after processing the case *)
-      let pat', ctx_with_pat_bindings = rename_pattern ctx_outer pat in
-      let t', _ = rename_it ctx_with_pat_bindings t in
-      (* Use original outer context for next case, not the one with pattern bindings *)
-      ((pat', t') :: acc, ctx_outer))
+       let pat', ctx_with_pat_bindings = rename_pattern ctx_outer pat in
+       let t', _ = rename_it ctx_with_pat_bindings t in
+       (* Use original outer context for next case, not the one with pattern bindings *)
+       ((pat', t') :: acc, ctx_outer))
     ([], ctx)
     cases
   |> fun (cs, ctx) -> (List.rev cs, ctx)
@@ -251,8 +248,8 @@ and rename_pattern ctx (Terms.Pat (pat_, bt, loc)) =
       let args', ctx' =
         List.fold_left
           (fun (acc, ctx) (id, pat) ->
-            let pat', ctx' = rename_pattern ctx pat in
-            ((id, pat') :: acc, ctx'))
+             let pat', ctx' = rename_pattern ctx pat in
+             ((id, pat') :: acc, ctx'))
           ([], ctx)
           args
       in
@@ -283,7 +280,7 @@ let rename_request (ctx : ctx) (req : Req.t) : Req.t * ctx =
   | Req.Q qp ->
     (* The quantified variable q needs to be bound *)
     let pointer', ctx1 = rename_it ctx qp.pointer in
-    let (q_sym, q_bt) = qp.q in
+    let q_sym, q_bt = qp.q in
     let q_sym', ctx2 = bind_canonical ctx1 q_sym in
     let permission', ctx3 = rename_it ctx2 qp.permission in
     let iargs', ctx4 = rename_list ctx3 qp.iargs in
@@ -449,12 +446,20 @@ module MucoreSubst = struct
   (* Apply rename substitution to a symbol *)
   let subst_sym (s : rename_subst) (sym : Sym.t) : Sym.t =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
-     | Some "1" -> Printf.eprintf "Looking up symbol %s (id %d) in subst\n%!" (Sym.pp_string sym) (Sym.num sym)
+     | Some "1" ->
+       Printf.eprintf
+         "Looking up symbol %s (id %d) in subst\n%!"
+         (Sym.pp_string sym)
+         (Sym.num sym)
      | _ -> ());
     match List.find_opt (fun (from, _) -> Sym.equal from sym) s with
     | Some (_, to_) ->
       (match Sys.getenv_opt "CN_DEBUG_HASH" with
-       | Some "1" -> Printf.eprintf "  -> Found! Renaming to %s (id %d)\n%!" (Sym.pp_string to_) (Sym.num to_)
+       | Some "1" ->
+         Printf.eprintf
+           "  -> Found! Renaming to %s (id %d)\n%!"
+           (Sym.pp_string to_)
+           (Sym.num to_)
        | _ -> ());
       to_
     | None ->
@@ -463,40 +468,47 @@ module MucoreSubst = struct
        | _ -> ());
       sym
 
+
   (* Substitute in pexpr *)
-  let rec subst_pexpr (s : rename_subst) (Mucore.Pexpr (loc, annots, ty, pe)) : 'ty Mucore.pexpr =
+  let rec subst_pexpr (s : rename_subst) (Mucore.Pexpr (loc, annots, ty, pe))
+    : 'ty Mucore.pexpr
+    =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" ->
-       let pe_name = match pe with
-        | Mucore.PEsym sym -> Printf.sprintf "PEsym %s (id %d)" (Sym.pp_string sym) (Sym.num sym)
-        | Mucore.PEval _ -> "PEval"
-        | Mucore.PEconstrained _ -> "PEconstrained"
-        | Mucore.PEundef _ -> "PEundef"
-        | Mucore.PEerror _ -> "PEerror"
-        | Mucore.PEctor _ -> "PEctor"
-        | Mucore.PEmember_shift _ -> "PEmember_shift"
-        | Mucore.PEarray_shift _ -> "PEarray_shift"
-        | Mucore.PEcatch_exceptional_condition _ -> "PEcatch_exceptional_condition"
-        | Mucore.PEwrapI _ -> "PEwrapI"
-        | Mucore.PEmemop _ -> "PEmemop"
-        | Mucore.PEnot _ -> "PEnot"
-        | Mucore.PEop _ -> "PEop"
-        | Mucore.PEconv_int _ -> "PEconv_int"
-        | Mucore.PEstruct _ -> "PEstruct"
-        | Mucore.PEunion _ -> "PEunion"
-        | Mucore.PEcfunction _ -> "PEcfunction"
-        | Mucore.PEmemberof _ -> "PEmemberof"
-        | Mucore.PEcall _ -> "PEcall"
-        | Mucore.PElet _ -> "PElet"
-        | Mucore.PEif _ -> "PEif"
-        | Mucore.PEare_compatible _ -> "PEare_compatible"
+       let pe_name =
+         match pe with
+         | Mucore.PEsym sym ->
+           Printf.sprintf "PEsym %s (id %d)" (Sym.pp_string sym) (Sym.num sym)
+         | Mucore.PEval _ -> "PEval"
+         | Mucore.PEconstrained _ -> "PEconstrained"
+         | Mucore.PEundef _ -> "PEundef"
+         | Mucore.PEerror _ -> "PEerror"
+         | Mucore.PEctor _ -> "PEctor"
+         | Mucore.PEmember_shift _ -> "PEmember_shift"
+         | Mucore.PEarray_shift _ -> "PEarray_shift"
+         | Mucore.PEcatch_exceptional_condition _ -> "PEcatch_exceptional_condition"
+         | Mucore.PEwrapI _ -> "PEwrapI"
+         | Mucore.PEmemop _ -> "PEmemop"
+         | Mucore.PEnot _ -> "PEnot"
+         | Mucore.PEop _ -> "PEop"
+         | Mucore.PEconv_int _ -> "PEconv_int"
+         | Mucore.PEstruct _ -> "PEstruct"
+         | Mucore.PEunion _ -> "PEunion"
+         | Mucore.PEcfunction _ -> "PEcfunction"
+         | Mucore.PEmemberof _ -> "PEmemberof"
+         | Mucore.PEcall _ -> "PEcall"
+         | Mucore.PElet _ -> "PElet"
+         | Mucore.PEif _ -> "PEif"
+         | Mucore.PEare_compatible _ -> "PEare_compatible"
        in
        Printf.eprintf "subst_pexpr: %s\n%!" pe_name
      | _ -> ());
-    let pe' = match pe with
+    let pe' =
+      match pe with
       | Mucore.PEsym sym -> Mucore.PEsym (subst_sym s sym)
       | Mucore.PEval v -> Mucore.PEval v
-      | Mucore.PEconstrained cs -> Mucore.PEconstrained cs  (* TODO: subst in constraints if needed *)
+      | Mucore.PEconstrained cs ->
+        Mucore.PEconstrained cs (* TODO: subst in constraints if needed *)
       | Mucore.PEundef (loc2, ub) -> Mucore.PEundef (loc2, ub)
       | Mucore.PEerror (str, pe1) -> Mucore.PEerror (str, subst_pexpr s pe1)
       | Mucore.PEctor (ctor, pes) -> Mucore.PEctor (ctor, List.map (subst_pexpr s) pes)
@@ -505,11 +517,11 @@ module MucoreSubst = struct
       | Mucore.PEarray_shift (pe1, ty2, pe2) ->
         Mucore.PEarray_shift (subst_pexpr s pe1, ty2, subst_pexpr s pe2)
       | Mucore.PEcatch_exceptional_condition (it, iop, pe1, pe2) ->
-        Mucore.PEcatch_exceptional_condition (it, iop, subst_pexpr s pe1, subst_pexpr s pe2)
+        Mucore.PEcatch_exceptional_condition
+          (it, iop, subst_pexpr s pe1, subst_pexpr s pe2)
       | Mucore.PEwrapI (it, iop, pe1, pe2) ->
         Mucore.PEwrapI (it, iop, subst_pexpr s pe1, subst_pexpr s pe2)
-      | Mucore.PEmemop (memop, pe1) ->
-        Mucore.PEmemop (memop, subst_pexpr s pe1)
+      | Mucore.PEmemop (memop, pe1) -> Mucore.PEmemop (memop, subst_pexpr s pe1)
       | Mucore.PEnot pe1 -> Mucore.PEnot (subst_pexpr s pe1)
       | Mucore.PEop (op, pe1, pe2) ->
         Mucore.PEop (op, subst_pexpr s pe1, subst_pexpr s pe2)
@@ -531,53 +543,63 @@ module MucoreSubst = struct
     in
     Mucore.Pexpr (loc, annots, ty, pe')
 
+
   (* Substitute in expr *)
-  let rec subst_expr (s : rename_subst) (Mucore.Expr (loc, annots, ty, e)) : 'ty Mucore.expr =
-    let e' = match e with
+  let rec subst_expr (s : rename_subst) (Mucore.Expr (loc, annots, ty, e))
+    : 'ty Mucore.expr
+    =
+    let e' =
+      match e with
       | Mucore.Epure pe -> Mucore.Epure (subst_pexpr s pe)
       | Mucore.Ememop (memop, pes) -> Mucore.Ememop (memop, List.map (subst_pexpr s) pes)
-      | Mucore.Eaction pact -> Mucore.Eaction pact  (* Skip - complex *)
+      | Mucore.Eaction pact -> Mucore.Eaction pact (* Skip - complex *)
       | Mucore.Eskip -> Mucore.Eskip
       | Mucore.Eccall (act, pe1, pes, opt) ->
         Mucore.Eccall (act, subst_pexpr s pe1, List.map (subst_pexpr s) pes, opt)
-      | Mucore.Eproc (name, pes) ->
-        Mucore.Eproc (name, List.map (subst_pexpr s) pes)
-      | Mucore.Elet (pat, pe, e1) ->
-        Mucore.Elet (pat, subst_pexpr s pe, subst_expr s e1)
+      | Mucore.Eproc (name, pes) -> Mucore.Eproc (name, List.map (subst_pexpr s) pes)
+      | Mucore.Elet (pat, pe, e1) -> Mucore.Elet (pat, subst_pexpr s pe, subst_expr s e1)
       | Mucore.Eunseq es -> Mucore.Eunseq (List.map (subst_expr s) es)
-      | Mucore.Ewseq (pat, e1, e2) ->
-        Mucore.Ewseq (pat, subst_expr s e1, subst_expr s e2)
-      | Mucore.Esseq (pat, e1, e2) ->
-        Mucore.Esseq (pat, subst_expr s e1, subst_expr s e2)
+      | Mucore.Ewseq (pat, e1, e2) -> Mucore.Ewseq (pat, subst_expr s e1, subst_expr s e2)
+      | Mucore.Esseq (pat, e1, e2) -> Mucore.Esseq (pat, subst_expr s e1, subst_expr s e2)
       | Mucore.Eif (pe, e1, e2) ->
         Mucore.Eif (subst_pexpr s pe, subst_expr s e1, subst_expr s e2)
       | Mucore.Ebound e1 -> Mucore.Ebound (subst_expr s e1)
       | Mucore.End es -> Mucore.End (List.map (subst_expr s) es)
-      | Mucore.Erun (sym, pes) ->
-        Mucore.Erun (sym, List.map (subst_pexpr s) pes)
-      | Mucore.CN_progs (stmts, progs) ->
-        Mucore.CN_progs (stmts, progs)  (* Skip - complex *)
+      | Mucore.Erun (sym, pes) -> Mucore.Erun (sym, List.map (subst_pexpr s) pes)
+      | Mucore.CN_progs (stmts, progs) -> Mucore.CN_progs (stmts, progs)
+      (* Skip - complex *)
     in
     Mucore.Expr (loc, annots, ty, e')
 
+
   (* Apply a list of renames in sequence *)
   let apply_renames_it (s : rename_subst) (it : IT.t) : IT.t =
-    List.fold_left (fun acc_it (from, to_) ->
-      IT.subst (IT.make_rename ~from ~to_) acc_it
-    ) it s
+    List.fold_left
+      (fun acc_it (from, to_) -> IT.subst (IT.make_rename ~from ~to_) acc_it)
+      it
+      s
+
 
   let apply_renames_req (s : rename_subst) (re : Request.t) : Request.t =
-    List.fold_left (fun acc_re (from, to_) ->
-      Req.subst (IT.make_rename ~from ~to_) acc_re
-    ) re s
+    List.fold_left
+      (fun acc_re (from, to_) -> Req.subst (IT.make_rename ~from ~to_) acc_re)
+      re
+      s
 
-  let apply_renames_lc (s : rename_subst) (lc : LogicalConstraints.t) : LogicalConstraints.t =
-    List.fold_left (fun acc_lc (from, to_) ->
-      LC.subst (IT.make_rename ~from ~to_) acc_lc
-    ) lc s
+
+  let apply_renames_lc (s : rename_subst) (lc : LogicalConstraints.t)
+    : LogicalConstraints.t
+    =
+    List.fold_left
+      (fun acc_lc (from, to_) -> LC.subst (IT.make_rename ~from ~to_) acc_lc)
+      lc
+      s
+
 
   (* Substitute in arguments_l *)
-  let rec subst_arguments_l (s : rename_subst) (lat : 'i Mucore.arguments_l) : 'i Mucore.arguments_l =
+  let rec subst_arguments_l (s : rename_subst) (lat : 'i Mucore.arguments_l)
+    : 'i Mucore.arguments_l
+    =
     match lat with
     | Mucore.Define ((name, it), info, t) ->
       let it' = apply_renames_it s it in
@@ -592,26 +614,34 @@ module MucoreSubst = struct
       let expr' = subst_expr s expr in
       Mucore.I (expr', labels, rt)
 
+
   (* Substitute in arguments *)
-  let rec subst_arguments (s : rename_subst) (args : 'i Mucore.arguments) : 'i Mucore.arguments =
+  let rec subst_arguments (s : rename_subst) (args : 'i Mucore.arguments)
+    : 'i Mucore.arguments
+    =
     match args with
     | Mucore.Computational ((name, bt), info, t) ->
       Mucore.Computational ((name, bt), info, subst_arguments s t)
     | Mucore.Ghost ((name, bt), info, t) ->
       Mucore.Ghost ((name, bt), info, subst_arguments s t)
-    | Mucore.L lat ->
-      Mucore.L (subst_arguments_l s lat)
+    | Mucore.L lat -> Mucore.L (subst_arguments_l s lat)
 end
 
 (** Alpha-rename Mucore arguments with proper substitution *)
-let rec rename_mucore_arguments counter (args : 'i Mucore.arguments) : 'i Mucore.arguments =
+let rec rename_mucore_arguments counter (args : 'i Mucore.arguments) : 'i Mucore.arguments
+  =
   match args with
   | Mucore.Computational ((name, bt), info, t) ->
     let new_name = Sym.fresh (Printf.sprintf "v_%d" !counter) in
     counter := !counter + 1;
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
-     | Some "1" -> Printf.eprintf "Building subst: %s (id %d) -> %s (id %d)\n%!"
-         (Sym.pp_string name) (Sym.num name) (Sym.pp_string new_name) (Sym.num new_name)
+     | Some "1" ->
+       Printf.eprintf
+         "Building subst: %s (id %d) -> %s (id %d)\n%!"
+         (Sym.pp_string name)
+         (Sym.num name)
+         (Sym.pp_string new_name)
+         (Sym.num new_name)
      | _ -> ());
     let subst = MucoreSubst.make_rename ~from:name ~to_:new_name in
     let t' = MucoreSubst.subst_arguments subst t in
@@ -624,11 +654,12 @@ let rec rename_mucore_arguments counter (args : 'i Mucore.arguments) : 'i Mucore
     let t' = MucoreSubst.subst_arguments subst t in
     let t'' = rename_mucore_arguments counter t' in
     Mucore.Ghost ((new_name, bt), info, t'')
-  | Mucore.L lat ->
-    Mucore.L (rename_mucore_arguments_l counter lat)
+  | Mucore.L lat -> Mucore.L (rename_mucore_arguments_l counter lat)
 
 
-and rename_mucore_arguments_l counter (lat : 'i Mucore.arguments_l) : 'i Mucore.arguments_l =
+and rename_mucore_arguments_l counter (lat : 'i Mucore.arguments_l)
+  : 'i Mucore.arguments_l
+  =
   match lat with
   | Mucore.Define ((name, it), info, t) ->
     let new_name = Sym.fresh (Printf.sprintf "v_%d" !counter) in
@@ -685,7 +716,6 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
   let counter = ref 0 in
   (* Maps from original symbol to canonical symbol *)
   let symbol_map = Hashtbl.create 100 in
-
   (* Get or create canonical symbol for a given symbol *)
   let canonicalize_symbol sym =
     match Hashtbl.find_opt symbol_map sym with
@@ -696,23 +726,27 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       Hashtbl.add symbol_map sym canon_sym;
       (match Sys.getenv_opt "CN_DEBUG_HASH" with
        | Some "1" ->
-         Printf.eprintf "Canonicalize: %s (id %d) -> s_%d\n%!"
-           (Sym.pp_string sym) (Sym.num sym) (!counter - 1)
+         Printf.eprintf
+           "Canonicalize: %s (id %d) -> s_%d\n%!"
+           (Sym.pp_string sym)
+           (Sym.num sym)
+           (!counter - 1)
        | _ -> ());
       canon_sym
   in
-
   (* Build substitution for IT.subst *)
   let build_it_subst () : [ `Term of IT.t | `Rename of Sym.t ] Subst.t =
-    let assoc = Hashtbl.fold (fun orig_sym canon_sym acc ->
-      (orig_sym, (`Rename canon_sym : [ `Term of IT.t | `Rename of Sym.t ])) :: acc
-    ) symbol_map [] in
-    Subst.make (function
-      | `Term t -> IT.free_vars t
-      | `Rename s -> Sym.Set.singleton s
-    ) assoc
+    let assoc =
+      Hashtbl.fold
+        (fun orig_sym canon_sym acc ->
+           (orig_sym, (`Rename canon_sym : [ `Term of IT.t | `Rename of Sym.t ])) :: acc)
+        symbol_map
+        []
+    in
+    Subst.make
+      (function `Term t -> IT.free_vars t | `Rename s -> Sym.Set.singleton s)
+      assoc
   in
-
   (* Now traverse and replace all symbols *)
   let rec rename_arguments = function
     | Mucore.Computational ((sym, bt), info, rest) ->
@@ -722,7 +756,6 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       let new_sym = canonicalize_symbol sym in
       Mucore.Ghost ((new_sym, bt), info, rename_arguments rest)
     | Mucore.L lat -> Mucore.L (rename_arguments_l lat)
-
   and rename_arguments_l = function
     | Mucore.Define ((sym, it), info, rest) ->
       let new_sym = canonicalize_symbol sym in
@@ -737,48 +770,89 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       Mucore.Constraint (lc', info, rename_arguments_l rest)
     | Mucore.I (expr, labels, rt) ->
       let expr' = rename_expr expr in
-      let labels' = labels in  (* TODO: rename labels if needed *)
+      (* Rename symbols in loop labels - loop invariants contain symbols *)
+      let labels' =
+        Pmap.map
+          (fun label_def ->
+             match label_def with
+             | Mucore.Loop (loc, loop_args, annots, label_spec, info) ->
+               (* Loop invariants are in loop_args arguments structure.
+             Since loop_args has type 'TY expr arguments (where the body is expr),
+             we need a specialized traversal that handles the expr-typed body. *)
+               let rec rename_loop_args
+                 : 'ty Mucore.expr Mucore.arguments -> 'ty Mucore.expr Mucore.arguments
+                 = function
+                 | Mucore.Computational ((sym, bt), info2, rest) ->
+                   let sym' = canonicalize_symbol sym in
+                   Mucore.Computational ((sym', bt), info2, rename_loop_args rest)
+                 | Mucore.Ghost ((sym, bt), info2, rest) ->
+                   let sym' = canonicalize_symbol sym in
+                   Mucore.Ghost ((sym', bt), info2, rename_loop_args rest)
+                 | Mucore.L lat -> Mucore.L (rename_loop_arguments_l lat)
+               and rename_loop_arguments_l
+                 : 'ty Mucore.expr Mucore.arguments_l ->
+                 'ty Mucore.expr Mucore.arguments_l
+                 = function
+                 | Mucore.Define ((sym, it), info2, rest) ->
+                   let sym' = canonicalize_symbol sym in
+                   let it' = rename_it it in
+                   Mucore.Define ((sym', it'), info2, rename_loop_arguments_l rest)
+                 | Mucore.Resource ((sym, (req, bt)), info2, rest) ->
+                   let sym' = canonicalize_symbol sym in
+                   let req' = rename_request req in
+                   Mucore.Resource
+                     ((sym', (req', bt)), info2, rename_loop_arguments_l rest)
+                 | Mucore.Constraint (lc, info2, rest) ->
+                   let lc' = rename_lc lc in
+                   Mucore.Constraint (lc', info2, rename_loop_arguments_l rest)
+                 | Mucore.I body_expr ->
+                   (* The body is just an expr for loop invariants *)
+                   let body_expr' = rename_expr body_expr in
+                   Mucore.I body_expr'
+               in
+               let loop_args' = rename_loop_args loop_args in
+               Mucore.Loop (loc, loop_args', annots, label_spec, info)
+             | Mucore.Non_inlined _ | Mucore.Return _ -> label_def)
+          labels
+      in
       let rt' = rename_return_type rt in
       Mucore.I (expr', labels', rt')
-
   and rename_it it =
     (* Walk the term to ensure all symbols are registered, then apply IT.subst.
        IT.subst handles the recursive traversal and substitution. *)
-    let rec collect_syms (IT.IT (t, _, _)) = match t with
+    let rec collect_syms (IT.IT (t, _, _)) =
+      match t with
       | Terms.Sym s -> ignore (canonicalize_symbol s)
       | Terms.EachI ((_, (s, _), _), t1) ->
         ignore (canonicalize_symbol s);
         collect_syms t1
-      | _ -> ()  (* IT.subst will handle traversing into subterms *)
+      | _ -> () (* IT.subst will handle traversing into subterms *)
     in
     collect_syms it;
     (* Now use IT.subst which will handle the full traversal and substitution *)
     IT.subst (build_it_subst ()) it
-
   and rename_request = function
     | Request.P p ->
-      Request.P { p with pointer = rename_it p.pointer; iargs = List.map rename_it p.iargs }
+      Request.P
+        { p with pointer = rename_it p.pointer; iargs = List.map rename_it p.iargs }
     | Request.Q qp ->
-      let (q_sym, q_bt) = qp.q in
+      let q_sym, q_bt = qp.q in
       let q_sym' = canonicalize_symbol q_sym in
-      Request.Q {
-        qp with
-        pointer = rename_it qp.pointer;
-        q = (q_sym', q_bt);
-        permission = rename_it qp.permission;
-        iargs = List.map rename_it qp.iargs
-      }
-
+      Request.Q
+        { qp with
+          pointer = rename_it qp.pointer;
+          q = (q_sym', q_bt);
+          permission = rename_it qp.permission;
+          iargs = List.map rename_it qp.iargs
+        }
   and rename_lc = function
     | LC.T it -> LC.T (rename_it it)
     | LC.Forall ((s, bt), it) ->
       let s' = canonicalize_symbol s in
       LC.Forall ((s', bt), rename_it it)
-
   and rename_return_type (RT.Computational ((sym, bt), info, lrt)) =
     let sym' = canonicalize_symbol sym in
     RT.Computational ((sym', bt), info, rename_logical_return_type lrt)
-
   and rename_logical_return_type = function
     | LRT.Define ((sym, it), info, rest) ->
       let sym' = canonicalize_symbol sym in
@@ -792,45 +866,41 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       let lc' = rename_lc lc in
       LRT.Constraint (lc', info, rename_logical_return_type rest)
     | LRT.I -> LRT.I
-
   and rename_paction (Mucore.Paction (p, act)) =
     let act' = rename_action act in
     Mucore.Paction (p, act')
-
   and rename_action (Mucore.Action (loc, act)) =
     let open Mucore in
-    let act' = match act with
-      | Create (pe1, actype, sym_opt) ->
-        Create (rename_pexpr pe1, actype, sym_opt)
+    let act' =
+      match act with
+      | Create (pe1, actype, sym_opt) -> Create (rename_pexpr pe1, actype, sym_opt)
       | CreateReadOnly (pe1, actype, pe2, sym_opt) ->
         CreateReadOnly (rename_pexpr pe1, actype, rename_pexpr pe2, sym_opt)
-      | Alloc (pe1, pe2, sym_opt) ->
-        Alloc (rename_pexpr pe1, rename_pexpr pe2, sym_opt)
-      | Kill (kind, pe) ->
-        Kill (kind, rename_pexpr pe)
+      | Alloc (pe1, pe2, sym_opt) -> Alloc (rename_pexpr pe1, rename_pexpr pe2, sym_opt)
+      | Kill (kind, pe) -> Kill (kind, rename_pexpr pe)
       | Store (is_locking, actype, pe1, pe2, mo) ->
         Store (is_locking, actype, rename_pexpr pe1, rename_pexpr pe2, mo)
-      | Load (actype, pe, mo) ->
-        Load (actype, rename_pexpr pe, mo)
+      | Load (actype, pe, mo) -> Load (actype, rename_pexpr pe, mo)
       | RMW (actype, pe1, pe2, pe3, mo1, mo2) ->
         RMW (actype, rename_pexpr pe1, rename_pexpr pe2, rename_pexpr pe3, mo1, mo2)
       | Fence mo -> Fence mo
       | CompareExchangeStrong (actype, pe1, pe2, pe3, mo1, mo2) ->
-        CompareExchangeStrong (actype, rename_pexpr pe1, rename_pexpr pe2, rename_pexpr pe3, mo1, mo2)
+        CompareExchangeStrong
+          (actype, rename_pexpr pe1, rename_pexpr pe2, rename_pexpr pe3, mo1, mo2)
       | CompareExchangeWeak (actype, pe1, pe2, pe3, mo1, mo2) ->
-        CompareExchangeWeak (actype, rename_pexpr pe1, rename_pexpr pe2, rename_pexpr pe3, mo1, mo2)
+        CompareExchangeWeak
+          (actype, rename_pexpr pe1, rename_pexpr pe2, rename_pexpr pe3, mo1, mo2)
       | LinuxFence mo -> LinuxFence mo
       | LinuxStore (actype, pe1, pe2, mo) ->
         LinuxStore (actype, rename_pexpr pe1, rename_pexpr pe2, mo)
-      | LinuxLoad (actype, pe, mo) ->
-        LinuxLoad (actype, rename_pexpr pe, mo)
+      | LinuxLoad (actype, pe, mo) -> LinuxLoad (actype, rename_pexpr pe, mo)
       | LinuxRMW (actype, pe1, pe2, mo) ->
         LinuxRMW (actype, rename_pexpr pe1, rename_pexpr pe2, mo)
     in
     Mucore.Action (loc, act')
-
   and rename_expr (Mucore.Expr (loc, annots, ty, e)) =
-    let e' = match e with
+    let e' =
+      match e with
       | Mucore.Epure pe -> Mucore.Epure (rename_pexpr pe)
       | Mucore.Ememop (memop, pes) ->
         (* Skip memop for now - it's complex Cerberus type *)
@@ -838,6 +908,8 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.Eaction pact -> Mucore.Eaction (rename_paction pact)
       | Mucore.Eskip -> Mucore.Eskip
       | Mucore.Eccall (act, pe, pes, opt) ->
+        (* TODO: opt contains Cnprog.t list with IndexTerms that should be renamed,
+           but they're rare and complex. Skip for now. *)
         Mucore.Eccall (act, rename_pexpr pe, List.map rename_pexpr pes, opt)
       | Mucore.Eproc (name, pes) -> Mucore.Eproc (name, List.map rename_pexpr pes)
       | Mucore.Elet (pat, pe, e1) ->
@@ -853,15 +925,22 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.End es -> Mucore.End (List.map rename_expr es)
       | Mucore.Erun (sym, pes) ->
         Mucore.Erun (canonicalize_symbol sym, List.map rename_pexpr pes)
-      | Mucore.CN_progs (stmts, progs) -> Mucore.CN_progs (stmts, progs)
+      | Mucore.CN_progs (stmts, progs) ->
+        (* TODO: progs contain Cnstatement.statement with IndexTerms that should be renamed,
+           but they're rare and complex. Skip for now. *)
+        Mucore.CN_progs (stmts, progs)
     in
     Mucore.Expr (loc, annots, ty, e')
-
   and rename_pexpr (Mucore.Pexpr (loc, annots, ty, pe)) =
-    let pe' = match pe with
+    let pe' =
+      match pe with
       | Mucore.PEsym sym ->
         (match Sys.getenv_opt "CN_DEBUG_HASH" with
-         | Some "1" -> Printf.eprintf "rename_pexpr PEsym: %s (id %d)\n%!" (Sym.pp_string sym) (Sym.num sym)
+         | Some "1" ->
+           Printf.eprintf
+             "rename_pexpr PEsym: %s (id %d)\n%!"
+             (Sym.pp_string sym)
+             (Sym.num sym)
          | _ -> ());
         Mucore.PEsym (canonicalize_symbol sym)
       | Mucore.PEval v -> Mucore.PEval v
@@ -877,11 +956,9 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
         Mucore.PEcatch_exceptional_condition (it, iop, rename_pexpr pe1, rename_pexpr pe2)
       | Mucore.PEwrapI (it, iop, pe1, pe2) ->
         Mucore.PEwrapI (it, iop, rename_pexpr pe1, rename_pexpr pe2)
-      | Mucore.PEmemop (memop, pe1) ->
-        Mucore.PEmemop (memop, rename_pexpr pe1)
+      | Mucore.PEmemop (memop, pe1) -> Mucore.PEmemop (memop, rename_pexpr pe1)
       | Mucore.PEnot pe1 -> Mucore.PEnot (rename_pexpr pe1)
-      | Mucore.PEop (op, pe1, pe2) ->
-        Mucore.PEop (op, rename_pexpr pe1, rename_pexpr pe2)
+      | Mucore.PEop (op, pe1, pe2) -> Mucore.PEop (op, rename_pexpr pe1, rename_pexpr pe2)
       | Mucore.PEconv_int (pe1, pe2) ->
         Mucore.PEconv_int (rename_pexpr pe1, rename_pexpr pe2)
       | Mucore.PEstruct (tag, fields) ->
@@ -899,9 +976,9 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
         Mucore.PEare_compatible (rename_pexpr pe1, rename_pexpr pe2)
     in
     Mucore.Pexpr (loc, annots, ty, pe')
-
   and rename_pattern (Mucore.Pattern (loc, annots, ty, p)) =
-    let p' = match p with
+    let p' =
+      match p with
       | Mucore.CaseBase (Some sym, cbt) ->
         Mucore.CaseBase (Some (canonicalize_symbol sym), cbt)
       | Mucore.CaseBase (None, cbt) -> Mucore.CaseBase (None, cbt)
@@ -910,5 +987,4 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
     in
     Mucore.Pattern (loc, annots, ty, p')
   in
-
   rename_arguments args_and_body
