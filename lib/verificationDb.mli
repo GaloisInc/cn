@@ -38,6 +38,7 @@ val record_function_verified
   content_hash:string ->
   spec_hash:string ->
   time_ms:int ->
+  consistency_checked:bool ->
   unit
 
 (** Record verification failure *)
@@ -53,6 +54,9 @@ val record_function_failed
 
 (** Get verification status for a function *)
 val get_function_status : db_handle -> string -> function_record option
+
+(** Update consistency_checked flag for a function *)
+val update_function_consistency_checked : db_handle -> sym:string -> unit
 
 (** Record function -> function call dependency *)
 val record_call_dependency : db_handle -> caller:string -> callee:string -> unit
@@ -76,6 +80,7 @@ val record_predicate_verified
   sym:string ->
   name:string ->
   content_hash:string ->
+  consistency_checked:bool ->
   unit
 
 (** Record logical function verification *)
