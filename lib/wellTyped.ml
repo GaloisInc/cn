@@ -56,6 +56,10 @@ type message =
   | Redundant_pattern of Pp.document
   | Unknown_variable of Sym.t
   | Void_ctype of [ `Array_shift | `Sizeof | `RW | `W ]
+  | Flexible_array_member_access of
+      { member : Id.t;
+        struct_tag : Sym.t
+      }
 
 type error =
   { loc : Locations.t;
@@ -715,15 +719,16 @@ module WIT = struct
             let reason = Either.Left loc in
             fail (illtyped_index_term loc t has ~expected ~reason)
         in
-        let@ field_ct = get_struct_member_type loc tag member in
-        (* FAM fields are stored in struct values as pointers (Loc ()) *)
+        (* Check if this is a flexible array member and disallow direct access *)
         let@ struct_decl = get_struct_decl loc tag in
-        let is_fam =
+        let@ () =
           match struct_decl.Memory.fam with
-          | Some fam_info when Id.equal member fam_info.Memory.member -> true
-          | _ -> false
+          | Some fam_info when Id.equal member fam_info.Memory.member ->
+            fail { loc; msg = Flexible_array_member_access { member; struct_tag = tag } }
+          | _ -> return ()
         in
-        let result_bt = if is_fam then BT.Loc () else Memory.bt_of_sct field_ct in
+        let@ field_ct = get_struct_member_type loc tag member in
+        let result_bt = Memory.bt_of_sct field_ct in
         return (IT (StructMember (t, member), result_bt, loc))
       | StructUpdate ((t, member), v) ->
         let@ t = infer t in

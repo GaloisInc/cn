@@ -34,6 +34,10 @@ type message =
   | Redundant_pattern of Pp.document
   | Unknown_variable of Sym.t
   | Void_ctype of [ `Sizeof | `Array_shift | `RW | `W ]
+  | Flexible_array_member_access of
+      { member : Id.t;
+        struct_tag : Sym.t
+      }
 
 type error =
   { loc : Locations.t;
