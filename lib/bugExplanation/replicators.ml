@@ -133,9 +133,9 @@ let replicate_call (sct : Sctypes.t) e_arg =
         [ mk_expr e_arg ] )
   | Struct _ ->
     let fsym = owned_sct_aux_sym (Sctypes.to_ctype sct) in
-    let e_arg =
-      CtA.wrap_with_convert_to (AilEunary (Address, mk_expr e_arg)) (BT.Loc ())
-    in
+    (* For structs, e_arg should already be a pointer expression (e.g., from array indexing
+       or member access). Don't add Address operator here - let the caller provide the
+       correct expression. *)
     A.AilEcall (mk_expr (AilEident fsym), [ mk_expr e_arg ])
   | _ ->
     let bt = Memory.bt_of_sct sct in
@@ -158,6 +158,10 @@ let replicate_member ptr_sym (sct : Sctypes.t) ((member, sct') : Id.t * Sctypes.
     match sct' with
     | Pointer _ -> CtA.wrap_with_convert_to e_arg (BT.Loc ())
     | Integer _ ->
+      CtA.wrap_with_convert_to (AilEunary (Address, mk_expr e_arg)) (BT.Loc ())
+    | Struct _ ->
+      (* Struct members accessed via memberofptr are lvalues, so take their address
+         to get a pointer *)
       CtA.wrap_with_convert_to (AilEunary (Address, mk_expr e_arg)) (BT.Loc ())
     | _ -> e_arg
   in
