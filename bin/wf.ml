@@ -20,7 +20,7 @@ let well_formed
       allow_split_magic_comments
       cache_status
       db_path
-      only_function
+      _only_function
   =
   let filename = Common.there_can_only_be_one filename in
   if cache_status then (
@@ -287,7 +287,7 @@ let cmd =
       & opt string ".cn/verification.db"
       & info [ "db-path" ] ~doc:"Path to verification database (for --cache-status)")
   in
-  let only_flag =
+  let only_function_flag =
     Arg.(
       value
       & opt (some string) None
@@ -315,7 +315,7 @@ let cmd =
     $ Common.Flags.allow_split_magic_comments
     $ cache_status_flag
     $ db_path_flag
-    $ only_flag
+    $ only_function_flag
   in
   let doc =
     "Runs CN's well-formedness check\n\

@@ -362,6 +362,23 @@ let pp_welltyped = function
     in
     let short = !^"C-type must not be void in a" ^^^ !^ctxt ^^ angles underscore in
     { short; descr = None; state = None }
+  | Flexible_array_member_access { member; struct_tag } ->
+    let short =
+      !^"Cannot access flexible array member"
+      ^^^ squotes (Id.pp member)
+      ^^^ !^"via struct value"
+    in
+    let descr =
+      !^"Flexible array members of"
+      ^^^ squotes (Sym.pp struct_tag)
+      ^^^ !^"must be accessed using"
+      ^^^ squotes (!^"member_shift" ^^ angles (Sym.pp struct_tag) ^^ parens (Id.pp member))
+      ^^ comma
+      ^^ hardline
+      ^^ !^"not via struct member access syntax"
+      ^^^ squotes (!^"struct_value" ^^ dot ^^ Id.pp member)
+    in
+    { short; descr = Some descr; state = None }
 
 
 let pp_builtins : Builtins.message -> _ = function
