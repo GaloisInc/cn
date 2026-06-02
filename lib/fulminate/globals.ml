@@ -7,17 +7,25 @@ let getter filename (sym : Sym.t) (sct : Sctypes.t)
   =
   let fsym = Sym.fresh (Cn_to_ail.getter_str filename sym) in
   let ct = Sctypes.to_ctype sct in
+  (* For array types, return pointer to element type, not pointer to array.
+     This avoids complex C declaration syntax like "int (* fn())[4]". *)
+  let return_ct, return_expr =
+    match sct with
+    | Array (elem_sct, _) ->
+      (* For arrays, return the array name itself (decays to pointer to first element) *)
+      ( C.mk_ctype_pointer C.no_qualifiers (Sctypes.to_ctype elem_sct),
+        Utils.mk_expr (AilEident sym) )
+    | _ ->
+      (* For non-arrays, return address of the variable *)
+      ( C.mk_ctype_pointer C.no_qualifiers ct,
+        Utils.mk_expr (AilEunary (Address, Utils.mk_expr (AilEident sym))) )
+  in
   A.
     ( ( fsym,
         ( Locations.other __LOC__,
           CF.Annot.Attrs [],
-          A.Decl_function
-            ( false,
-              (C.no_qualifiers, C.mk_ctype_pointer C.no_qualifiers ct),
-              [],
-              false,
-              false,
-              false ) ) ),
+          A.Decl_function (false, (C.no_qualifiers, return_ct), [], false, false, false)
+        ) ),
       ( fsym,
         ( Locations.other __LOC__,
           0,
@@ -26,11 +34,7 @@ let getter filename (sym : Sym.t) (sct : Sctypes.t)
           Utils.mk_stmt
             (AilSblock
                ( [ Utils.create_binding sym ct ],
-                 [ Utils.mk_stmt
-                     (AilSreturn
-                        (Utils.mk_expr
-                           (AilEunary (Address, Utils.mk_expr (AilEident sym)))))
-                 ] )) ) ) )
+                 [ Utils.mk_stmt (AilSreturn return_expr) ] )) ) ) )
 
 
 let setter filename (sym : Sym.t) (sct : Sctypes.t)
@@ -43,22 +47,22 @@ let setter filename (sym : Sym.t) (sct : Sctypes.t)
     match sct with
     | Array (sct', len) ->
       let ct' = Sctypes.to_ctype sct' in
-      A.AilEcall
-        ( Utils.mk_expr (AilEident (Sym.fresh "sizeof")),
-          [ Utils.mk_expr
-              (AilEbinary
-                 ( Utils.mk_expr
-                     (AilEconst
-                        (ConstantInteger
-                           (IConstant (Z.of_int (Option.get len), Decimal, None)))),
-                   Arithmetic Mul,
-                   Utils.mk_expr
+      (* For arrays: sizeof(element_type) * length *)
+      A.AilEbinary
+        ( Utils.mk_expr
+            (AilEcall
+               ( Utils.mk_expr (AilEident (Sym.fresh "sizeof")),
+                 [ Utils.mk_expr
                      (AilEident
                         (Sym.fresh
                            (Pp.plain
                               (CF.Pp_ail.pp_ctype ~is_human:false C.no_qualifiers ct'))))
-                 ))
-          ] )
+                 ] )),
+          Arithmetic Mul,
+          Utils.mk_expr
+            (AilEconst
+               (ConstantInteger (IConstant (Z.of_int (Option.get len), Decimal, None))))
+        )
     | _ ->
       A.AilEcall
         ( Utils.mk_expr (AilEident (Sym.fresh "sizeof")),
