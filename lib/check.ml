@@ -4041,11 +4041,13 @@ let time_check_c_functions
                let sym_str = Sym.pp_string fsym in
                (* Check if already stored by verification (which has real data) *)
                match VerificationDb.get_function_status db_handle sym_str with
-               | Some _ ->
-                 (* Already stored by verification with real data - skip *)
+               | Some record
+                 when String.compare record.VerificationDb.content_hash "not_verified"
+                      <> 0 ->
+                 (* Already stored by actual verification with real content - skip *)
                  return ()
-               | None ->
-                 (* Not verified (e.g., trusted function) - store spec hash *)
+               | _ ->
+                 (* Not verified OR previously stored as not_verified - update spec hash *)
                  let spec_hash = ContentHash.hash_function_spec ft_opt in
                  VerificationDb.record_function_verified
                    db_handle
