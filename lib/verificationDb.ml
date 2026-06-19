@@ -52,6 +52,11 @@ let init_schema (db : db_handle) : unit =
   (match exec db "PRAGMA busy_timeout = 5000" with
    | Rc.OK -> ()
    | rc -> failwith (Printf.sprintf "Failed to set busy timeout: %s" (Rc.to_string rc)));
+  (* Enable WAL mode for better concurrent access *)
+  (match exec db "PRAGMA journal_mode = WAL" with
+   | Rc.OK -> ()
+   | rc ->
+     Printf.eprintf "Warning: Failed to enable WAL mode: %s\n%!" (Rc.to_string rc));
   let schema =
     [ {|CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY
@@ -109,62 +114,74 @@ let init_schema (db : db_handle) : unit =
       {|CREATE TABLE IF NOT EXISTS function_calls_function (
         caller_sym TEXT NOT NULL,
         callee_sym TEXT NOT NULL,
-        PRIMARY KEY (caller_sym, callee_sym)
+        PRIMARY KEY (caller_sym, callee_sym),
+        FOREIGN KEY (caller_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS function_uses_predicate (
         function_sym TEXT NOT NULL,
         predicate_sym TEXT NOT NULL,
-        PRIMARY KEY (function_sym, predicate_sym)
+        PRIMARY KEY (function_sym, predicate_sym),
+        FOREIGN KEY (function_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS function_uses_struct (
         function_sym TEXT NOT NULL,
         struct_name TEXT NOT NULL,
-        PRIMARY KEY (function_sym, struct_name)
+        PRIMARY KEY (function_sym, struct_name),
+        FOREIGN KEY (function_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS function_uses_datatype (
         function_sym TEXT NOT NULL,
         datatype_name TEXT NOT NULL,
-        PRIMARY KEY (function_sym, datatype_name)
+        PRIMARY KEY (function_sym, datatype_name),
+        FOREIGN KEY (function_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS predicate_uses_predicate (
         user_sym TEXT NOT NULL,
         used_sym TEXT NOT NULL,
-        PRIMARY KEY (user_sym, used_sym)
+        PRIMARY KEY (user_sym, used_sym),
+        FOREIGN KEY (user_sym) REFERENCES predicates(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS logical_function_uses_logical_function (
         user_sym TEXT NOT NULL,
         used_sym TEXT NOT NULL,
-        PRIMARY KEY (user_sym, used_sym)
+        PRIMARY KEY (user_sym, used_sym),
+        FOREIGN KEY (user_sym) REFERENCES logical_functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS function_uses_logical_function (
         function_sym TEXT NOT NULL,
         logical_function_sym TEXT NOT NULL,
-        PRIMARY KEY (function_sym, logical_function_sym)
+        PRIMARY KEY (function_sym, logical_function_sym),
+        FOREIGN KEY (function_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS predicate_uses_logical_function (
         predicate_sym TEXT NOT NULL,
         logical_function_sym TEXT NOT NULL,
-        PRIMARY KEY (predicate_sym, logical_function_sym)
+        PRIMARY KEY (predicate_sym, logical_function_sym),
+        FOREIGN KEY (predicate_sym) REFERENCES predicates(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS predicate_uses_struct (
         predicate_sym TEXT NOT NULL,
         struct_name TEXT NOT NULL,
-        PRIMARY KEY (predicate_sym, struct_name)
+        PRIMARY KEY (predicate_sym, struct_name),
+        FOREIGN KEY (predicate_sym) REFERENCES predicates(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS predicate_uses_datatype (
         predicate_sym TEXT NOT NULL,
         datatype_name TEXT NOT NULL,
-        PRIMARY KEY (predicate_sym, datatype_name)
+        PRIMARY KEY (predicate_sym, datatype_name),
+        FOREIGN KEY (predicate_sym) REFERENCES predicates(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS logical_function_uses_struct (
         logical_function_sym TEXT NOT NULL,
         struct_name TEXT NOT NULL,
-        PRIMARY KEY (logical_function_sym, struct_name)
+        PRIMARY KEY (logical_function_sym, struct_name),
+        FOREIGN KEY (logical_function_sym) REFERENCES logical_functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS logical_function_uses_datatype (
         logical_function_sym TEXT NOT NULL,
         datatype_name TEXT NOT NULL,
-        PRIMARY KEY (logical_function_sym, datatype_name)
+        PRIMARY KEY (logical_function_sym, datatype_name),
+        FOREIGN KEY (logical_function_sym) REFERENCES logical_functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS lemmata (
         sym TEXT PRIMARY KEY,
@@ -176,27 +193,32 @@ let init_schema (db : db_handle) : unit =
       {|CREATE TABLE IF NOT EXISTS function_uses_lemma (
         function_sym TEXT NOT NULL,
         lemma_sym TEXT NOT NULL,
-        PRIMARY KEY (function_sym, lemma_sym)
+        PRIMARY KEY (function_sym, lemma_sym),
+        FOREIGN KEY (function_sym) REFERENCES functions(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS lemma_uses_predicate (
         lemma_sym TEXT NOT NULL,
         predicate_sym TEXT NOT NULL,
-        PRIMARY KEY (lemma_sym, predicate_sym)
+        PRIMARY KEY (lemma_sym, predicate_sym),
+        FOREIGN KEY (lemma_sym) REFERENCES lemmata(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS lemma_uses_logical_function (
         lemma_sym TEXT NOT NULL,
         logical_function_sym TEXT NOT NULL,
-        PRIMARY KEY (lemma_sym, logical_function_sym)
+        PRIMARY KEY (lemma_sym, logical_function_sym),
+        FOREIGN KEY (lemma_sym) REFERENCES lemmata(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS lemma_uses_struct (
         lemma_sym TEXT NOT NULL,
         struct_name TEXT NOT NULL,
-        PRIMARY KEY (lemma_sym, struct_name)
+        PRIMARY KEY (lemma_sym, struct_name),
+        FOREIGN KEY (lemma_sym) REFERENCES lemmata(sym) ON DELETE CASCADE
       )|};
       {|CREATE TABLE IF NOT EXISTS lemma_uses_datatype (
         lemma_sym TEXT NOT NULL,
         datatype_name TEXT NOT NULL,
-        PRIMARY KEY (lemma_sym, datatype_name)
+        PRIMARY KEY (lemma_sym, datatype_name),
+        FOREIGN KEY (lemma_sym) REFERENCES lemmata(sym) ON DELETE CASCADE
       )|};
       {|CREATE INDEX IF NOT EXISTS idx_functions_status
        ON functions(verification_status)|};
@@ -204,6 +226,10 @@ let init_schema (db : db_handle) : unit =
        ON functions(content_hash)|}
     ]
   in
+  (* Enable foreign key constraints *)
+  (match exec db "PRAGMA foreign_keys = ON" with
+   | Rc.OK -> ()
+   | rc -> failwith (Printf.sprintf "Failed to enable foreign keys: %s" (Rc.to_string rc)));
   (* Use a transaction to ensure atomicity *)
   (match exec db "BEGIN IMMEDIATE" with
    | Rc.OK -> ()
@@ -223,7 +249,7 @@ let init_schema (db : db_handle) : unit =
          failwith (Printf.sprintf "Schema init failed: %s\nSQL: %s" (Rc.to_string rc) sql))
     schema;
   (* Insert or update schema version *)
-  ignore (exec db "INSERT OR REPLACE INTO schema_version (version) VALUES (1)");
+  ignore (exec db "INSERT OR IGNORE INTO schema_version (version) VALUES (1)");
   (* Commit the transaction *)
   match exec db "COMMIT" with
   | Rc.OK -> ()
@@ -299,6 +325,11 @@ let record_function_verified
     VALUES (?, ?, ?, ?, ?, ?, 'pass', ?, ?, ?)
   |}
   in
+  let debug =
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with
+    | Some "1" -> true
+    | _ -> false
+  in
   try
     let stmt = prepare db sql in
     let now = Unix.time () in
@@ -314,9 +345,13 @@ let record_function_verified
         Data.INT (if consistency_checked then Int64.one else Int64.zero);
         Data.TEXT (if consistency_checked then "pass" else "not_checked")
       ];
-    ignore (finalize stmt)
+    ignore (finalize stmt);
+    if debug then
+      Printf.eprintf "DEBUG: Recorded function %s (content: %s, spec: %s)\n%!"
+        sym content_hash spec_hash
   with
   | exn ->
+    Printf.eprintf "ERROR: Failed to record function %s: %s\n%!" sym (Printexc.to_string exn);
     failwith
       (Printf.sprintf "Failed to record function verified: %s" (Printexc.to_string exn))
 
@@ -691,6 +726,41 @@ let get_datatype_definition (db : db_handle) (name : string) : function_record o
         consistency_checked = false;
         consistency_status = None
       }
+
+
+(** Clear all dependencies for a function (called before re-recording to avoid stale entries) *)
+let clear_function_dependencies (db : db_handle) ~(function_sym : string) : unit =
+  let tables =
+    [ "function_uses_struct";
+      "function_uses_datatype";
+      "function_calls_function";
+      "function_uses_predicate";
+      "function_uses_logical_function";
+      "function_uses_lemma"
+    ]
+  in
+  (* Debug: Show what we're clearing *)
+  let debug = match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false in
+  if debug then Printf.eprintf "Clearing dependencies for %s\n%!" function_sym;
+  List.iter
+    (fun table ->
+       let sql = Printf.sprintf "DELETE FROM %s WHERE function_sym = ?" table in
+       try
+         let stmt = prepare db sql in
+         let changes_before = changes db in
+         exec_stmt stmt [ Data.TEXT function_sym ];
+         let changes_after = changes db in
+         let rows_deleted = changes_after - changes_before in
+         if debug then Printf.eprintf "  Deleted %d rows from %s\n%!" rows_deleted table;
+         ignore (finalize stmt)
+       with
+       | exn ->
+         Printf.eprintf
+           "Warning: Failed to clear dependencies from %s for %s: %s\n%!"
+           table
+           function_sym
+           (Printexc.to_string exn))
+    tables
 
 
 (** Record function -> struct usage *)
@@ -1576,10 +1646,10 @@ let merge_from_db (db : db_handle) (source_path : string)
     let attach_stmt = prepare db attach_sql in
     exec_stmt attach_stmt [];
     ignore (finalize attach_stmt);
-    (* Merge functions (INSERT OR REPLACE to overwrite if newer) *)
+    (* Merge functions (INSERT OR IGNORE because we manually delete stuff later) *)
     let merge_funcs_sql =
       {|
-      INSERT OR REPLACE INTO functions
+      INSERT OR IGNORE INTO functions
       SELECT * FROM source.functions
     |}
     in
@@ -1594,7 +1664,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     in
     (* Merge predicates *)
     let pred_stmt =
-      prepare db "INSERT OR REPLACE INTO predicates SELECT * FROM source.predicates"
+      prepare db "INSERT OR IGNORE INTO predicates SELECT * FROM source.predicates"
     in
     exec_stmt pred_stmt [];
     ignore (finalize pred_stmt);
@@ -1608,7 +1678,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     let lf_stmt =
       prepare
         db
-        "INSERT OR REPLACE INTO logical_functions SELECT * FROM source.logical_functions"
+        "INSERT OR IGNORE INTO logical_functions SELECT * FROM source.logical_functions"
     in
     exec_stmt lf_stmt [];
     ignore (finalize lf_stmt);
@@ -1620,7 +1690,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     in
     (* Merge lemmata *)
     let lemma_stmt =
-      prepare db "INSERT OR REPLACE INTO lemmata SELECT * FROM source.lemmata"
+      prepare db "INSERT OR IGNORE INTO lemmata SELECT * FROM source.lemmata"
     in
     exec_stmt lemma_stmt [];
     ignore (finalize lemma_stmt);
@@ -1634,7 +1704,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     let struct_stmt =
       prepare
         db
-        "INSERT OR REPLACE INTO struct_definitions SELECT * FROM \
+        "INSERT OR IGNORE INTO struct_definitions SELECT * FROM \
          source.struct_definitions"
     in
     exec_stmt struct_stmt [];
@@ -1643,7 +1713,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     let dt_stmt =
       prepare
         db
-        "INSERT OR REPLACE INTO datatype_definitions SELECT * FROM \
+        "INSERT OR IGNORE INTO datatype_definitions SELECT * FROM \
          source.datatype_definitions"
     in
     exec_stmt dt_stmt [];
