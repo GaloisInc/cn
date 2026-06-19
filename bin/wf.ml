@@ -67,11 +67,12 @@ let well_formed
                      List.exists (fun name -> String.equal name sym_str) names)
                   c_functions
             in
-            Printf.printf "Cache Status Report\n";
-            Printf.printf "===================\n\n";
-            Printf.printf "Database: %s\n" db_path;
-            Printf.printf "File: %s\n" filename;
-            Printf.printf "Functions analyzed: %d\n\n" (List.length selected_funs);
+            if not json then (
+              Printf.printf "Cache Status Report\n";
+              Printf.printf "===================\n\n";
+              Printf.printf "Database: %s\n" db_path;
+              Printf.printf "File: %s\n" filename;
+              Printf.printf "Functions analyzed: %d\n\n" (List.length selected_funs));
             (* Compute all current hashes like verify does - for ALL functions including trusted *)
             let current_hashes = Hashtbl.create (Sym.Map.cardinal global.fun_decls) in
             let@ () =
@@ -122,16 +123,14 @@ let well_formed
                 global.logical_functions
                 (return ())
             in
-            (* Compute current hashes for all structs *)
-            let current_struct_hashes =
-              Hashtbl.create (Sym.Map.cardinal global.struct_decls)
-            in
+            (* Compute current hashes for all structs and datatypes *)
+            let current_struct_hashes = Hashtbl.create (Sym.Map.cardinal global.struct_decls) in
             Sym.Map.iter
               (fun struct_sym struct_decl ->
                  let struct_hash = ContentHash.hash_struct_definition struct_decl in
-                 Hashtbl.add current_struct_hashes (Sym.pp_string struct_sym) struct_hash)
+                 let canonical_name = Check.canonical_struct_name struct_sym global.struct_decls in
+                 Hashtbl.add current_struct_hashes canonical_name struct_hash)
               global.struct_decls;
-            (* Compute current hashes for all datatypes *)
             let current_datatype_hashes =
               Hashtbl.create (Sym.Map.cardinal global.datatypes)
             in
@@ -141,97 +140,222 @@ let well_formed
                  Hashtbl.add current_datatype_hashes (Sym.pp_string dt_sym) dt_hash)
               global.datatypes;
             (* Analyze each selected function using the same logic as verify *)
-            List.iter
-              (fun (sym, (loc, _args_and_body)) ->
-                 let sym_str = Sym.pp_string sym in
-                 let file_path =
-                   Option.value (Cerb_location.get_filename loc) ~default:"<unknown>"
-                 in
-                 let content_hash, spec_hash = Hashtbl.find current_hashes sym_str in
-                 (* Use the same staleness check as verify *)
-                 match
-                   Check.check_function_staleness
-                     db
-                     sym_str
-                     content_hash
-                     spec_hash
-                     current_pred_hashes
-                     current_lf_hashes
-                     current_struct_hashes
-                     current_datatype_hashes
-                     current_hashes
-                 with
-                 | None ->
-                   (* Up to date *)
-                   (match VerificationDb.get_function_status db sym_str with
-                    | Some record ->
-                      let status_str =
-                        match record.VerificationDb.status with
-                        | VerificationDb.Pass -> "pass"
-                        | VerificationDb.Fail -> "fail"
-                        | VerificationDb.Stale -> "stale"
-                        | VerificationDb.Unknown -> "unknown"
-                      in
-                      Printf.printf
-                        "[CACHED] %s (%s)\n\
-                        \  Location: %s\n\
-                        \  Action: Will skip verification\n\n"
-                        sym_str
-                        status_str
-                        file_path
-                    | None -> ())
-                 | Some reasons ->
-                   (* Stale - print detailed reasons *)
-                   let status_str =
-                     match VerificationDb.get_function_status db sym_str with
-                     | Some record ->
-                       (match record.VerificationDb.status with
-                        | VerificationDb.Pass -> "PASS"
-                        | VerificationDb.Fail -> "FAIL"
-                        | VerificationDb.Stale -> "STALE"
-                        | VerificationDb.Unknown -> "UNKNOWN")
-                     | None -> "NEW"
+            let results =
+              List.map
+                (fun (sym, (loc, _args_and_body)) ->
+                   let sym_str = Sym.pp_string sym in
+                   let file_path =
+                     Option.value (Cerb_location.get_filename loc) ~default:"<unknown>"
                    in
-                   Printf.printf "[STALE] %s (was: %s)\n" sym_str status_str;
-                   Printf.printf "  Location: %s\n" file_path;
-                   Printf.printf "  Reasons:\n";
-                   List.iter
-                     (fun reason ->
-                        match reason with
-                        | Check.NotInCache -> Printf.printf "    - Not in cache\n"
-                        | Check.ContentChanged { old_hash; new_hash } ->
-                          Printf.printf
-                            "    - Content changed (old: %s, new: %s)\n"
-                            (String.sub old_hash 0 (min 8 (String.length old_hash)))
-                            (String.sub new_hash 0 (min 8 (String.length new_hash)))
-                        | Check.SpecChanged { old_hash; new_hash } ->
-                          Printf.printf
-                            "    - Spec changed (old: %s, new: %s)\n"
-                            (String.sub old_hash 0 (min 8 (String.length old_hash)))
-                            (String.sub new_hash 0 (min 8 (String.length new_hash)))
-                        | Check.PredicateChanged preds ->
-                          Printf.printf
-                            "    - Predicate dependencies changed: %s\n"
-                            (String.concat ", " preds)
-                        | Check.StructChanged structs ->
-                          Printf.printf
-                            "    - Struct dependencies changed: %s\n"
-                            (String.concat ", " structs)
-                        | Check.DatatypeChanged datatypes ->
-                          Printf.printf
-                            "    - Datatype dependencies changed: %s\n"
-                            (String.concat ", " datatypes)
-                        | Check.CalleeSpecChanged callees ->
-                          Printf.printf
-                            "    - Called function specs changed: %s\n"
-                            (String.concat ", " callees)
-                        | Check.LogicalFunctionChanged lfs ->
-                          Printf.printf
-                            "    - Logical function dependencies changed: %s\n"
-                            (String.concat ", " lfs))
-                     reasons;
-                   Printf.printf "  Action: Will re-verify\n\n")
-              selected_funs;
+                   let content_hash, spec_hash = Hashtbl.find current_hashes sym_str in
+                   (* Use the same staleness check as verify *)
+                   match
+                     Check.check_function_staleness
+                       db
+                       sym_str
+                       content_hash
+                       spec_hash
+                       current_pred_hashes
+                       current_lf_hashes
+                       current_struct_hashes
+                       current_datatype_hashes
+                       current_hashes
+                   with
+                   | None ->
+                     (* Up to date *)
+                     let cached_status =
+                       match VerificationDb.get_function_status db sym_str with
+                       | Some record ->
+                         (match record.VerificationDb.status with
+                          | VerificationDb.Pass -> "pass"
+                          | VerificationDb.Fail -> "fail"
+                          | VerificationDb.Stale -> "stale"
+                          | VerificationDb.Unknown -> "unknown")
+                       | None -> "unknown"
+                     in
+                     `Assoc
+                       [ ("function", `String sym_str);
+                         ("location", `String file_path);
+                         ("cache_status", `String "cached");
+                         ("previous_status", `String cached_status);
+                         ("action", `String "skip")
+                       ]
+                   | Some reasons ->
+                     (* Stale - collect detailed reasons *)
+                     let previous_status =
+                       match VerificationDb.get_function_status db sym_str with
+                       | Some record ->
+                         (match record.VerificationDb.status with
+                          | VerificationDb.Pass -> "pass"
+                          | VerificationDb.Fail -> "fail"
+                          | VerificationDb.Stale -> "stale"
+                          | VerificationDb.Unknown -> "unknown")
+                       | None -> "new"
+                     in
+                     let reason_to_json reason =
+                       match reason with
+                       | Check.NotInCache ->
+                         `Assoc [ ("type", `String "not_in_cache") ]
+                       | Check.ContentChanged { old_hash; new_hash } ->
+                         `Assoc
+                           [ ("type", `String "content_changed");
+                             ("old_hash", `String old_hash);
+                             ("new_hash", `String new_hash)
+                           ]
+                       | Check.SpecChanged { old_hash; new_hash } ->
+                         `Assoc
+                           [ ("type", `String "spec_changed");
+                             ("old_hash", `String old_hash);
+                             ("new_hash", `String new_hash)
+                           ]
+                       | Check.PredicateChanged preds ->
+                         `Assoc
+                           [ ("type", `String "predicate_changed");
+                             ("predicates", `List (List.map (fun p -> `String p) preds))
+                           ]
+                       | Check.StructChanged structs ->
+                         `Assoc
+                           [ ("type", `String "struct_changed");
+                             ("structs", `List (List.map (fun s -> `String s) structs))
+                           ]
+                       | Check.DatatypeChanged datatypes ->
+                         `Assoc
+                           [ ("type", `String "datatype_changed");
+                             ("datatypes", `List (List.map (fun d -> `String d) datatypes))
+                           ]
+                       | Check.CalleeSpecChanged callees ->
+                         `Assoc
+                           [ ("type", `String "callee_spec_changed");
+                             ("callees", `List (List.map (fun c -> `String c) callees))
+                           ]
+                       | Check.LogicalFunctionChanged lfs ->
+                         `Assoc
+                           [ ("type", `String "logical_function_changed");
+                             ( "logical_functions",
+                               `List (List.map (fun lf -> `String lf) lfs) )
+                           ]
+                     in
+                     `Assoc
+                       [ ("function", `String sym_str);
+                         ("location", `String file_path);
+                         ("cache_status", `String "stale");
+                         ("previous_status", `String previous_status);
+                         ("action", `String "reverify");
+                         ("reasons", `List (List.map reason_to_json reasons))
+                       ])
+                selected_funs
+            in
+            (if json then (
+              let json_output =
+                `Assoc
+                  [ ("database", `String db_path);
+                    ("file", `String filename);
+                    ("functions_analyzed", `Int (List.length selected_funs));
+                    ("results", `List results)
+                  ]
+              in
+              Printf.printf "%s\n" (Yojson.Basic.pretty_to_string json_output))
+            else
+              List.iter
+                (fun result ->
+                   let open Yojson.Basic.Util in
+                   let cache_status = result |> member "cache_status" |> to_string_option |> Option.value ~default:"" in
+                   let function_name = result |> member "function" |> to_string_option |> Option.value ~default:"" in
+                   let location = result |> member "location" |> to_string_option |> Option.value ~default:"" in
+                   let previous_status = result |> member "previous_status" |> to_string_option |> Option.value ~default:"" in
+                   if String.equal cache_status "cached" then
+                       Printf.printf
+                         "[CACHED] %s (%s)\n  Location: %s\n  Action: Will skip \
+                          verification\n\n"
+                         function_name
+                         previous_status
+                         location
+                   else (
+                     Printf.printf
+                       "[STALE] %s (was: %s)\n  Location: %s\n  Reasons:\n"
+                       function_name
+                       (String.uppercase_ascii previous_status)
+                       location;
+                     let reasons = result |> member "reasons" |> to_list in
+                     List.iter
+                       (fun reason ->
+                          let rtype = reason |> member "type" |> to_string_option |> Option.value ~default:"" in
+                          match rtype with
+                           | "not_in_cache" -> Printf.printf "    - Not in cache\n"
+                           | "content_changed" ->
+                             let old_h =
+                               reason
+                               |> member "old_hash"
+                               |> to_string_option
+                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
+                               |> Option.value ~default:""
+                             in
+                             let new_h =
+                               reason
+                               |> member "new_hash"
+                               |> to_string_option
+                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
+                               |> Option.value ~default:""
+                             in
+                             Printf.printf
+                               "    - Content changed (old: %s, new: %s)\n"
+                               old_h
+                               new_h
+                           | "spec_changed" ->
+                             let old_h =
+                               reason
+                               |> member "old_hash"
+                               |> to_string_option
+                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
+                               |> Option.value ~default:""
+                             in
+                             let new_h =
+                               reason
+                               |> member "new_hash"
+                               |> to_string_option
+                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
+                               |> Option.value ~default:""
+                             in
+                             Printf.printf "    - Spec changed (old: %s, new: %s)\n" old_h new_h
+                           | "predicate_changed" ->
+                             let preds =
+                               reason |> member "predicates" |> to_list |> filter_string
+                             in
+                             Printf.printf
+                               "    - Predicate dependencies changed: %s\n"
+                               (String.concat ", " preds)
+                           | "struct_changed" ->
+                             let structs =
+                               reason |> member "structs" |> to_list |> filter_string
+                             in
+                             Printf.printf
+                               "    - Struct dependencies changed: %s\n"
+                               (String.concat ", " structs)
+                           | "datatype_changed" ->
+                             let datatypes =
+                               reason |> member "datatypes" |> to_list |> filter_string
+                             in
+                             Printf.printf
+                               "    - Datatype dependencies changed: %s\n"
+                               (String.concat ", " datatypes)
+                           | "callee_spec_changed" ->
+                             let callees =
+                               reason |> member "callees" |> to_list |> filter_string
+                             in
+                             Printf.printf
+                               "    - Called function specs changed: %s\n"
+                               (String.concat ", " callees)
+                           | "logical_function_changed" ->
+                             let lfs =
+                               reason |> member "logical_functions" |> to_list |> filter_string
+                             in
+                             Printf.printf
+                               "    - Logical function dependencies changed: %s\n"
+                               (String.concat ", " lfs)
+                           | _ -> ())
+                       reasons;
+                     Printf.printf "  Action: Will re-verify\n\n"))
+                results);
             VerificationDb.close_db db |> ignore;
             return ())
         in

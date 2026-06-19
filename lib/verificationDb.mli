@@ -109,6 +109,9 @@ val get_struct_definition : db_handle -> string -> function_record option
 (** Get datatype definition status *)
 val get_datatype_definition : db_handle -> string -> function_record option
 
+(** Clear all dependencies for a function (called before re-recording to avoid stale entries) *)
+val clear_function_dependencies : db_handle -> function_sym:string -> unit
+
 (** Record function -> struct usage *)
 val record_struct_usage : db_handle -> function_sym:string -> struct_name:string -> unit
 

@@ -230,6 +230,149 @@ let rec extract_datatypes_from_bt (bt : BT.t) : Sym.t list =
   | _ -> []
 
 
+(** Extract struct tags and datatype constructors used in an index term *)
+let rec extract_struct_datatype_from_it (it : IT.t) : Sym.t list * Sym.t list =
+  let (IT (term, bt, _)) = it in
+  (* Extract from the term's base type *)
+  let bt_structs = extract_structs_from_bt bt in
+  let bt_datatypes = extract_datatypes_from_bt bt in
+  (* Extract from the term structure *)
+  let term_structs, term_datatypes =
+    match term with
+    | Terms.Struct (tag, members) ->
+      (* Struct value - tag is a struct dependency *)
+      let member_structs, member_datatypes =
+        List.split (List.map (fun (_, t) -> extract_struct_datatype_from_it t) members)
+      in
+      (tag :: List.concat member_structs, List.concat member_datatypes)
+    | Terms.Record members ->
+      (* Record value *)
+      let member_structs, member_datatypes =
+        List.split (List.map (fun (_, t) -> extract_struct_datatype_from_it t) members)
+      in
+      (List.concat member_structs, List.concat member_datatypes)
+    | Terms.StructMember (t, _tag) ->
+      extract_struct_datatype_from_it t
+    | Terms.RecordMember (t, _) ->
+      extract_struct_datatype_from_it t
+    | Terms.StructUpdate ((t1, _tag), t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.RecordUpdate ((t1, _), t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.Constructor (ctor_sym, members) ->
+      (* Datatype constructor - need to find which datatype it belongs to *)
+      (* The constructor symbol itself is what we need to track *)
+      let member_structs, member_datatypes =
+        List.split (List.map (fun (_, t) -> extract_struct_datatype_from_it t) members)
+      in
+      (* ctor_sym is a constructor, we'll resolve it to datatype later via global *)
+      (List.concat member_structs, ctor_sym :: List.concat member_datatypes)
+    | Terms.Match (t, cases) ->
+      let match_structs, match_datatypes = extract_struct_datatype_from_it t in
+      let case_results =
+        List.map
+          (fun (pat, body) ->
+             let pat_structs, pat_datatypes = extract_struct_datatype_from_pattern pat in
+             let body_structs, body_datatypes = extract_struct_datatype_from_it body in
+             (pat_structs @ body_structs, pat_datatypes @ body_datatypes))
+          cases
+      in
+      let case_structs, case_datatypes = List.split case_results in
+      (match_structs @ List.concat case_structs, match_datatypes @ List.concat case_datatypes)
+    | Terms.Const _ | Terms.Sym _ -> ([], [])
+    | Terms.Unop (_, t) -> extract_struct_datatype_from_it t
+    | Terms.Binop (_, t1, t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.ITE (t1, t2, t3) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      let s3, d3 = extract_struct_datatype_from_it t3 in
+      (s1 @ s2 @ s3, d1 @ d2 @ d3)
+    | Terms.EachI (_, t) -> extract_struct_datatype_from_it t
+    | Terms.Tuple ts ->
+      let results = List.map extract_struct_datatype_from_it ts in
+      let structs, datatypes = List.split results in
+      (List.concat structs, List.concat datatypes)
+    | Terms.NthTuple (_, t) -> extract_struct_datatype_from_it t
+    | Terms.Cast (_, t) -> extract_struct_datatype_from_it t
+    | Terms.MemberShift (t, _, _) -> extract_struct_datatype_from_it t
+    | Terms.ArrayShift { base; index; _ } ->
+      let s1, d1 = extract_struct_datatype_from_it base in
+      let s2, d2 = extract_struct_datatype_from_it index in
+      (s1 @ s2, d1 @ d2)
+    | Terms.CopyAllocId { addr; loc } ->
+      let s1, d1 = extract_struct_datatype_from_it addr in
+      let s2, d2 = extract_struct_datatype_from_it loc in
+      (s1 @ s2, d1 @ d2)
+    | Terms.HasAllocId t -> extract_struct_datatype_from_it t
+    | Terms.SizeOf _ | Terms.OffsetOf _ | Terms.Nil _ | Terms.CN_None _ -> ([], [])
+    | Terms.Cons (t1, t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.Head t | Terms.Tail t -> extract_struct_datatype_from_it t
+    | Terms.Representable (_, t) | Terms.Good (_, t) | Terms.WrapI (_, t) ->
+      extract_struct_datatype_from_it t
+    | Terms.Aligned { t; align } ->
+      let s1, d1 = extract_struct_datatype_from_it t in
+      let s2, d2 = extract_struct_datatype_from_it align in
+      (s1 @ s2, d1 @ d2)
+    | Terms.MapConst (_, t) -> extract_struct_datatype_from_it t
+    | Terms.MapSet (t1, t2, t3) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      let s3, d3 = extract_struct_datatype_from_it t3 in
+      (s1 @ s2 @ s3, d1 @ d2 @ d3)
+    | Terms.MapGet (t1, t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.MapDef (_, t) -> extract_struct_datatype_from_it t
+    | Terms.Let ((_, t1), t2) ->
+      let s1, d1 = extract_struct_datatype_from_it t1 in
+      let s2, d2 = extract_struct_datatype_from_it t2 in
+      (s1 @ s2, d1 @ d2)
+    | Terms.CN_Some t | Terms.IsSome t | Terms.GetOpt t -> extract_struct_datatype_from_it t
+    | Terms.Apply (_, args) ->
+      let results = List.map extract_struct_datatype_from_it args in
+      let structs, datatypes = List.split results in
+      (List.concat structs, List.concat datatypes)
+  in
+  (bt_structs @ term_structs, bt_datatypes @ term_datatypes)
+
+and extract_struct_datatype_from_pattern (IT.Pat (pat_, bt, _))
+  : Sym.t list * Sym.t list
+  =
+  let bt_structs = extract_structs_from_bt bt in
+  let bt_datatypes = extract_datatypes_from_bt bt in
+  let pat_structs, pat_datatypes =
+    match pat_ with
+    | IT.PSym _ | IT.PWild -> ([], [])
+    | IT.PConstructor (ctor_sym, args) ->
+      (* Constructor pattern - ctor_sym is a constructor we need to track *)
+      let arg_results =
+        List.map (fun (_, pat) -> extract_struct_datatype_from_pattern pat) args
+      in
+      let arg_structs, arg_datatypes = List.split arg_results in
+      (* ctor_sym is a constructor symbol *)
+      (List.concat arg_structs, ctor_sym :: List.concat arg_datatypes)
+  in
+  (bt_structs @ pat_structs, bt_datatypes @ pat_datatypes)
+
+
+(** Extract struct/datatype from a logical constraint *)
+let extract_struct_datatype_from_lc (lc : LogicalConstraints.t) : Sym.t list * Sym.t list =
+  match lc with
+  | LogicalConstraints.T it -> extract_struct_datatype_from_it it
+  | LogicalConstraints.Forall ((_, _), it) -> extract_struct_datatype_from_it it
+
+
 (** Extract struct/datatype usage from a function spec *)
 let extract_struct_datatype_uses_from_spec (ft : AT.ft option) : Sym.t list * Sym.t list =
   match ft with
@@ -245,13 +388,31 @@ let extract_struct_datatype_uses_from_spec (ft : AT.ft option) : Sym.t list * Sy
       | AT.L lat -> collect_from_lat lat
     and collect_from_lat (lat : 'a LAT.t) : Sym.t list * Sym.t list =
       match lat with
-      | LAT.Define ((_, _it), _, lat) -> collect_from_lat lat
-      | LAT.Resource ((_, (_req, bt)), _, lat) ->
-        let structs1, datatypes1 = collect_from_lat lat in
-        let structs2 = extract_structs_from_bt bt in
-        let datatypes2 = extract_datatypes_from_bt bt in
-        (structs1 @ structs2, datatypes1 @ datatypes2)
-      | LAT.Constraint (_lc, _, lat) -> collect_from_lat lat
+      | LAT.Define ((_, it), _, lat) ->
+        (* Extract from the index term in Define clause *)
+        let it_structs, it_datatypes = extract_struct_datatype_from_it it in
+        let rest_structs, rest_datatypes = collect_from_lat lat in
+        (it_structs @ rest_structs, it_datatypes @ rest_datatypes)
+      | LAT.Resource ((_, (req, bt)), _, lat) ->
+        let rest_structs, rest_datatypes = collect_from_lat lat in
+        let bt_structs = extract_structs_from_bt bt in
+        let bt_datatypes = extract_datatypes_from_bt bt in
+        (* Extract from request arguments (pointer and iargs contain index terms) *)
+        let req_structs, req_datatypes =
+          match req with
+          | Req.P { pointer; iargs; _ } | Req.Q { pointer; iargs; _ } ->
+            let ptr_s, ptr_d = extract_struct_datatype_from_it pointer in
+            let arg_results = List.map extract_struct_datatype_from_it iargs in
+            let arg_s, arg_d = List.split arg_results in
+            (ptr_s @ List.concat arg_s, ptr_d @ List.concat arg_d)
+        in
+        ( rest_structs @ bt_structs @ req_structs,
+          rest_datatypes @ bt_datatypes @ req_datatypes )
+      | LAT.Constraint (lc, _, lat) ->
+        (* Extract from logical constraint *)
+        let lc_structs, lc_datatypes = extract_struct_datatype_from_lc lc in
+        let rest_structs, rest_datatypes = collect_from_lat lat in
+        (lc_structs @ rest_structs, lc_datatypes @ rest_datatypes)
       | LAT.I _ -> ([], [])
     in
     let structs, datatypes = collect_from_at ft in

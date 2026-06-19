@@ -620,8 +620,14 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
            (* Print body *)
            Pp_mucore.Basic.pp_expr None body
            (* Include labels (loop bodies, return points, etc) *)
-           ^^^ Pmap.fold
-                 (fun sym def acc ->
+           (* IMPORTANT: Sort labels by symbol name for deterministic output *)
+           ^^^ let sorted_labels =
+                 Pmap.bindings_list labels
+                 |> List.sort (fun (sym1, _) (sym2, _) ->
+                        String.compare (Sym.pp_string sym1) (Sym.pp_string sym2))
+               in
+               List.fold_left
+                 (fun acc (sym, def) ->
                     acc
                     ^^^
                     match def with
@@ -639,8 +645,8 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
                     | _ ->
                       (* Non-loop labels (Return, Non_inlined) don't need special handling *)
                       Pp.empty)
-                 labels
                  Pp.empty
+                 sorted_labels
            (* Include return type *)
            ^^^ ReturnTypes.pp rt)
         args_and_body_renamed
@@ -654,6 +660,15 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
          "=== Pre-normalization sample (first 500 chars) ===\n%s\n%!"
          (String.sub str 0 (min 500 (String.length str)))
      | _ -> ());
+    (* Normalize file paths: remove ./ and redundant path components *)
+    let normalize_paths s =
+      (* Remove ./ from paths *)
+      let s = Str.global_replace (Str.regexp "\\./" ) "" s in
+      (* Remove leading ./ *)
+      let s = Str.global_replace (Str.regexp "^\\./") "" s in
+      s
+    in
+    let str = normalize_paths str in
     (* Alpha-rename all symbols based on binding order *)
     let normalized = normalize_symbols_in_string str in
     (* Debug: Print serialized text if environment variable is set *)
@@ -676,6 +691,27 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
      | Some "1" -> Printf.eprintf "=== Hash: %s ===\n%!" hash
      | _ -> ());
+    let debug_cache =
+      match Sys.getenv_opt "CN_DEBUG_CACHE" with
+      | Some "1" -> true
+      | _ -> false
+    in
+    if debug_cache then (
+      Printf.eprintf "DEBUG: Content hash for function -> %s\n  Length: %d bytes\n  First 200 chars: %s\n  Last 200 chars: %s\n%!"
+        hash
+        (String.length normalized)
+        (String.sub normalized 0 (min 200 (String.length normalized)))
+        (if String.length normalized > 200 then
+          String.sub normalized (String.length normalized - 200) 200
+        else "");
+      (* Optionally dump full normalized string to file for diffing *)
+      match Sys.getenv_opt "CN_DEBUG_HASH_DUMP" with
+      | Some filename ->
+        let oc = open_out filename in
+        output_string oc normalized;
+        close_out oc;
+        Printf.eprintf "DEBUG: Wrote normalized string to %s\n%!" filename
+      | None -> ());
     hash
   with
   | exn ->
@@ -703,4 +739,14 @@ let hash_lemma (lemma_typ : ArgumentTypes.lemmat) : string =
   (* Apply canonical alpha-renaming before serialization *)
   let lemma_renamed = AlphaRenaming.rename_lemmat lemma_typ in
   let lemma_str = pp_to_string (ArgumentTypes.pp LogicalReturnTypes.pp lemma_renamed) in
-  Digest.string lemma_str |> Digest.to_hex
+  let hash = Digest.string lemma_str |> Digest.to_hex in
+  let debug =
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with
+    | Some "1" -> true
+    | _ -> false
+  in
+  if debug then
+    Printf.eprintf "DEBUG: Hashing lemma -> %s\n  Content (first 200 chars): %s\n%!"
+      hash
+      (String.sub lemma_str 0 (min 200 (String.length lemma_str)));
+  hash

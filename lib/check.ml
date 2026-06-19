@@ -2862,6 +2862,25 @@ let select_functions
   Sym.Set.filter (fun fsym -> not (Sym.Set.mem fsym skip)) only_funs
 
 
+(** Canonicalize struct name for caching. For unnamed structs (like __cerbty_unnamed_tag_NNNN),
+    use the content hash as the canonical name to avoid non-deterministic numbering. *)
+let canonical_struct_name (struct_sym : Sym.t) (struct_decls : Memory.struct_decl Sym.Map.t)
+  : string
+  =
+  let sym_str = Sym.pp_string struct_sym in
+  (* Check if this is an unnamed tag with non-deterministic numbering *)
+  if Str.string_match (Str.regexp "^__cerbty_unnamed_tag_[0-9]+$") sym_str 0 then
+    (* Unnamed struct - use content hash as canonical name *)
+    match Sym.Map.find_opt struct_sym struct_decls with
+    | Some struct_decl ->
+      let hash = ContentHash.hash_struct_definition struct_decl in
+      "__cerbty_unnamed_tag_hash_" ^ hash
+    | None -> sym_str (* Shouldn't happen, but fallback to original name *)
+  else
+    (* Named struct - use symbol name as-is *)
+    sym_str
+
+
 (** Check a single C function. Failure of the check is encoded monadically. *)
 let check_c_function ((fsym, (loc, args_and_body)) : c_function) : unit m =
   current_function_calls := [];
@@ -2915,6 +2934,8 @@ let check_c_functions_fast
                ~spec_hash
                ~time_ms
                ~consistency_checked:false;
+             (* Clear old dependencies before recording new ones (avoids stale entries) *)
+             VerificationDb.clear_function_dependencies db_handle ~function_sym:sym_str;
              (* Extract and record predicate dependencies *)
              let pred_deps =
                DependencyExtractor.extract_predicate_uses_from_spec ft_opt
@@ -2949,15 +2970,35 @@ let check_c_functions_fast
                     ~logical_function_sym:(Sym.pp_string lf_sym))
                lf_deps;
              (* Extract and record struct/datatype dependencies *)
-             let struct_deps, datatype_deps =
+             let struct_deps, datatype_or_ctor_deps =
                DependencyExtractor.extract_struct_datatype_uses_from_spec ft_opt
+             in
+             (* Resolve constructor symbols to their parent datatypes *)
+             let datatype_deps =
+               List.filter_map
+                 (fun sym ->
+                    (* Check if it's a datatype *)
+                    match Sym.Map.find_opt sym global.datatypes with
+                    | Some _ -> Some sym (* It's a datatype *)
+                    | None ->
+                      (* Check if it's a constructor *)
+                      (match Sym.Map.find_opt sym global.datatype_constrs with
+                       | Some constr_info -> Some constr_info.BT.Datatype.datatype_tag
+                       | None ->
+                         (* Neither datatype nor constructor, might be a struct tag misclassified *)
+                         None))
+                 datatype_or_ctor_deps
+               |> List.sort_uniq Sym.compare
              in
              List.iter
                (fun struct_sym ->
+                  let canonical_name =
+                    canonical_struct_name struct_sym global.struct_decls
+                  in
                   VerificationDb.record_struct_usage
                     db_handle
                     ~function_sym:sym_str
-                    ~struct_name:(Sym.pp_string struct_sym))
+                    ~struct_name:canonical_name)
                struct_deps;
              List.iter
                (fun datatype_sym ->
@@ -3062,6 +3103,8 @@ let check_c_functions_all
              ~spec_hash
              ~time_ms
              ~consistency_checked:false;
+           (* Clear old dependencies before recording new ones (avoids stale entries) *)
+           VerificationDb.clear_function_dependencies db_handle ~function_sym:sym_str;
            (* Extract and record predicate dependencies *)
            let pred_deps = DependencyExtractor.extract_predicate_uses_from_spec ft_opt in
            List.iter
@@ -3094,15 +3137,29 @@ let check_c_functions_all
                   ~logical_function_sym:(Sym.pp_string lf_sym))
              lf_deps;
            (* Extract and record struct/datatype dependencies *)
-           let struct_deps, datatype_deps =
+           let struct_deps, datatype_or_ctor_deps =
              DependencyExtractor.extract_struct_datatype_uses_from_spec ft_opt
+           in
+           (* Resolve constructor symbols to their parent datatypes *)
+           let datatype_deps =
+             List.filter_map
+               (fun sym ->
+                  match Sym.Map.find_opt sym global.datatypes with
+                  | Some _ -> Some sym
+                  | None ->
+                    (match Sym.Map.find_opt sym global.datatype_constrs with
+                     | Some constr_info -> Some constr_info.BT.Datatype.datatype_tag
+                     | None -> None))
+               datatype_or_ctor_deps
+             |> List.sort_uniq Sym.compare
            in
            List.iter
              (fun struct_sym ->
+                let canonical_name = canonical_struct_name struct_sym global.struct_decls in
                 VerificationDb.record_struct_usage
                   db_handle
                   ~function_sym:sym_str
-                  ~struct_name:(Sym.pp_string struct_sym))
+                  ~struct_name:canonical_name)
              struct_deps;
            List.iter
              (fun datatype_sym ->
@@ -3357,8 +3414,15 @@ let check_function_staleness
       (current_hashes : (string, string * string) Hashtbl.t)
   : staleness_reason list option
   =
+  let debug =
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with
+    | Some "1" -> true
+    | _ -> false
+  in
   match VerificationDb.get_function_status db_handle sym_str with
-  | None -> Some [ NotInCache ]
+  | None ->
+    if debug then Printf.eprintf "DEBUG: %s not in cache\n%!" sym_str;
+    Some [ NotInCache ]
   | Some record ->
     let reasons = ref [] in
     (* Check if SPEC or CONTENT hash changed *)
@@ -3366,6 +3430,13 @@ let check_function_staleness
     let content_changed =
       String.compare record.VerificationDb.content_hash current_content <> 0
     in
+    if debug then
+      Printf.eprintf "DEBUG: Checking %s\n  Stored content: %s\n  Current content: %s\n  Stored spec: %s\n  Current spec: %s\n%!"
+        sym_str
+        record.VerificationDb.content_hash
+        current_content
+        record.VerificationDb.spec_hash
+        current_spec;
     if spec_changed then
       reasons
       := SpecChanged
@@ -3718,16 +3789,14 @@ let time_check_c_functions
             global.logical_functions
             (return ())
         in
-        (* Compute current hashes for all structs *)
-        let current_struct_hashes =
-          Hashtbl.create (Sym.Map.cardinal global.struct_decls)
-        in
+        (* Compute current hashes for all structs and datatypes *)
+        let current_struct_hashes = Hashtbl.create (Sym.Map.cardinal global.struct_decls) in
         Sym.Map.iter
           (fun struct_sym struct_decl ->
              let struct_hash = ContentHash.hash_struct_definition struct_decl in
-             Hashtbl.add current_struct_hashes (Sym.pp_string struct_sym) struct_hash)
+             let canonical_name = canonical_struct_name struct_sym global.struct_decls in
+             Hashtbl.add current_struct_hashes canonical_name struct_hash)
           global.struct_decls;
-        (* Compute current hashes for all datatypes *)
         let current_datatype_hashes =
           Hashtbl.create (Sym.Map.cardinal global.datatypes)
         in
@@ -3869,16 +3938,32 @@ let time_check_c_functions
                         ~logical_function_sym:(Sym.pp_string lf_sym))
                    pred_lf_deps;
                  (* Extract and record struct/datatype dependencies for predicate *)
-                 let pred_struct_deps, pred_datatype_deps =
+                 let pred_struct_deps, pred_datatype_or_ctor_deps =
                    DependencyExtractor.extract_struct_datatype_uses_from_predicate
                      pred_def
                  in
+                 (* Resolve constructor symbols to their parent datatypes *)
+                 let pred_datatype_deps =
+                   List.filter_map
+                     (fun sym ->
+                        match Sym.Map.find_opt sym global.datatypes with
+                        | Some _ -> Some sym
+                        | None ->
+                          (match Sym.Map.find_opt sym global.datatype_constrs with
+                           | Some constr_info -> Some constr_info.BT.Datatype.datatype_tag
+                           | None -> None))
+                     pred_datatype_or_ctor_deps
+                   |> List.sort_uniq Sym.compare
+                 in
                  List.iter
                    (fun struct_sym ->
+                      let canonical_name =
+                        canonical_struct_name struct_sym global.struct_decls
+                      in
                       VerificationDb.record_predicate_struct_usage
                         db_handle
                         ~predicate_sym:(Sym.pp_string pred_sym)
-                        ~struct_name:(Sym.pp_string struct_sym))
+                        ~struct_name:canonical_name)
                    pred_struct_deps;
                  List.iter
                    (fun datatype_sym ->
@@ -3924,16 +4009,32 @@ let time_check_c_functions
                         ~used_sym:(Sym.pp_string used_lf_sym))
                    lf_deps;
                  (* Extract and record struct/datatype dependencies for logical function *)
-                 let lf_struct_deps, lf_datatype_deps =
+                 let lf_struct_deps, lf_datatype_or_ctor_deps =
                    DependencyExtractor.extract_struct_datatype_uses_from_logical_function
                      lf_def
                  in
+                 (* Resolve constructor symbols to their parent datatypes *)
+                 let lf_datatype_deps =
+                   List.filter_map
+                     (fun sym ->
+                        match Sym.Map.find_opt sym global.datatypes with
+                        | Some _ -> Some sym
+                        | None ->
+                          (match Sym.Map.find_opt sym global.datatype_constrs with
+                           | Some constr_info -> Some constr_info.BT.Datatype.datatype_tag
+                           | None -> None))
+                     lf_datatype_or_ctor_deps
+                   |> List.sort_uniq Sym.compare
+                 in
                  List.iter
                    (fun struct_sym ->
+                      let canonical_name =
+                        canonical_struct_name struct_sym global.struct_decls
+                      in
                       VerificationDb.record_logical_function_struct_usage
                         db_handle
                         ~logical_function_sym:(Sym.pp_string lf_sym)
-                        ~struct_name:(Sym.pp_string struct_sym))
+                        ~struct_name:canonical_name)
                    lf_struct_deps;
                  List.iter
                    (fun datatype_sym ->
@@ -3982,15 +4083,31 @@ let time_check_c_functions
                       ~logical_function_sym:(Sym.pp_string lf_sym))
                  lemma_lf_deps;
                (* Extract and record struct/datatype dependencies for lemma *)
-               let lemma_struct_deps, lemma_datatype_deps =
+               let lemma_struct_deps, lemma_datatype_or_ctor_deps =
                  DependencyExtractor.extract_struct_datatype_uses_from_lemma lemma_typ
+               in
+               (* Resolve constructor symbols to their parent datatypes *)
+               let lemma_datatype_deps =
+                 List.filter_map
+                   (fun sym ->
+                      match Sym.Map.find_opt sym global.datatypes with
+                      | Some _ -> Some sym
+                      | None ->
+                        (match Sym.Map.find_opt sym global.datatype_constrs with
+                         | Some constr_info -> Some constr_info.BT.Datatype.datatype_tag
+                         | None -> None))
+                   lemma_datatype_or_ctor_deps
+                 |> List.sort_uniq Sym.compare
                in
                List.iter
                  (fun struct_sym ->
+                    let canonical_name =
+                      canonical_struct_name struct_sym global.struct_decls
+                    in
                     VerificationDb.record_lemma_struct_usage
                       db_handle
                       ~lemma_sym:(Sym.pp_string lemma_sym)
-                      ~struct_name:(Sym.pp_string struct_sym))
+                      ~struct_name:canonical_name)
                  lemma_struct_deps;
                List.iter
                  (fun datatype_sym ->
@@ -4009,9 +4126,10 @@ let time_check_c_functions
             (fun struct_tag struct_decl acc ->
                let@ () = acc in
                let struct_hash = ContentHash.hash_struct_definition struct_decl in
+               let canonical_name = canonical_struct_name struct_tag global.struct_decls in
                VerificationDb.record_struct_definition
                  db_handle
-                 ~name:(Sym.pp_string struct_tag)
+                 ~name:canonical_name
                  ~content_hash:struct_hash;
                return ())
             global.struct_decls

@@ -470,7 +470,7 @@ module MucoreSubst = struct
 
 
   (* Substitute in pexpr *)
-  let rec subst_pexpr (s : rename_subst) (Mucore.Pexpr (loc, annots, ty, pe))
+  let rec subst_pexpr (s : rename_subst) (Mucore.Pexpr (_loc, annots, ty, pe))
     : 'ty Mucore.pexpr
     =
     (match Sys.getenv_opt "CN_DEBUG_HASH" with
@@ -541,11 +541,11 @@ module MucoreSubst = struct
       | Mucore.PEare_compatible (pe1, pe2) ->
         Mucore.PEare_compatible (subst_pexpr s pe1, subst_pexpr s pe2)
     in
-    Mucore.Pexpr (loc, annots, ty, pe')
+    Mucore.Pexpr (Locations.other "<subst>", annots, ty, pe')
 
 
   (* Substitute in expr *)
-  let rec subst_expr (s : rename_subst) (Mucore.Expr (loc, annots, ty, e))
+  let rec subst_expr (s : rename_subst) (Mucore.Expr (_loc, annots, ty, e))
     : 'ty Mucore.expr
     =
     let e' =
@@ -569,7 +569,7 @@ module MucoreSubst = struct
       | Mucore.CN_progs (stmts, progs) -> Mucore.CN_progs (stmts, progs)
       (* Skip - complex *)
     in
-    Mucore.Expr (loc, annots, ty, e')
+    Mucore.Expr (Locations.other "<subst>", annots, ty, e')
 
 
   (* Apply a list of renames in sequence *)
@@ -712,6 +712,8 @@ and rename_mucore_arguments_l counter (lat : 'i Mucore.arguments_l)
 let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
   : BT.t Mucore.args_and_body
   =
+  (* Canonical location for hashing - strips file path differences *)
+  let canonical_loc = Locations.other "<canonical>" in
   (* Track mappings *)
   let counter = ref 0 in
   (* Maps from original symbol to canonical symbol *)
@@ -834,12 +836,12 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
   (* Helper to rename Cnprog.t with IndexTerms payload *)
   and rename_cnprog_it (prog : IT.t Cnprog.t) : IT.t Cnprog.t =
     let rec aux = function
-      | Cnprog.Let (loc, (sym, load), rest) ->
+      | Cnprog.Let (_loc, (sym, load), rest) ->
         let sym' = canonicalize_symbol sym in
         let pointer' = rename_it load.Cnprog.pointer in
         let rest' = aux rest in
-        Cnprog.Let (loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
-      | Cnprog.Pure (loc, it) -> Cnprog.Pure (loc, rename_it it)
+        Cnprog.Let (canonical_loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
+      | Cnprog.Pure (_loc, it) -> Cnprog.Pure (canonical_loc, rename_it it)
     in
     aux prog
   (* Helper to rename Cnprog.t with Cnstatement.statement payload *)
@@ -847,12 +849,12 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
     : Cnstatement.statement Cnprog.t
     =
     let rec aux = function
-      | Cnprog.Let (loc, (sym, load), rest) ->
+      | Cnprog.Let (_loc, (sym, load), rest) ->
         let sym' = canonicalize_symbol sym in
         let pointer' = rename_it load.Cnprog.pointer in
         let rest' = aux rest in
-        Cnprog.Let (loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
-      | Cnprog.Pure (loc, stmt) ->
+        Cnprog.Let (canonical_loc, (sym', { load with Cnprog.pointer = pointer' }), rest')
+      | Cnprog.Pure (_loc, stmt) ->
         (* Use Cnstatement.subst to rename all IT.t and LC.t fields in the statement.
            We need to apply all the renamings we've collected. *)
         let stmt' =
@@ -862,7 +864,7 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
             stmt
             (Hashtbl.fold (fun k v acc -> (k, v) :: acc) symbol_map [])
         in
-        Cnprog.Pure (loc, stmt')
+        Cnprog.Pure (canonical_loc, stmt')
     in
     aux prog
   and rename_request = function
@@ -903,7 +905,7 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
   and rename_paction (Mucore.Paction (p, act)) =
     let act' = rename_action act in
     Mucore.Paction (p, act')
-  and rename_action (Mucore.Action (loc, act)) =
+  and rename_action (Mucore.Action (_loc, act)) =
     let open Mucore in
     let act' =
       match act with
@@ -931,8 +933,8 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | LinuxRMW (actype, pe1, pe2, mo) ->
         LinuxRMW (actype, rename_pexpr pe1, rename_pexpr pe2, mo)
     in
-    Mucore.Action (loc, act')
-  and rename_expr (Mucore.Expr (loc, annots, ty, e)) =
+    Mucore.Action (canonical_loc, act')
+  and rename_expr (Mucore.Expr (_loc, annots, ty, e)) =
     let e' =
       match e with
       | Mucore.Epure pe -> Mucore.Epure (rename_pexpr pe)
@@ -945,10 +947,10 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
         let opt' =
           match opt with
           | None -> None
-          | Some (loc, ghost_progs) ->
+          | Some (_loc, ghost_progs) ->
             (* Rename IndexTerms in ghost argument programs *)
             let ghost_progs' = List.map rename_cnprog_it ghost_progs in
-            Some (loc, ghost_progs')
+            Some (canonical_loc, ghost_progs')
         in
         Mucore.Eccall (act, rename_pexpr pe, List.map rename_pexpr pes, opt')
       | Mucore.Eproc (name, pes) -> Mucore.Eproc (name, List.map rename_pexpr pes)
@@ -970,8 +972,8 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
         let progs' = List.map rename_cnprog_stmt progs in
         Mucore.CN_progs (stmts, progs')
     in
-    Mucore.Expr (loc, annots, ty, e')
-  and rename_pexpr (Mucore.Pexpr (loc, annots, ty, pe)) =
+    Mucore.Expr (canonical_loc, annots, ty, e')
+  and rename_pexpr (Mucore.Pexpr (_loc, annots, ty, pe)) =
     let pe' =
       match pe with
       | Mucore.PEsym sym ->
@@ -1015,8 +1017,8 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.PEare_compatible (pe1, pe2) ->
         Mucore.PEare_compatible (rename_pexpr pe1, rename_pexpr pe2)
     in
-    Mucore.Pexpr (loc, annots, ty, pe')
-  and rename_pattern (Mucore.Pattern (loc, annots, ty, p)) =
+    Mucore.Pexpr (canonical_loc, annots, ty, pe')
+  and rename_pattern (Mucore.Pattern (_loc, annots, ty, p)) =
     let p' =
       match p with
       | Mucore.CaseBase (Some sym, cbt) ->
@@ -1025,6 +1027,6 @@ let rename_args_and_body (args_and_body : BT.t Mucore.args_and_body)
       | Mucore.CaseCtor (ctor, pats) ->
         Mucore.CaseCtor (ctor, List.map rename_pattern pats)
     in
-    Mucore.Pattern (loc, annots, ty, p')
+    Mucore.Pattern (canonical_loc, annots, ty, p')
   in
   rename_arguments args_and_body
