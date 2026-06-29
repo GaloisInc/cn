@@ -566,6 +566,35 @@ let pp_message = function
       let context, _log = ctxt in
       let model_val, _quantifier = model in
       let evaluate it = try Solver.eval model_val it with _ -> None in
+      (* Extract bindings from a pattern match *)
+      let rec extract_pattern_bindings
+        : 'bt. 'bt IT.pattern -> IT.t -> (Sym.t * IT.t) list
+        =
+        fun pat value ->
+        match pat with
+        | IT.Pat (IT.PConstructor (_ctor, field_pats), _, _) ->
+          (* Constructor pattern - extract fields from constructor value *)
+          (match IT.get_term value with
+           | IT.Constructor (_ctor_sym, field_values) ->
+             (* Match up pattern fields with value fields and recurse *)
+             List.concat_map
+               (fun (field_id, field_pat) ->
+                  (* Find the corresponding field value - field_values is a list of (Id.t * value) *)
+                  match
+                    List.find_opt (fun (fid, _fval) -> Id.equal fid field_id) field_values
+                  with
+                  | Some (_fid, field_value) ->
+                    extract_pattern_bindings field_pat field_value
+                  | None -> [])
+               field_pats
+           | _ -> [])
+        | IT.Pat (IT.PSym sym, _, _) ->
+          (* Variable binding - bind symbol to value *)
+          [ (sym, value) ]
+        | IT.Pat (IT.PWild, _, _) ->
+          (* Wildcard - no bindings *)
+          []
+      in
       (* Depth-first search: print as we explore, find first atomic failure *)
       let rec explore_failure ~(depth : int) ~(subst : (Sym.t * IT.t) list) (it : IT.t) =
         let (IT.IT (term, _bt, _loc)) = it in
@@ -690,32 +719,188 @@ let pp_message = function
                    branches
                in
                (match matching_branch with
-                | Some (_pat, body) ->
+                | Some (pat, body) ->
                   prerr_endline (prefix ^ "Match: exploring matching branch");
-                  explore_failure ~depth:(depth + 1) ~subst body
+                  (* Extract pattern bindings and add to substitution *)
+                  let pat_bindings = extract_pattern_bindings pat scrutinee_simp in
+                  prerr_endline
+                    (prefix
+                     ^ "  Extracted "
+                     ^ string_of_int (List.length pat_bindings)
+                     ^ " bindings from pattern");
+                  List.iter
+                    (fun (sym, value) ->
+                       prerr_endline
+                         (prefix
+                          ^ "    "
+                          ^ Sym.pp_string sym
+                          ^ " = "
+                          ^ Pp.plain (IT.pp value)))
+                    pat_bindings;
+                  let new_subst = pat_bindings @ subst in
+                  explore_failure ~depth:(depth + 1) ~subst:new_subst body
                 | None ->
                   prerr_endline (prefix ^ "Match: no matching branch found");
                   None)
              | _ ->
-               (* Scrutinee is not a concrete constructor - treat whole match as atomic *)
-               prerr_endline (prefix ^ "Match scrutinee is not concrete");
-               let it_subst =
-                 match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
-               in
-               (match evaluate it_subst with
-                | Some (IT.IT (Const (Bool false), _, _)) ->
-                  prerr_endline (prefix ^ "Match evaluates to FALSE");
-                  Some it
-                | Some (IT.IT (Const (Bool true), _, _)) ->
-                  prerr_endline (prefix ^ "Match evaluates to TRUE");
-                  None
-                | _ ->
+               (* Scrutinee is not a concrete constructor - try evaluating it in the model *)
+               prerr_endline
+                 (prefix ^ "Match scrutinee is not concrete, evaluating in model");
+               (match evaluate scrutinee_simp with
+                | Some evaluated_scrutinee ->
                   prerr_endline
                     (prefix
-                     ^ "Match unknown ("
-                     ^ string_of_int (List.length branches)
-                     ^ " branches)");
-                  None))
+                     ^ "Match scrutinee evaluates to: "
+                     ^ Pp.plain (IT.pp evaluated_scrutinee));
+                  (* Check if the evaluated scrutinee is a constructor *)
+                  (match IT.get_term evaluated_scrutinee with
+                   | IT.Constructor (ctor, _args) ->
+                     prerr_endline
+                       (prefix
+                        ^ "Evaluated scrutinee is constructor: "
+                        ^ Pp.plain (Sym.pp ctor));
+                     let matching_branch =
+                       List.find_opt
+                         (fun (pat, _body) ->
+                            match pat with
+                            | IT.Pat (IT.PConstructor (pat_ctor, _), _, _) ->
+                              Sym.equal ctor pat_ctor
+                            | IT.Pat (IT.PWild, _, _) -> true
+                            | _ -> false)
+                         branches
+                     in
+                     (match matching_branch with
+                      | Some (pat, body) ->
+                        prerr_endline
+                          (prefix ^ "Match: exploring matching branch (from model)");
+                        (* Extract pattern bindings from evaluated scrutinee *)
+                        let pat_bindings =
+                          extract_pattern_bindings pat evaluated_scrutinee
+                        in
+                        prerr_endline
+                          (prefix
+                           ^ "  Extracted "
+                           ^ string_of_int (List.length pat_bindings)
+                           ^ " bindings from pattern (from model)");
+                        List.iter
+                          (fun (sym, value) ->
+                             prerr_endline
+                               (prefix
+                                ^ "    "
+                                ^ Sym.pp_string sym
+                                ^ " = "
+                                ^ Pp.plain (IT.pp value)))
+                          pat_bindings;
+                        let new_subst = pat_bindings @ subst in
+                        explore_failure ~depth:(depth + 1) ~subst:new_subst body
+                      | None ->
+                        prerr_endline
+                          (prefix ^ "Match: no matching branch found (from model)");
+                        None)
+                   | _ ->
+                     (* Still not a constructor - fall back to evaluating whole match *)
+                     prerr_endline (prefix ^ "Evaluated scrutinee still not a constructor");
+                     let it_subst =
+                       match subst with
+                       | [] -> it
+                       | _ -> IT.subst (IT.make_subst subst) it
+                     in
+                     (match evaluate it_subst with
+                      | Some (IT.IT (Const (Bool false), _, _)) ->
+                        prerr_endline (prefix ^ "Match evaluates to FALSE");
+                        Some it
+                      | Some (IT.IT (Const (Bool true), _, _)) ->
+                        prerr_endline (prefix ^ "Match evaluates to TRUE");
+                        None
+                      | _ ->
+                        prerr_endline
+                          (prefix
+                           ^ "Match unknown ("
+                           ^ string_of_int (List.length branches)
+                           ^ " branches)");
+                        None))
+                | None ->
+                  (* Couldn't evaluate scrutinee - dump detailed info and fall back *)
+                  prerr_endline (prefix ^ "Could not evaluate scrutinee in model");
+                  prerr_endline (prefix ^ "Scrutinee AST structure:");
+                  prerr_endline (prefix ^ "  " ^ Pp.plain (IT.pp scrutinee_simp));
+                  let (IT.IT (scrut_term, scrut_bt, _scrut_loc)) = scrutinee_simp in
+                  prerr_endline
+                    (prefix
+                     ^ "  Term: "
+                     ^
+                     match scrut_term with
+                     | IT.Sym _ -> "Sym"
+                     | IT.Apply _ -> "Apply"
+                     | IT.Let _ -> "Let"
+                     | IT.Constructor _ -> "Constructor"
+                     | IT.Match _ -> "Match"
+                     | IT.Const _ -> "Const"
+                     | IT.Unop _ -> "Unop"
+                     | IT.Binop _ -> "Binop"
+                     | IT.ITE _ -> "ITE"
+                     | IT.EachI _ -> "EachI"
+                     | IT.Tuple _ -> "Tuple"
+                     | IT.NthTuple _ -> "NthTuple"
+                     | IT.Struct _ -> "Struct"
+                     | IT.StructMember _ -> "StructMember"
+                     | IT.StructUpdate _ -> "StructUpdate"
+                     | IT.Record _ -> "Record"
+                     | IT.RecordMember _ -> "RecordMember"
+                     | IT.RecordUpdate _ -> "RecordUpdate"
+                     | IT.Cast _ -> "Cast"
+                     | IT.MemberShift _ -> "MemberShift"
+                     | IT.ArrayShift _ -> "ArrayShift"
+                     | IT.CopyAllocId _ -> "CopyAllocId"
+                     | IT.HasAllocId _ -> "HasAllocId"
+                     | IT.SizeOf _ -> "SizeOf"
+                     | IT.OffsetOf _ -> "OffsetOf"
+                     | IT.Nil _ -> "Nil"
+                     | IT.Cons _ -> "Cons"
+                     | IT.Head _ -> "Head"
+                     | IT.Tail _ -> "Tail"
+                     | IT.Representable _ -> "Representable"
+                     | IT.Good _ -> "Good"
+                     | IT.WrapI _ -> "WrapI"
+                     | IT.Aligned _ -> "Aligned"
+                     | IT.MapConst _ -> "MapConst"
+                     | IT.MapSet _ -> "MapSet"
+                     | IT.MapGet _ -> "MapGet"
+                     | IT.MapDef _ -> "MapDef"
+                     | IT.CN_Some _ -> "CN_Some"
+                     | IT.CN_None _ -> "CN_None"
+                     | IT.IsSome _ -> "IsSome"
+                     | IT.GetOpt _ -> "GetOpt");
+                  prerr_endline
+                    (prefix ^ "  Base type: " ^ Pp.plain (BaseTypes.pp scrut_bt));
+                  prerr_endline (prefix ^ "Match branches:");
+                  List.iteri
+                    (fun i (pat, branch_body) ->
+                       prerr_endline
+                         (prefix
+                          ^ "  Branch "
+                          ^ string_of_int i
+                          ^ ": "
+                          ^ Pp.plain (IT.pp_pattern pat));
+                       prerr_endline (prefix ^ "    Body: " ^ Pp.plain (IT.pp branch_body)))
+                    branches;
+                  let it_subst =
+                    match subst with [] -> it | _ -> IT.subst (IT.make_subst subst) it
+                  in
+                  (match evaluate it_subst with
+                   | Some (IT.IT (Const (Bool false), _, _)) ->
+                     prerr_endline (prefix ^ "Match evaluates to FALSE");
+                     Some it
+                   | Some (IT.IT (Const (Bool true), _, _)) ->
+                     prerr_endline (prefix ^ "Match evaluates to TRUE");
+                     None
+                   | _ ->
+                     prerr_endline
+                       (prefix
+                        ^ "Match unknown ("
+                        ^ string_of_int (List.length branches)
+                        ^ " branches)");
+                     None)))
           | IT.Const (Bool false) ->
             prerr_endline (prefix ^ "Literal false");
             Some it

@@ -262,18 +262,33 @@ let state (ctxt : C.t) log model_with_q extras =
     let subterms =
       List.fold_left ITSet.union ITSet.empty [ variables; unproven; request ]
     in
-    let filtered =
+    (* Collect terms with their evaluated values.
+       When --query-cache is used with a cache hit, Solver.empty_model is passed
+       which just returns each term unchanged (no concrete values available).
+       In this case, we still want to show the terms but mark values as unknown. *)
+    let all_evaluations =
       List.filter_map
         (fun it ->
            match evaluate it with
-           | Some value when not (IT.equal value it) -> Some (it, value)
-           | Some _ -> None
+           | Some value -> Some (it, value, IT.equal value it)
            | None -> None)
         (ITSet.elements subterms)
     in
+    (* Check if we have a real model or just the empty model.
+       The empty model returns every term unchanged. *)
+    let is_empty_model = List.for_all (fun (_, _, is_eq) -> is_eq) all_evaluations in
+    let filtered =
+      if is_empty_model then
+        (* When using empty model (e.g., with --query-cache), show all terms with "?" as value *)
+        all_evaluations
+      else
+        (* With a real model, only show terms that have concrete values different from the term *)
+        List.filter (fun (_, _, is_eq) -> not is_eq) all_evaluations
+    in
     let pretty_printed =
       List.map
-        (fun (it, value) -> (it, Rp.{ term = IT.pp it; value = IT.pp value }))
+        (fun (it, value, is_eq) ->
+           (it, Rp.{ term = IT.pp it; value = (if is_eq then !^"?" else IT.pp value) }))
         filtered
     in
     let interesting, uninteresting =
@@ -289,7 +304,7 @@ let state (ctxt : C.t) log model_with_q extras =
            Rp.lab_uninteresting
            (List.map snd uninteresting)
            Rp.labeled_empty),
-      filtered )
+      List.map (fun (it, value, _) -> (it, value)) filtered )
   in
   let constraints =
     Rp.add_labeled

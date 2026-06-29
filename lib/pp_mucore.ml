@@ -549,22 +549,30 @@ module Make (Config : CONFIG) = struct
                (* Helper to strip location annotations from strings *)
                let rec strip_locs s =
                  try
-                   let start_idx = Str.search_forward (Str.regexp " (/[^:]*\\.[ch]:") s 0 in
+                   let start_idx =
+                     Str.search_forward (Str.regexp " (/[^:]*\\.[ch]:") s 0
+                   in
                    let open_paren_idx = start_idx + 1 in
                    let rec find_close idx depth =
-                     if idx >= String.length s then idx
-                     else match s.[idx] with
-                     | '(' -> find_close (idx + 1) (depth + 1)
-                     | ')' -> if depth = 1 then idx else find_close (idx + 1) (depth - 1)
-                     | _ -> find_close (idx + 1) depth
+                     if idx >= String.length s then
+                       idx
+                     else (
+                       match s.[idx] with
+                       | '(' -> find_close (idx + 1) (depth + 1)
+                       | ')' -> if depth = 1 then idx else find_close (idx + 1) (depth - 1)
+                       | _ -> find_close (idx + 1) depth)
                    in
                    let close_idx = find_close (open_paren_idx + 1) 1 in
                    let before = String.sub s 0 start_idx in
-                   let after = if close_idx + 1 < String.length s
-                               then String.sub s (close_idx + 1) (String.length s - close_idx - 1)
-                               else "" in
+                   let after =
+                     if close_idx + 1 < String.length s then
+                       String.sub s (close_idx + 1) (String.length s - close_idx - 1)
+                     else
+                       ""
+                   in
                    strip_locs (before ^ after)
-                 with Not_found -> s
+                 with
+                 | Not_found -> s
                in
                match dtree with
                | Dleaf pp ->
@@ -584,7 +592,10 @@ module Make (Config : CONFIG) = struct
                  (* Strip locations from the node label *)
                  let str = Pp.plain pp in
                  let stripped = strip_locs str in
-                 Dnode_attrs (Pp.string stripped, attrs, List.map strip_locations_from_dtree children)
+                 Dnode_attrs
+                   ( Pp.string stripped,
+                     attrs,
+                     List.map strip_locations_from_dtree children )
              in
              pp_keyword "cn_prog"
              ^^ Pp.parens

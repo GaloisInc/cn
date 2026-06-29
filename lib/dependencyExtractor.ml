@@ -251,10 +251,8 @@ let rec extract_struct_datatype_from_it (it : IT.t) : Sym.t list * Sym.t list =
         List.split (List.map (fun (_, t) -> extract_struct_datatype_from_it t) members)
       in
       (List.concat member_structs, List.concat member_datatypes)
-    | Terms.StructMember (t, _tag) ->
-      extract_struct_datatype_from_it t
-    | Terms.RecordMember (t, _) ->
-      extract_struct_datatype_from_it t
+    | Terms.StructMember (t, _tag) -> extract_struct_datatype_from_it t
+    | Terms.RecordMember (t, _) -> extract_struct_datatype_from_it t
     | Terms.StructUpdate ((t1, _tag), t2) ->
       let s1, d1 = extract_struct_datatype_from_it t1 in
       let s2, d2 = extract_struct_datatype_from_it t2 in
@@ -282,7 +280,8 @@ let rec extract_struct_datatype_from_it (it : IT.t) : Sym.t list * Sym.t list =
           cases
       in
       let case_structs, case_datatypes = List.split case_results in
-      (match_structs @ List.concat case_structs, match_datatypes @ List.concat case_datatypes)
+      ( match_structs @ List.concat case_structs,
+        match_datatypes @ List.concat case_datatypes )
     | Terms.Const _ | Terms.Sym _ -> ([], [])
     | Terms.Unop (_, t) -> extract_struct_datatype_from_it t
     | Terms.Binop (_, t1, t2) ->
@@ -338,7 +337,8 @@ let rec extract_struct_datatype_from_it (it : IT.t) : Sym.t list * Sym.t list =
       let s1, d1 = extract_struct_datatype_from_it t1 in
       let s2, d2 = extract_struct_datatype_from_it t2 in
       (s1 @ s2, d1 @ d2)
-    | Terms.CN_Some t | Terms.IsSome t | Terms.GetOpt t -> extract_struct_datatype_from_it t
+    | Terms.CN_Some t | Terms.IsSome t | Terms.GetOpt t ->
+      extract_struct_datatype_from_it t
     | Terms.Apply (_, args) ->
       let results = List.map extract_struct_datatype_from_it args in
       let structs, datatypes = List.split results in
@@ -346,9 +346,8 @@ let rec extract_struct_datatype_from_it (it : IT.t) : Sym.t list * Sym.t list =
   in
   (bt_structs @ term_structs, bt_datatypes @ term_datatypes)
 
-and extract_struct_datatype_from_pattern (IT.Pat (pat_, bt, _))
-  : Sym.t list * Sym.t list
-  =
+
+and extract_struct_datatype_from_pattern (IT.Pat (pat_, bt, _)) : Sym.t list * Sym.t list =
   let bt_structs = extract_structs_from_bt bt in
   let bt_datatypes = extract_datatypes_from_bt bt in
   let pat_structs, pat_datatypes =
