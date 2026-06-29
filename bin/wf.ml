@@ -124,11 +124,15 @@ let well_formed
                 (return ())
             in
             (* Compute current hashes for all structs and datatypes *)
-            let current_struct_hashes = Hashtbl.create (Sym.Map.cardinal global.struct_decls) in
+            let current_struct_hashes =
+              Hashtbl.create (Sym.Map.cardinal global.struct_decls)
+            in
             Sym.Map.iter
               (fun struct_sym struct_decl ->
                  let struct_hash = ContentHash.hash_struct_definition struct_decl in
-                 let canonical_name = Check.canonical_struct_name struct_sym global.struct_decls in
+                 let canonical_name =
+                   Check.canonical_struct_name struct_sym global.struct_decls
+                 in
                  Hashtbl.add current_struct_hashes canonical_name struct_hash)
               global.struct_decls;
             let current_datatype_hashes =
@@ -194,8 +198,7 @@ let well_formed
                      in
                      let reason_to_json reason =
                        match reason with
-                       | Check.NotInCache ->
-                         `Assoc [ ("type", `String "not_in_cache") ]
+                       | Check.NotInCache -> `Assoc [ ("type", `String "not_in_cache") ]
                        | Check.ContentChanged { old_hash; new_hash } ->
                          `Assoc
                            [ ("type", `String "content_changed");
@@ -245,7 +248,7 @@ let well_formed
                        ])
                 selected_funs
             in
-            (if json then (
+            if json then (
               let json_output =
                 `Assoc
                   [ ("database", `String db_path);
@@ -259,17 +262,38 @@ let well_formed
               List.iter
                 (fun result ->
                    let open Yojson.Basic.Util in
-                   let cache_status = result |> member "cache_status" |> to_string_option |> Option.value ~default:"" in
-                   let function_name = result |> member "function" |> to_string_option |> Option.value ~default:"" in
-                   let location = result |> member "location" |> to_string_option |> Option.value ~default:"" in
-                   let previous_status = result |> member "previous_status" |> to_string_option |> Option.value ~default:"" in
+                   let cache_status =
+                     result
+                     |> member "cache_status"
+                     |> to_string_option
+                     |> Option.value ~default:""
+                   in
+                   let function_name =
+                     result
+                     |> member "function"
+                     |> to_string_option
+                     |> Option.value ~default:""
+                   in
+                   let location =
+                     result
+                     |> member "location"
+                     |> to_string_option
+                     |> Option.value ~default:""
+                   in
+                   let previous_status =
+                     result
+                     |> member "previous_status"
+                     |> to_string_option
+                     |> Option.value ~default:""
+                   in
                    if String.equal cache_status "cached" then
-                       Printf.printf
-                         "[CACHED] %s (%s)\n  Location: %s\n  Action: Will skip \
-                          verification\n\n"
-                         function_name
-                         previous_status
-                         location
+                     Printf.printf
+                       "[CACHED] %s (%s)\n\
+                       \  Location: %s\n\
+                       \  Action: Will skip verification\n\n"
+                       function_name
+                       previous_status
+                       location
                    else (
                      Printf.printf
                        "[STALE] %s (was: %s)\n  Location: %s\n  Reasons:\n"
@@ -279,83 +303,98 @@ let well_formed
                      let reasons = result |> member "reasons" |> to_list in
                      List.iter
                        (fun reason ->
-                          let rtype = reason |> member "type" |> to_string_option |> Option.value ~default:"" in
+                          let rtype =
+                            reason
+                            |> member "type"
+                            |> to_string_option
+                            |> Option.value ~default:""
+                          in
                           match rtype with
-                           | "not_in_cache" -> Printf.printf "    - Not in cache\n"
-                           | "content_changed" ->
-                             let old_h =
-                               reason
-                               |> member "old_hash"
-                               |> to_string_option
-                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
-                               |> Option.value ~default:""
-                             in
-                             let new_h =
-                               reason
-                               |> member "new_hash"
-                               |> to_string_option
-                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
-                               |> Option.value ~default:""
-                             in
-                             Printf.printf
-                               "    - Content changed (old: %s, new: %s)\n"
-                               old_h
-                               new_h
-                           | "spec_changed" ->
-                             let old_h =
-                               reason
-                               |> member "old_hash"
-                               |> to_string_option
-                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
-                               |> Option.value ~default:""
-                             in
-                             let new_h =
-                               reason
-                               |> member "new_hash"
-                               |> to_string_option
-                               |> Option.map (fun s -> String.sub s 0 (min 8 (String.length s)))
-                               |> Option.value ~default:""
-                             in
-                             Printf.printf "    - Spec changed (old: %s, new: %s)\n" old_h new_h
-                           | "predicate_changed" ->
-                             let preds =
-                               reason |> member "predicates" |> to_list |> filter_string
-                             in
-                             Printf.printf
-                               "    - Predicate dependencies changed: %s\n"
-                               (String.concat ", " preds)
-                           | "struct_changed" ->
-                             let structs =
-                               reason |> member "structs" |> to_list |> filter_string
-                             in
-                             Printf.printf
-                               "    - Struct dependencies changed: %s\n"
-                               (String.concat ", " structs)
-                           | "datatype_changed" ->
-                             let datatypes =
-                               reason |> member "datatypes" |> to_list |> filter_string
-                             in
-                             Printf.printf
-                               "    - Datatype dependencies changed: %s\n"
-                               (String.concat ", " datatypes)
-                           | "callee_spec_changed" ->
-                             let callees =
-                               reason |> member "callees" |> to_list |> filter_string
-                             in
-                             Printf.printf
-                               "    - Called function specs changed: %s\n"
-                               (String.concat ", " callees)
-                           | "logical_function_changed" ->
-                             let lfs =
-                               reason |> member "logical_functions" |> to_list |> filter_string
-                             in
-                             Printf.printf
-                               "    - Logical function dependencies changed: %s\n"
-                               (String.concat ", " lfs)
-                           | _ -> ())
+                          | "not_in_cache" -> Printf.printf "    - Not in cache\n"
+                          | "content_changed" ->
+                            let old_h =
+                              reason
+                              |> member "old_hash"
+                              |> to_string_option
+                              |> Option.map (fun s ->
+                                String.sub s 0 (min 8 (String.length s)))
+                              |> Option.value ~default:""
+                            in
+                            let new_h =
+                              reason
+                              |> member "new_hash"
+                              |> to_string_option
+                              |> Option.map (fun s ->
+                                String.sub s 0 (min 8 (String.length s)))
+                              |> Option.value ~default:""
+                            in
+                            Printf.printf
+                              "    - Content changed (old: %s, new: %s)\n"
+                              old_h
+                              new_h
+                          | "spec_changed" ->
+                            let old_h =
+                              reason
+                              |> member "old_hash"
+                              |> to_string_option
+                              |> Option.map (fun s ->
+                                String.sub s 0 (min 8 (String.length s)))
+                              |> Option.value ~default:""
+                            in
+                            let new_h =
+                              reason
+                              |> member "new_hash"
+                              |> to_string_option
+                              |> Option.map (fun s ->
+                                String.sub s 0 (min 8 (String.length s)))
+                              |> Option.value ~default:""
+                            in
+                            Printf.printf
+                              "    - Spec changed (old: %s, new: %s)\n"
+                              old_h
+                              new_h
+                          | "predicate_changed" ->
+                            let preds =
+                              reason |> member "predicates" |> to_list |> filter_string
+                            in
+                            Printf.printf
+                              "    - Predicate dependencies changed: %s\n"
+                              (String.concat ", " preds)
+                          | "struct_changed" ->
+                            let structs =
+                              reason |> member "structs" |> to_list |> filter_string
+                            in
+                            Printf.printf
+                              "    - Struct dependencies changed: %s\n"
+                              (String.concat ", " structs)
+                          | "datatype_changed" ->
+                            let datatypes =
+                              reason |> member "datatypes" |> to_list |> filter_string
+                            in
+                            Printf.printf
+                              "    - Datatype dependencies changed: %s\n"
+                              (String.concat ", " datatypes)
+                          | "callee_spec_changed" ->
+                            let callees =
+                              reason |> member "callees" |> to_list |> filter_string
+                            in
+                            Printf.printf
+                              "    - Called function specs changed: %s\n"
+                              (String.concat ", " callees)
+                          | "logical_function_changed" ->
+                            let lfs =
+                              reason
+                              |> member "logical_functions"
+                              |> to_list
+                              |> filter_string
+                            in
+                            Printf.printf
+                              "    - Logical function dependencies changed: %s\n"
+                              (String.concat ", " lfs)
+                          | _ -> ())
                        reasons;
                      Printf.printf "  Action: Will re-verify\n\n"))
-                results);
+                results;
             VerificationDb.close_db db |> ignore;
             return ())
         in

@@ -2864,20 +2864,21 @@ let select_functions
 
 (** Canonicalize struct name for caching. For unnamed structs (like __cerbty_unnamed_tag_NNNN),
     use the content hash as the canonical name to avoid non-deterministic numbering. *)
-let canonical_struct_name (struct_sym : Sym.t) (struct_decls : Memory.struct_decl Sym.Map.t)
+let canonical_struct_name
+      (struct_sym : Sym.t)
+      (struct_decls : Memory.struct_decl Sym.Map.t)
   : string
   =
   let sym_str = Sym.pp_string struct_sym in
   (* Check if this is an unnamed tag with non-deterministic numbering *)
-  if Str.string_match (Str.regexp "^__cerbty_unnamed_tag_[0-9]+$") sym_str 0 then
+  if Str.string_match (Str.regexp "^__cerbty_unnamed_tag_[0-9]+$") sym_str 0 then (
     (* Unnamed struct - use content hash as canonical name *)
-    match Sym.Map.find_opt struct_sym struct_decls with
-    | Some struct_decl ->
-      let hash = ContentHash.hash_struct_definition struct_decl in
-      "__cerbty_unnamed_tag_hash_" ^ hash
-    | None -> sym_str (* Shouldn't happen, but fallback to original name *)
-  else
-    (* Named struct - use symbol name as-is *)
+      match Sym.Map.find_opt struct_sym struct_decls with
+      | Some struct_decl ->
+        let hash = ContentHash.hash_struct_definition struct_decl in
+        "__cerbty_unnamed_tag_hash_" ^ hash
+      | None -> sym_str (* Shouldn't happen, but fallback to original name *))
+  else (* Named struct - use symbol name as-is *)
     sym_str
 
 
@@ -3155,7 +3156,9 @@ let check_c_functions_all
            in
            List.iter
              (fun struct_sym ->
-                let canonical_name = canonical_struct_name struct_sym global.struct_decls in
+                let canonical_name =
+                  canonical_struct_name struct_sym global.struct_decls
+                in
                 VerificationDb.record_struct_usage
                   db_handle
                   ~function_sym:sym_str
@@ -3415,9 +3418,7 @@ let check_function_staleness
   : staleness_reason list option
   =
   let debug =
-    match Sys.getenv_opt "CN_DEBUG_CACHE" with
-    | Some "1" -> true
-    | _ -> false
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false
   in
   match VerificationDb.get_function_status db_handle sym_str with
   | None ->
@@ -3431,7 +3432,13 @@ let check_function_staleness
       String.compare record.VerificationDb.content_hash current_content <> 0
     in
     if debug then
-      Printf.eprintf "DEBUG: Checking %s\n  Stored content: %s\n  Current content: %s\n  Stored spec: %s\n  Current spec: %s\n%!"
+      Printf.eprintf
+        "DEBUG: Checking %s\n\
+        \  Stored content: %s\n\
+        \  Current content: %s\n\
+        \  Stored spec: %s\n\
+        \  Current spec: %s\n\
+         %!"
         sym_str
         record.VerificationDb.content_hash
         current_content
@@ -3790,7 +3797,9 @@ let time_check_c_functions
             (return ())
         in
         (* Compute current hashes for all structs and datatypes *)
-        let current_struct_hashes = Hashtbl.create (Sym.Map.cardinal global.struct_decls) in
+        let current_struct_hashes =
+          Hashtbl.create (Sym.Map.cardinal global.struct_decls)
+        in
         Sym.Map.iter
           (fun struct_sym struct_decl ->
              let struct_hash = ContentHash.hash_struct_definition struct_decl in
@@ -4126,7 +4135,9 @@ let time_check_c_functions
             (fun struct_tag struct_decl acc ->
                let@ () = acc in
                let struct_hash = ContentHash.hash_struct_definition struct_decl in
-               let canonical_name = canonical_struct_name struct_tag global.struct_decls in
+               let canonical_name =
+                 canonical_struct_name struct_tag global.struct_decls
+               in
                VerificationDb.record_struct_definition
                  db_handle
                  ~name:canonical_name

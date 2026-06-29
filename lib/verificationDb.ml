@@ -55,8 +55,7 @@ let init_schema (db : db_handle) : unit =
   (* Enable WAL mode for better concurrent access *)
   (match exec db "PRAGMA journal_mode = WAL" with
    | Rc.OK -> ()
-   | rc ->
-     Printf.eprintf "Warning: Failed to enable WAL mode: %s\n%!" (Rc.to_string rc));
+   | rc -> Printf.eprintf "Warning: Failed to enable WAL mode: %s\n%!" (Rc.to_string rc));
   let schema =
     [ {|CREATE TABLE IF NOT EXISTS schema_version (
         version INTEGER PRIMARY KEY
@@ -326,9 +325,7 @@ let record_function_verified
   |}
   in
   let debug =
-    match Sys.getenv_opt "CN_DEBUG_CACHE" with
-    | Some "1" -> true
-    | _ -> false
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false
   in
   try
     let stmt = prepare db sql in
@@ -347,11 +344,17 @@ let record_function_verified
       ];
     ignore (finalize stmt);
     if debug then
-      Printf.eprintf "DEBUG: Recorded function %s (content: %s, spec: %s)\n%!"
-        sym content_hash spec_hash
+      Printf.eprintf
+        "DEBUG: Recorded function %s (content: %s, spec: %s)\n%!"
+        sym
+        content_hash
+        spec_hash
   with
   | exn ->
-    Printf.eprintf "ERROR: Failed to record function %s: %s\n%!" sym (Printexc.to_string exn);
+    Printf.eprintf
+      "ERROR: Failed to record function %s: %s\n%!"
+      sym
+      (Printexc.to_string exn);
     failwith
       (Printf.sprintf "Failed to record function verified: %s" (Printexc.to_string exn))
 
@@ -740,7 +743,9 @@ let clear_function_dependencies (db : db_handle) ~(function_sym : string) : unit
     ]
   in
   (* Debug: Show what we're clearing *)
-  let debug = match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false in
+  let debug =
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false
+  in
   if debug then Printf.eprintf "Clearing dependencies for %s\n%!" function_sym;
   List.iter
     (fun table ->
@@ -1704,8 +1709,7 @@ let merge_from_db (db : db_handle) (source_path : string)
     let struct_stmt =
       prepare
         db
-        "INSERT OR IGNORE INTO struct_definitions SELECT * FROM \
-         source.struct_definitions"
+        "INSERT OR IGNORE INTO struct_definitions SELECT * FROM source.struct_definitions"
     in
     exec_stmt struct_stmt [];
     ignore (finalize struct_stmt);

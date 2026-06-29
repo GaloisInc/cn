@@ -621,32 +621,33 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
            Pp_mucore.Basic.pp_expr None body
            (* Include labels (loop bodies, return points, etc) *)
            (* IMPORTANT: Sort labels by symbol name for deterministic output *)
-           ^^^ let sorted_labels =
-                 Pmap.bindings_list labels
-                 |> List.sort (fun (sym1, _) (sym2, _) ->
-                        String.compare (Sym.pp_string sym1) (Sym.pp_string sym2))
-               in
-               List.fold_left
-                 (fun acc (sym, def) ->
-                    acc
-                    ^^^
-                    match def with
-                    | Mucore.Loop (_loc, loop_args, _annots, _label_spec, _info) ->
-                      (* Include loop body - loop_args wraps just the expr, not (expr, labels, rt) *)
-                      Pp.string "loop_"
-                      ^^^ Pp.string (Sym.pp_string sym)
-                      ^^^ Pp.string "_body{"
-                      ^^^ Pp_mucore.Basic.pp_arguments
-                            (fun loop_body_expr ->
-                               (* Print the loop body expression - this includes asserts, split_case, etc *)
-                               Pp_mucore.Basic.pp_expr None loop_body_expr)
-                            loop_args
-                      ^^^ Pp.string "}"
-                    | _ ->
-                      (* Non-loop labels (Return, Non_inlined) don't need special handling *)
-                      Pp.empty)
-                 Pp.empty
-                 sorted_labels
+           ^^^
+           let sorted_labels =
+             Pmap.bindings_list labels
+             |> List.sort (fun (sym1, _) (sym2, _) ->
+               String.compare (Sym.pp_string sym1) (Sym.pp_string sym2))
+           in
+           List.fold_left
+             (fun acc (sym, def) ->
+                acc
+                ^^^
+                match def with
+                | Mucore.Loop (_loc, loop_args, _annots, _label_spec, _info) ->
+                  (* Include loop body - loop_args wraps just the expr, not (expr, labels, rt) *)
+                  Pp.string "loop_"
+                  ^^^ Pp.string (Sym.pp_string sym)
+                  ^^^ Pp.string "_body{"
+                  ^^^ Pp_mucore.Basic.pp_arguments
+                        (fun loop_body_expr ->
+                           (* Print the loop body expression - this includes asserts, split_case, etc *)
+                           Pp_mucore.Basic.pp_expr None loop_body_expr)
+                        loop_args
+                  ^^^ Pp.string "}"
+                | _ ->
+                  (* Non-loop labels (Return, Non_inlined) don't need special handling *)
+                  Pp.empty)
+             Pp.empty
+             sorted_labels
            (* Include return type *)
            ^^^ ReturnTypes.pp rt)
         args_and_body_renamed
@@ -663,7 +664,7 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
     (* Normalize file paths: remove ./ and redundant path components *)
     let normalize_paths s =
       (* Remove ./ from paths *)
-      let s = Str.global_replace (Str.regexp "\\./" ) "" s in
+      let s = Str.global_replace (Str.regexp "\\./") "" s in
       (* Remove leading ./ *)
       let s = Str.global_replace (Str.regexp "^\\./") "" s in
       s
@@ -692,18 +693,22 @@ let hash_args_and_body (args_and_body : BT.t Mucore.args_and_body) : string =
      | Some "1" -> Printf.eprintf "=== Hash: %s ===\n%!" hash
      | _ -> ());
     let debug_cache =
-      match Sys.getenv_opt "CN_DEBUG_CACHE" with
-      | Some "1" -> true
-      | _ -> false
+      match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false
     in
     if debug_cache then (
-      Printf.eprintf "DEBUG: Content hash for function -> %s\n  Length: %d bytes\n  First 200 chars: %s\n  Last 200 chars: %s\n%!"
+      Printf.eprintf
+        "DEBUG: Content hash for function -> %s\n\
+        \  Length: %d bytes\n\
+        \  First 200 chars: %s\n\
+        \  Last 200 chars: %s\n\
+         %!"
         hash
         (String.length normalized)
         (String.sub normalized 0 (min 200 (String.length normalized)))
         (if String.length normalized > 200 then
-          String.sub normalized (String.length normalized - 200) 200
-        else "");
+           String.sub normalized (String.length normalized - 200) 200
+         else
+           "");
       (* Optionally dump full normalized string to file for diffing *)
       match Sys.getenv_opt "CN_DEBUG_HASH_DUMP" with
       | Some filename ->
@@ -741,12 +746,11 @@ let hash_lemma (lemma_typ : ArgumentTypes.lemmat) : string =
   let lemma_str = pp_to_string (ArgumentTypes.pp LogicalReturnTypes.pp lemma_renamed) in
   let hash = Digest.string lemma_str |> Digest.to_hex in
   let debug =
-    match Sys.getenv_opt "CN_DEBUG_CACHE" with
-    | Some "1" -> true
-    | _ -> false
+    match Sys.getenv_opt "CN_DEBUG_CACHE" with Some "1" -> true | _ -> false
   in
   if debug then
-    Printf.eprintf "DEBUG: Hashing lemma -> %s\n  Content (first 200 chars): %s\n%!"
+    Printf.eprintf
+      "DEBUG: Hashing lemma -> %s\n  Content (first 200 chars): %s\n%!"
       hash
       (String.sub lemma_str 0 (min 200 (String.length lemma_str)));
   hash
