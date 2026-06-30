@@ -1754,7 +1754,11 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
         push solver;
         let { qs; expr; extra } = reduce_goal assumptions lc in
         List.iter (declare_variable solver) qs;
-        List.iter (fun t -> assume solver (T t)) (not_ expr loc :: extra);
+        (* Simplify the negated expression to eliminate double negations *)
+        let negated_expr =
+          Simplify.IndexTerms.simp simp_ctxt_with_assumptions (not_ expr loc)
+        in
+        List.iter (fun t -> assume solver (T t)) (negated_expr :: extra);
         qs)
     in
     (* Get all commands including incremental state from previous frames *)

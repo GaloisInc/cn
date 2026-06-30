@@ -501,6 +501,9 @@ module IndexTerms = struct
          | IT (Const (Bool false), _, _), _ -> bool_ false the_loc
          | _, IT (Const (Bool false), _, _) -> bool_ false the_loc
          | _ when IT.equal it1 it2 -> it1
+         (* Detect (and X (not X)) or (and (not X) X) - always false *)
+         | IT (Unop (Not, x), _, _), _ when IT.equal x it2 -> bool_ false the_loc
+         | _, IT (Unop (Not, x), _, _) when IT.equal x it1 -> bool_ false the_loc
          | _ -> IT (Binop (And, it1, it2), the_bt, the_loc))
       | Binop (Or, it1, it2) ->
         let it1 = aux it1 in

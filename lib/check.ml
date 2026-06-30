@@ -2891,7 +2891,8 @@ let check_c_function ((fsym, (loc, args_and_body)) : c_function) : unit m =
   current_function_calls := [];
   Dependencies.reset_logical_function_uses ();
   Dependencies.reset_lemma_uses ();
-  check_procedure loc fsym args_and_body
+  let fname = Sym.pp_string fsym in
+  Timing.time_phase fname (fun () -> check_procedure loc fsym args_and_body)
 
 
 (** Check the provided C functions. The first failed check will short-circuit
@@ -3705,9 +3706,11 @@ let time_check_c_functions
   let _ = db in
   (* Silence unused warning for now - will use later *)
   Cerb_debug.begin_csv_timing () (*type checking functions*);
-  let@ () = init_solver () in
+  let@ () = Timing.time_phase "Solver_init" init_solver in
   let here = Locations.other __LOC__ in
-  let@ () = add_cs here global_var_constraints in
+  let@ () =
+    Timing.time_phase "Global_constraints" (fun () -> add_cs here global_var_constraints)
+  in
   (* Run consistency checking pass first if requested *)
   let@ consistency_errors =
     if check_consistency then
