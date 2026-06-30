@@ -1394,6 +1394,11 @@ module BaseTyping = struct
 
   module Mu = Mucore
 
+  (* Memoization caches for type inference - eliminates redundant DAG traversal *)
+  let infer_expr_cache : (int, BT.t Mu.expr) Hashtbl.t = Hashtbl.create 1000
+
+  let infer_pexpr_cache : (int, BT.t Mu.pexpr) Hashtbl.t = Hashtbl.create 1000
+
   let rec check_and_bind_pattern bt = function
     | Mu.Pattern (loc, anns, _, p_) ->
       let@ p_ = check_and_bind_pattern_ bt loc p_ in
@@ -1642,198 +1647,209 @@ module BaseTyping = struct
   let rec infer_pexpr : 'TY. 'TY Mu.pexpr -> BT.t Mu.pexpr m =
     fun pe ->
     let open Mu in
-    Pp.debug 22 (lazy (Pp.item __FUNCTION__ (Pp_mucore_ast.pp_pexpr pe)));
     let (Pexpr (loc, annots, _, pe_)) = pe in
-    match integer_annot annots with
-    | Some ity ->
-      check_pexpr (Memory.bt_of_sct (Integer ity)) (remove_integer_annot_pexpr pe)
-    | _ ->
-      let todo () =
-        Pp.error loc !^"TODO: WellTyped infer_pexpr" [ Pp_mucore_ast.pp_pexpr pe ];
-        failwith "TODO: WellTyped infer_pexpr"
-      in
-      let@ bty, pe_ =
-        match pe_ with
-        | PEsym sym ->
-          let@ l_elem = get_a sym in
-          return (Context.bt_of l_elem, PEsym sym)
-        | PEval v ->
-          let@ v = infer_value loc v in
-          let bt = bt_of_value v in
-          return (bt, PEval v)
-        | PElet (pat, pe1, pe2) ->
-          let@ pe1 = infer_pexpr pe1 in
-          pure
-            (let@ pat = check_and_bind_pattern (bt_of_pexpr pe1) pat in
-             let@ pe2 = infer_pexpr pe2 in
-             return (bt_of_pexpr pe2, PElet (pat, pe1, pe2)))
-        | PEop (op, pe1, pe2) ->
-          let@ pe1 = infer_pexpr pe1 in
-          (* Core binops are either ('a -> 'a -> bool) or ('a -> 'a -> 'a) *)
-          let@ pe2 = check_pexpr (bt_of_pexpr pe1) pe2 in
-          let casts_to_bool =
-            match op with OpEq | OpGt | OpLt | OpGe | OpLe -> true | _ -> false
+    let pexpr_id : int = Obj.magic pe |> Obj.repr |> Obj.magic in
+    (* Check cache for memoization *)
+    match Hashtbl.find_opt infer_pexpr_cache pexpr_id with
+    | Some cached -> return cached
+    | None ->
+      Pp.debug 22 (lazy (Pp.item __FUNCTION__ (Pp_mucore_ast.pp_pexpr pe)));
+      let@ result =
+        match integer_annot annots with
+        | Some ity ->
+          check_pexpr (Memory.bt_of_sct (Integer ity)) (remove_integer_annot_pexpr pe)
+        | _ ->
+          let todo () =
+            Pp.error loc !^"TODO: WellTyped infer_pexpr" [ Pp_mucore_ast.pp_pexpr pe ];
+            failwith "TODO: WellTyped infer_pexpr"
           in
-          let bt = if casts_to_bool then Bool else bt_of_pexpr pe1 in
-          return (bt, PEop (op, pe1, pe2))
-        | PEcatch_exceptional_condition (ity, op, pe1, pe2) | PEwrapI (ity, op, pe1, pe2)
-          ->
-          let@ pe1 = infer_pexpr pe1 in
-          (* Core i-binops are all ('a -> 'a -> 'a), except shifts which promote the
-             rhs *)
-          let promotes_rhs = match op with IOpShl | IOpShr -> true | _ -> false in
-          let@ pe2 =
-            if promotes_rhs then
-              let@ pe2 = infer_pexpr pe2 in
-              let@ () = ensure_bits_type (loc_of_pexpr pe2) (bt_of_pexpr pe2) in
-              return pe2
-            else
-              check_pexpr (bt_of_pexpr pe1) pe2
-          in
-          let pe_ =
+          let@ bty, pe_ =
             match pe_ with
-            | PEcatch_exceptional_condition _ ->
-              PEcatch_exceptional_condition (ity, op, pe1, pe2)
-            | PEwrapI _ -> PEwrapI (ity, op, pe1, pe2)
-            | _ -> assert false
-          in
-          return (Memory.bt_of_sct (Integer ity), pe_)
-        | PEif (c_pe, pe1, pe2) ->
-          let@ c_pe = check_pexpr Bool c_pe in
-          let@ bt, pe1, pe2 =
-            if is_undef_or_error_pexpr pe1 then
-              let@ pe2 = infer_pexpr pe2 in
-              let bt = bt_of_pexpr pe2 in
-              let@ pe1 = check_pexpr bt pe1 in
-              return (bt, pe1, pe2)
-            else
+            | PEsym sym ->
+              let@ l_elem = get_a sym in
+              return (Context.bt_of l_elem, PEsym sym)
+            | PEval v ->
+              let@ v = infer_value loc v in
+              let bt = bt_of_value v in
+              return (bt, PEval v)
+            | PElet (pat, pe1, pe2) ->
               let@ pe1 = infer_pexpr pe1 in
-              let bt = bt_of_pexpr pe1 in
-              let@ pe2 = check_pexpr bt pe2 in
-              return (bt, pe1, pe2)
-          in
-          return (bt, PEif (c_pe, pe1, pe2))
-        | PEarray_shift (pe1, ct, pe2) ->
-          let@ pe1 = infer_pexpr pe1 in
-          let@ pe2 = infer_pexpr pe2 in
-          return (Loc (), PEarray_shift (pe1, ct, pe2))
-        | PEmember_shift (pe, tag, member) ->
-          let@ pe = infer_pexpr pe in
-          return (Loc (), PEmember_shift (pe, tag, member))
-        | PEcall
-            (Sym (Symbol (_, _, SD_Id ("conv_int" | "conv_loaded_int"))), [ ct_pe; pe ])
-        | PEconv_int (ct_pe, pe) ->
-          let@ ct_pe, sct = check_pexpr_good_ctype_const ct_pe in
-          let@ pe = infer_pexpr pe in
-          let@ () = ensure_bits_type loc (Mu.bt_of_pexpr pe) in
-          let rbt = Memory.bt_of_sct sct in
-          let@ () = ensure_bits_type loc rbt in
-          let pe_ =
-            match pe_ with
-            | PEcall (f, _) -> PEcall (f, [ ct_pe; pe ])
-            | PEconv_int _ -> PEconv_int (ct_pe, pe)
-            | _ -> assert false
-          in
-          return (rbt, pe_)
-        | PEcall (Sym (Symbol (_, _, SD_Id ("conv_int" | "conv_loaded_int"))), pes) ->
-          let has = List.length pes in
-          fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
-        | PEnot pe ->
-          let@ pe = infer_pexpr pe in
-          return (Bool, PEnot pe)
-        | PEmemop (ByteFromInt, pe) ->
-          let@ pe = infer_pexpr pe in
-          let@ () = ensure_bits_type loc (bt_of_pexpr pe) in
-          return (Option MemByte, PEmemop (ByteFromInt, pe))
-        | PEmemop (IntFromByte, pe) ->
-          let@ pe = infer_pexpr pe in
-          let@ () = ensure_base_type loc ~expect:(Option MemByte) (bt_of_pexpr pe) in
-          return (Bits (Unsigned, 8), PEmemop (IntFromByte, pe))
-        | PEmemop (_, _) -> assert false
-        | PEctor (ctor, pes) -> infer_ctor ctor pes pe
-        | PEcfunction pe ->
-          let@ pe = infer_pexpr pe in
-          return (Tuple [ CType; List CType; Bool; Bool ], PEcfunction pe)
-        | PEstruct (nm, nm_pes) ->
-          let@ nm_pes =
-            ListM.mapM
-              (fun (nm, pe) ->
-                 let@ pe = infer_pexpr pe in
-                 return (nm, pe))
-              nm_pes
-          in
-          return (Struct nm, PEstruct (nm, nm_pes))
-        | PEcall
-            ((Sym (Symbol (_, _, SD_Id "is_representable_integer")) as f), [ pe; pe_ct ])
-          ->
-          let@ pe = infer_pexpr pe in
-          let@ pe_ct = check_pexpr CType pe_ct in
-          return (Bool, PEcall (f, [ pe; pe_ct ]))
-        | PEcall (Sym (Symbol (_, _, SD_Id "is_representable_integer")), pes) ->
-          let has = List.length pes in
-          fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
-        | PEcall (f, pes) ->
-          (match (f, pes) with
-           | Sym (Symbol (_, _, SD_Id "ctype_width")), _ ->
-             Pp.debug 10 (lazy (item "untypeable" (Pp_mucore_ast.pp_pexpr pe)));
-             let err = !^"untypeable expression" in
-             fail { loc; msg = Generic err [@alert "-deprecated"] }
-           | Sym (Symbol (_, _, SD_Id "params_length")), [ e ] ->
-             let@ e = check_pexpr (List CType) e in
-             return (Integer, PEcall (f, [ e ]))
-           | Sym (Symbol (_, _, SD_Id "params_length")), _ ->
-             let has = List.length pes in
-             fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 1 } }
-           | Sym (Symbol (_, _, SD_Id "params_nth")), [ e1; e2 ] ->
-             let@ e1 = check_pexpr (List CType) e1 in
-             let@ e2 = check_pexpr Integer e2 in
-             return (CType, PEcall (f, [ e1; e2 ]))
-           | Sym (Symbol (_, _, SD_Id "params_nth")), _ ->
-             let has = List.length pes in
-             fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
-           | _ ->
-             fail
-               { loc; msg = Generic !^"Unsupported Core standard library function" }
-             [@alert "-deprecated"])
-        | PEare_compatible (pe1, pe2) ->
-          let@ pe1 = check_pexpr CType pe1 in
-          let@ pe2 = check_pexpr CType pe2 in
-          return (BT.Bool, PEare_compatible (pe1, pe2))
-        | PEconstrained _ -> todo ()
-        | PEunion (tag, member, pe) ->
-          if !Sym.experimental_unions then (
-            (* todo: make this proper when CN actually supports unions *)
-            let ct = Option.get (Sctypes.of_ctype (CF.Ctype.Ctype ([], Union tag))) in
-            let@ () = WCT.is_ct loc ct in
-            let@ pe = infer_pexpr pe in
-            return (Memory.bt_of_sct ct, PEunion (tag, member, pe)))
-          else
-            fail
-              { loc; msg = Generic !^"unsupported: union types" } [@alert "-deprecated"]
-        | PEmemberof (tag, member, pe) ->
-          let@ pe = infer_pexpr pe in
-          let@ field_ct = get_struct_member_type loc tag member in
-          let@ struct_decl = get_struct_decl loc tag in
-          let result_bt =
-            match struct_decl.Memory.fam with
-            | Some fam_info when Id.equal member fam_info.Memory.member -> BT.Loc ()
-            | _ -> Memory.bt_of_sct field_ct
-          in
-          return (result_bt, PEmemberof (tag, member, pe))
-        (* reaching these cases should be prevented by the `is_unreachable` used in
+              pure
+                (let@ pat = check_and_bind_pattern (bt_of_pexpr pe1) pat in
+                 let@ pe2 = infer_pexpr pe2 in
+                 return (bt_of_pexpr pe2, PElet (pat, pe1, pe2)))
+            | PEop (op, pe1, pe2) ->
+              let@ pe1 = infer_pexpr pe1 in
+              (* Core binops are either ('a -> 'a -> bool) or ('a -> 'a -> 'a) *)
+              let@ pe2 = check_pexpr (bt_of_pexpr pe1) pe2 in
+              let casts_to_bool =
+                match op with OpEq | OpGt | OpLt | OpGe | OpLe -> true | _ -> false
+              in
+              let bt = if casts_to_bool then Bool else bt_of_pexpr pe1 in
+              return (bt, PEop (op, pe1, pe2))
+            | PEcatch_exceptional_condition (ity, op, pe1, pe2)
+            | PEwrapI (ity, op, pe1, pe2) ->
+              let@ pe1 = infer_pexpr pe1 in
+              (* Core i-binops are all ('a -> 'a -> 'a), except shifts which promote the
+             rhs *)
+              let promotes_rhs = match op with IOpShl | IOpShr -> true | _ -> false in
+              let@ pe2 =
+                if promotes_rhs then
+                  let@ pe2 = infer_pexpr pe2 in
+                  let@ () = ensure_bits_type (loc_of_pexpr pe2) (bt_of_pexpr pe2) in
+                  return pe2
+                else
+                  check_pexpr (bt_of_pexpr pe1) pe2
+              in
+              let pe_ =
+                match pe_ with
+                | PEcatch_exceptional_condition _ ->
+                  PEcatch_exceptional_condition (ity, op, pe1, pe2)
+                | PEwrapI _ -> PEwrapI (ity, op, pe1, pe2)
+                | _ -> assert false
+              in
+              return (Memory.bt_of_sct (Integer ity), pe_)
+            | PEif (c_pe, pe1, pe2) ->
+              let@ c_pe = check_pexpr Bool c_pe in
+              let@ bt, pe1, pe2 =
+                if is_undef_or_error_pexpr pe1 then
+                  let@ pe2 = infer_pexpr pe2 in
+                  let bt = bt_of_pexpr pe2 in
+                  let@ pe1 = check_pexpr bt pe1 in
+                  return (bt, pe1, pe2)
+                else
+                  let@ pe1 = infer_pexpr pe1 in
+                  let bt = bt_of_pexpr pe1 in
+                  let@ pe2 = check_pexpr bt pe2 in
+                  return (bt, pe1, pe2)
+              in
+              return (bt, PEif (c_pe, pe1, pe2))
+            | PEarray_shift (pe1, ct, pe2) ->
+              let@ pe1 = infer_pexpr pe1 in
+              let@ pe2 = infer_pexpr pe2 in
+              return (Loc (), PEarray_shift (pe1, ct, pe2))
+            | PEmember_shift (pe, tag, member) ->
+              let@ pe = infer_pexpr pe in
+              return (Loc (), PEmember_shift (pe, tag, member))
+            | PEcall
+                ( Sym (Symbol (_, _, SD_Id ("conv_int" | "conv_loaded_int"))),
+                  [ ct_pe; pe ] )
+            | PEconv_int (ct_pe, pe) ->
+              let@ ct_pe, sct = check_pexpr_good_ctype_const ct_pe in
+              let@ pe = infer_pexpr pe in
+              let@ () = ensure_bits_type loc (Mu.bt_of_pexpr pe) in
+              let rbt = Memory.bt_of_sct sct in
+              let@ () = ensure_bits_type loc rbt in
+              let pe_ =
+                match pe_ with
+                | PEcall (f, _) -> PEcall (f, [ ct_pe; pe ])
+                | PEconv_int _ -> PEconv_int (ct_pe, pe)
+                | _ -> assert false
+              in
+              return (rbt, pe_)
+            | PEcall (Sym (Symbol (_, _, SD_Id ("conv_int" | "conv_loaded_int"))), pes) ->
+              let has = List.length pes in
+              fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
+            | PEnot pe ->
+              let@ pe = infer_pexpr pe in
+              return (Bool, PEnot pe)
+            | PEmemop (ByteFromInt, pe) ->
+              let@ pe = infer_pexpr pe in
+              let@ () = ensure_bits_type loc (bt_of_pexpr pe) in
+              return (Option MemByte, PEmemop (ByteFromInt, pe))
+            | PEmemop (IntFromByte, pe) ->
+              let@ pe = infer_pexpr pe in
+              let@ () = ensure_base_type loc ~expect:(Option MemByte) (bt_of_pexpr pe) in
+              return (Bits (Unsigned, 8), PEmemop (IntFromByte, pe))
+            | PEmemop (_, _) -> assert false
+            | PEctor (ctor, pes) -> infer_ctor ctor pes pe
+            | PEcfunction pe ->
+              let@ pe = infer_pexpr pe in
+              return (Tuple [ CType; List CType; Bool; Bool ], PEcfunction pe)
+            | PEstruct (nm, nm_pes) ->
+              let@ nm_pes =
+                ListM.mapM
+                  (fun (nm, pe) ->
+                     let@ pe = infer_pexpr pe in
+                     return (nm, pe))
+                  nm_pes
+              in
+              return (Struct nm, PEstruct (nm, nm_pes))
+            | PEcall
+                ( (Sym (Symbol (_, _, SD_Id "is_representable_integer")) as f),
+                  [ pe; pe_ct ] ) ->
+              let@ pe = infer_pexpr pe in
+              let@ pe_ct = check_pexpr CType pe_ct in
+              return (Bool, PEcall (f, [ pe; pe_ct ]))
+            | PEcall (Sym (Symbol (_, _, SD_Id "is_representable_integer")), pes) ->
+              let has = List.length pes in
+              fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
+            | PEcall (f, pes) ->
+              (match (f, pes) with
+               | Sym (Symbol (_, _, SD_Id "ctype_width")), _ ->
+                 Pp.debug 10 (lazy (item "untypeable" (Pp_mucore_ast.pp_pexpr pe)));
+                 let err = !^"untypeable expression" in
+                 fail { loc; msg = Generic err [@alert "-deprecated"] }
+               | Sym (Symbol (_, _, SD_Id "params_length")), [ e ] ->
+                 let@ e = check_pexpr (List CType) e in
+                 return (Integer, PEcall (f, [ e ]))
+               | Sym (Symbol (_, _, SD_Id "params_length")), _ ->
+                 let has = List.length pes in
+                 fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 1 } }
+               | Sym (Symbol (_, _, SD_Id "params_nth")), [ e1; e2 ] ->
+                 let@ e1 = check_pexpr (List CType) e1 in
+                 let@ e2 = check_pexpr Integer e2 in
+                 return (CType, PEcall (f, [ e1; e2 ]))
+               | Sym (Symbol (_, _, SD_Id "params_nth")), _ ->
+                 let has = List.length pes in
+                 fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 2 } }
+               | _ ->
+                 fail
+                   { loc; msg = Generic !^"Unsupported Core standard library function" }
+                 [@alert "-deprecated"])
+            | PEare_compatible (pe1, pe2) ->
+              let@ pe1 = check_pexpr CType pe1 in
+              let@ pe2 = check_pexpr CType pe2 in
+              return (BT.Bool, PEare_compatible (pe1, pe2))
+            | PEconstrained _ -> todo ()
+            | PEunion (tag, member, pe) ->
+              if !Sym.experimental_unions then (
+                (* todo: make this proper when CN actually supports unions *)
+                let ct = Option.get (Sctypes.of_ctype (CF.Ctype.Ctype ([], Union tag))) in
+                let@ () = WCT.is_ct loc ct in
+                let@ pe = infer_pexpr pe in
+                return (Memory.bt_of_sct ct, PEunion (tag, member, pe)))
+              else
+                fail
+                  { loc; msg = Generic !^"unsupported: union types" }
+                [@alert "-deprecated"]
+            | PEmemberof (tag, member, pe) ->
+              let@ pe = infer_pexpr pe in
+              let@ field_ct = get_struct_member_type loc tag member in
+              let@ struct_decl = get_struct_decl loc tag in
+              let result_bt =
+                match struct_decl.Memory.fam with
+                | Some fam_info when Id.equal member fam_info.Memory.member -> BT.Loc ()
+                | _ -> Memory.bt_of_sct field_ct
+              in
+              return (result_bt, PEmemberof (tag, member, pe))
+            (* reaching these cases should be prevented by the `is_unreachable` used in
            inferring types of PEif *)
-        | PEerror (_, _) -> todo ()
-        | PEundef (loc, ub) ->
-          if !Sym.experimental_unions then
-            (* in the case of a well-formedness check when labels are not inlined
+            | PEerror (_, _) -> todo ()
+            | PEundef (loc, ub) ->
+              if !Sym.experimental_unions then
+                (* in the case of a well-formedness check when labels are not inlined
              *      run ret_label ( undef(<<UB088_reached_end_of_function>>)))
              * we may need to infer an type for PEundef, which in the absence of
              * polymorphism is arbitrarily to Unit below *)
-            return (Unit, PEundef (loc, ub))
-          else
-            todo ()
+                return (Unit, PEundef (loc, ub))
+              else
+                todo ()
+          in
+          return (Pexpr (loc, annots, bty, pe_))
       in
-      return (Pexpr (loc, annots, bty, pe_))
+      Hashtbl.add infer_pexpr_cache pexpr_id result;
+      return result
 
 
   and check_pexpr_good_ctype_const pe =
@@ -2248,235 +2264,259 @@ module BaseTyping = struct
   let rec infer_expr : 'TY. label_context -> 'TY Mu.expr -> BT.t Mu.expr m =
     fun label_context e ->
     let open Mu in
-    Pp.debug 22 (lazy (Pp.item __FUNCTION__ (Pp_mucore_ast.pp_expr e)));
     let (Expr (loc, annots, _, e_)) = e in
-    match integer_annot annots with
-    | Some ity ->
-      check_expr
-        label_context
-        (Memory.bt_of_sct (Integer ity))
-        (remove_integer_annot_expr e)
-    | _ ->
-      let todo () =
-        Pp.error loc !^"TODO: WellTyped infer_expr" [ Pp_mucore_ast.pp_expr e ];
-        failwith "TODO: WellTyped infer_expr"
-      in
-      let@ bty, e_ =
-        match e_ with
-        | Epure pe ->
-          let@ pe = infer_pexpr pe in
-          return (bt_of_pexpr pe, Epure pe)
-        | Ememop (((PtrEq | PtrNe | PtrLt | PtrGt | PtrLe | PtrGe) as memop), [ pe1; pe2 ])
-          ->
-          let@ pe1 = check_pexpr (Loc ()) pe1 in
-          let@ pe2 = check_pexpr (Loc ()) pe2 in
-          return (Bool, Ememop (memop, [ pe1; pe2 ]))
-        | Ememop (Ptrdiff, [ pe_ct; pe1; pe2 ]) ->
-          let@ pe_ct, _ct = check_pexpr_good_ctype_const pe_ct in
-          let@ pe1 = check_pexpr (Loc ()) pe1 in
-          let@ pe2 = check_pexpr (Loc ()) pe2 in
-          let bty = Memory.bt_of_sct (Integer Ptrdiff_t) in
-          return (bty, Ememop (Ptrdiff, [ pe_ct; pe1; pe2 ]))
-        | Ememop (IntFromPtr, [ pe_from_ct; pe_to_ct; pe ]) ->
-          let@ pe_from_ct, _ = check_pexpr_good_ctype_const pe_from_ct in
-          let@ pe_to_ct, to_ct = check_pexpr_good_ctype_const pe_to_ct in
-          let@ pe = check_pexpr (Loc ()) pe in
-          let bty = Memory.bt_of_sct to_ct in
-          return (bty, Ememop (IntFromPtr, [ pe_from_ct; pe_to_ct; pe ]))
-        | Ememop (PtrFromInt, [ pe_from_ct; pe_to_ct; pe ]) ->
-          let@ pe_from_ct, from_ct = check_pexpr_good_ctype_const pe_from_ct in
-          let@ pe_to_ct, _ = check_pexpr_good_ctype_const pe_to_ct in
-          let from_bt = Memory.bt_of_sct from_ct in
-          let@ pe = check_pexpr from_bt pe in
-          let@ () = ensure_bits_type (loc_of_pexpr pe) from_bt in
-          return (Loc (), Ememop (PtrFromInt, [ pe_from_ct; pe_to_ct; pe ]))
-        | Ememop (PtrValidForDeref, [ pe_ct; pe ]) ->
-          let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
-          let@ pe = check_pexpr (Loc ()) pe in
-          return (Bool, Ememop (PtrValidForDeref, [ pe_ct; pe ]))
-        | Ememop (PtrWellAligned, [ pe_ct; pe ]) ->
-          let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
-          let@ pe = check_pexpr (Loc ()) pe in
-          return (Bool, Ememop (PtrWellAligned, [ pe_ct; pe ]))
-        | Ememop (PtrArrayShift, [ pe1; pe_ct; pe2 ]) ->
-          let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
-          let@ pe1 = check_pexpr (Loc ()) pe1 in
-          let@ pe2 = infer_pexpr pe2 in
-          let@ () = ensure_bits_type (loc_of_pexpr pe2) (bt_of_pexpr pe2) in
-          return (Loc (), Ememop (PtrArrayShift, [ pe1; pe_ct; pe2 ]))
-        | Ememop (PtrMemberShift _, _) -> todo ()
-        | Ememop (Memcpy, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
-        | Ememop (Memcmp, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
-        | Ememop (Realloc, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
-        | Ememop (Va_start, _) (* (asym 'bty * asym 'bty) *) -> todo ()
-        | Ememop (Va_copy, _) (* (asym 'bty) *) -> todo ()
-        | Ememop (Va_arg, _) (* (asym 'bty * actype 'bty) *) -> todo ()
-        | Ememop (Va_end, _) (* (asym 'bty) *) -> todo ()
-        | Ememop (Copy_alloc_id, [ pe1; pe2 ]) ->
-          let@ pe1 = check_pexpr Memory.uintptr_bt pe1 in
-          let@ pe2 = check_pexpr BT.(Loc ()) pe2 in
-          return (Loc (), Ememop (Copy_alloc_id, [ pe1; pe2 ]))
-        | Ememop (CHERI_intrinsic _, _) -> todo ()
-        | Ememop _ -> assert false
-        | Eaction (Paction (pol, Action (aloc, action_))) ->
-          let@ bTy, action_ =
-            match action_ with
-            | Create (pe, act, prefix) ->
-              let@ () = WCT.is_ct act.loc act.ct in
-              let@ pe = check_pexpr signed_int_ty pe in
-              let@ () = ensure_bits_type (loc_of_pexpr pe) (bt_of_pexpr pe) in
-              return (Loc (), Create (pe, act, prefix))
-            | Kill (k, pe) ->
-              let@ () =
-                match k with Dynamic -> return () | Static ct -> WCT.is_ct loc ct
-              in
+    let expr_id : int = Obj.magic e |> Obj.repr |> Obj.magic in
+    (* Check cache first - memoization eliminates DAG retraversal *)
+    match Hashtbl.find_opt infer_expr_cache expr_id with
+    | Some cached ->
+      (* Already inferred this expression - return cached result *)
+      return cached
+    | None ->
+      Pp.debug 22 (lazy (Pp.item __FUNCTION__ (Pp_mucore_ast.pp_expr e)));
+      (* Compute result and cache it *)
+      let@ result =
+        match integer_annot annots with
+        | Some ity ->
+          check_expr
+            label_context
+            (Memory.bt_of_sct (Integer ity))
+            (remove_integer_annot_expr e)
+        | _ ->
+          let todo () =
+            Pp.error loc !^"TODO: WellTyped infer_expr" [ Pp_mucore_ast.pp_expr e ];
+            failwith "TODO: WellTyped infer_expr"
+          in
+          let@ bty, e_ =
+            match e_ with
+            | Epure pe ->
+              let@ pe = infer_pexpr pe in
+              return (bt_of_pexpr pe, Epure pe)
+            | Ememop
+                (((PtrEq | PtrNe | PtrLt | PtrGt | PtrLe | PtrGe) as memop), [ pe1; pe2 ])
+              ->
+              let@ pe1 = check_pexpr (Loc ()) pe1 in
+              let@ pe2 = check_pexpr (Loc ()) pe2 in
+              return (Bool, Ememop (memop, [ pe1; pe2 ]))
+            | Ememop (Ptrdiff, [ pe_ct; pe1; pe2 ]) ->
+              let@ pe_ct, _ct = check_pexpr_good_ctype_const pe_ct in
+              let@ pe1 = check_pexpr (Loc ()) pe1 in
+              let@ pe2 = check_pexpr (Loc ()) pe2 in
+              let bty = Memory.bt_of_sct (Integer Ptrdiff_t) in
+              return (bty, Ememop (Ptrdiff, [ pe_ct; pe1; pe2 ]))
+            | Ememop (IntFromPtr, [ pe_from_ct; pe_to_ct; pe ]) ->
+              let@ pe_from_ct, _ = check_pexpr_good_ctype_const pe_from_ct in
+              let@ pe_to_ct, to_ct = check_pexpr_good_ctype_const pe_to_ct in
               let@ pe = check_pexpr (Loc ()) pe in
-              return (Unit, Kill (k, pe))
-            | Store (is_locking, act, p_pe, v_pe, mo) ->
-              let@ () = WCT.is_ct act.loc act.ct in
-              let@ p_pe = check_pexpr (Loc ()) p_pe in
-              let@ v_pe = check_pexpr (Memory.bt_of_sct act.ct) v_pe in
-              return (Unit, Store (is_locking, act, p_pe, v_pe, mo))
-            | Load (act, p_pe, mo) ->
-              let@ () = WCT.is_ct act.loc act.ct in
-              let@ p_pe = check_pexpr (Loc ()) p_pe in
-              return (Memory.bt_of_sct act.ct, Load (act, p_pe, mo))
-            | _ -> todo ()
-          in
-          return (bTy, Eaction (Paction (pol, Action (aloc, action_))))
-        | Eskip -> return (Unit, Eskip)
-        | Eproc (name, es) ->
-          (match (name, es) with
-           | Impl (BuiltinFunction ("ctz" | "generic_ffs")), [ pe ] ->
-             let@ pe = infer_pexpr pe in
-             let bt = bt_of_pexpr pe in
-             let@ () = ensure_bits_type (loc_of_pexpr pe) bt in
-             return (bt, Eproc (name, [ pe ]))
-           | Impl (BuiltinFunction ("ctz" | "generic_ffs")), _ ->
-             let has = List.length es in
-             fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 1 } }
-           | _ ->
-             fail
-               { loc; msg = Generic !^"Unsupported Core procedure" }
-             [@alert "-deprecated"])
-        | Eccall (act, f_pe, pes, gargs_opt) ->
-          let@ () = WCT.is_ct act.loc act.ct in
-          let@ ret_ct, arg_cts =
-            match act.ct with
-            | Sctypes.(Pointer (Function (ret_v_ct, arg_r_cts, is_variadic))) ->
-              if is_variadic then
-                fail
-                  { loc;
-                    msg =
-                      Generic !^"variadic function pointers are not supported"
-                      [@alert "-deprecated"]
-                  }
-              else
-                return (snd ret_v_ct, List.map fst arg_r_cts)
-            | _ ->
-              fail
-                { loc;
-                  msg =
-                    Generic
-                      (Pp.item "not a function pointer at call-site" (Sctypes.pp act.ct))
-                    [@alert "-deprecated"]
-                }
-          in
-          List.iter add_ct (ret_ct :: arg_cts);
-          let@ f_pe = check_pexpr (Loc ()) f_pe in
-          (* TODO: we'd have to check the arguments against the function type, but we
-             can't when f_pe is dynamic *)
-          let arg_bt_specs = List.map (fun ct -> Memory.bt_of_sct ct) arg_cts in
-          let@ pes = ListM.map2M check_pexpr arg_bt_specs pes in
-          let its = match gargs_opt with None -> [] | Some (_, its) -> its in
-          let@ its = ListM.mapM (check_cnprog (fun _ it -> WIT.infer it)) its in
-          let gargs_opt = Option.map (fun (ghost_loc, _) -> (ghost_loc, its)) gargs_opt in
-          return (Memory.bt_of_sct ret_ct, Eccall (act, f_pe, pes, gargs_opt))
-        | Eif (c_pe, e1, e2) ->
-          let@ c_pe = check_pexpr Bool c_pe in
-          let@ bt, e1, e2 =
-            if is_undef_or_error_expr e1 then
-              let@ e2 = infer_expr label_context e2 in
-              let bt = bt_of_expr e2 in
-              let@ e1 = check_expr label_context bt e1 in
-              return (bt, e1, e2)
-            else
-              let@ e1 = infer_expr label_context e1 in
-              let bt = bt_of_expr e1 in
-              let@ e2 = check_expr label_context bt e2 in
-              return (bt, e1, e2)
-          in
-          return (bt, Eif (c_pe, e1, e2))
-        | Ebound e ->
-          let@ e = infer_expr label_context e in
-          return (bt_of_expr e, Ebound e)
-        | Elet (pat, pe, e) ->
-          let@ pe = infer_pexpr pe in
-          pure
-            (let@ pat = check_and_bind_pattern (bt_of_pexpr pe) pat in
-             let@ e = infer_expr label_context e in
-             return (bt_of_expr e, Elet (pat, pe, e)))
-        | Esseq (pat, e1, e2) | Ewseq (pat, e1, e2) ->
-          let@ e1 = infer_expr label_context e1 in
-          pure
-            (let@ pat = check_and_bind_pattern (bt_of_expr e1) pat in
-             let@ e2 = infer_expr label_context e2 in
-             let e_ =
-               match e_ with Esseq _ -> Esseq (pat, e1, e2) | _ -> Ewseq (pat, e1, e2)
-             in
-             return (bt_of_expr e2, e_))
-        | Eunseq es ->
-          let@ es = ListM.mapM (infer_expr label_context) es in
-          let bts = List.map bt_of_expr es in
-          return (Tuple bts, Eunseq es)
-        | Erun (l, pes) ->
-          (match Sym.Map.find_opt l label_context with
-           | None ->
-             if !Sym.experimental_unions then
-               let@ pes = ListM.mapM infer_pexpr pes in
-               return (Unit, Erun (l, pes))
-             else (* copying from check.ml *)
-               fail
-                 { loc;
-                   msg =
-                     Generic (!^"undefined code label" ^/^ Sym.pp l)
-                     [@alert "-deprecated"]
-                 }
-           | Some (lt, _lkind, _) ->
-             let@ pes =
-               let wrong_number_computational_args () =
-                 let has = List.length pes in
-                 let expect = AT.count_computational lt in
+              let bty = Memory.bt_of_sct to_ct in
+              return (bty, Ememop (IntFromPtr, [ pe_from_ct; pe_to_ct; pe ]))
+            | Ememop (PtrFromInt, [ pe_from_ct; pe_to_ct; pe ]) ->
+              let@ pe_from_ct, from_ct = check_pexpr_good_ctype_const pe_from_ct in
+              let@ pe_to_ct, _ = check_pexpr_good_ctype_const pe_to_ct in
+              let from_bt = Memory.bt_of_sct from_ct in
+              let@ pe = check_pexpr from_bt pe in
+              let@ () = ensure_bits_type (loc_of_pexpr pe) from_bt in
+              return (Loc (), Ememop (PtrFromInt, [ pe_from_ct; pe_to_ct; pe ]))
+            | Ememop (PtrValidForDeref, [ pe_ct; pe ]) ->
+              let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
+              let@ pe = check_pexpr (Loc ()) pe in
+              return (Bool, Ememop (PtrValidForDeref, [ pe_ct; pe ]))
+            | Ememop (PtrWellAligned, [ pe_ct; pe ]) ->
+              let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
+              let@ pe = check_pexpr (Loc ()) pe in
+              return (Bool, Ememop (PtrWellAligned, [ pe_ct; pe ]))
+            | Ememop (PtrArrayShift, [ pe1; pe_ct; pe2 ]) ->
+              let@ pe_ct, _ = check_pexpr_good_ctype_const pe_ct in
+              let@ pe1 = check_pexpr (Loc ()) pe1 in
+              let@ pe2 = infer_pexpr pe2 in
+              let@ () = ensure_bits_type (loc_of_pexpr pe2) (bt_of_pexpr pe2) in
+              return (Loc (), Ememop (PtrArrayShift, [ pe1; pe_ct; pe2 ]))
+            | Ememop (PtrMemberShift _, _) -> todo ()
+            | Ememop (Memcpy, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
+            | Ememop (Memcmp, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
+            | Ememop (Realloc, _) (* (asym 'bty * asym 'bty * asym 'bty) *) -> todo ()
+            | Ememop (Va_start, _) (* (asym 'bty * asym 'bty) *) -> todo ()
+            | Ememop (Va_copy, _) (* (asym 'bty) *) -> todo ()
+            | Ememop (Va_arg, _) (* (asym 'bty * actype 'bty) *) -> todo ()
+            | Ememop (Va_end, _) (* (asym 'bty) *) -> todo ()
+            | Ememop (Copy_alloc_id, [ pe1; pe2 ]) ->
+              let@ pe1 = check_pexpr Memory.uintptr_bt pe1 in
+              let@ pe2 = check_pexpr BT.(Loc ()) pe2 in
+              return (Loc (), Ememop (Copy_alloc_id, [ pe1; pe2 ]))
+            | Ememop (CHERI_intrinsic _, _) -> todo ()
+            | Ememop _ -> assert false
+            | Eaction (Paction (pol, Action (aloc, action_))) ->
+              let@ bTy, action_ =
+                match action_ with
+                | Create (pe, act, prefix) ->
+                  let@ () = WCT.is_ct act.loc act.ct in
+                  let@ pe = check_pexpr signed_int_ty pe in
+                  let@ () = ensure_bits_type (loc_of_pexpr pe) (bt_of_pexpr pe) in
+                  return (Loc (), Create (pe, act, prefix))
+                | Kill (k, pe) ->
+                  let@ () =
+                    match k with Dynamic -> return () | Static ct -> WCT.is_ct loc ct
+                  in
+                  let@ pe = check_pexpr (Loc ()) pe in
+                  return (Unit, Kill (k, pe))
+                | Store (is_locking, act, p_pe, v_pe, mo) ->
+                  let@ () = WCT.is_ct act.loc act.ct in
+                  let@ p_pe = check_pexpr (Loc ()) p_pe in
+                  let@ v_pe = check_pexpr (Memory.bt_of_sct act.ct) v_pe in
+                  return (Unit, Store (is_locking, act, p_pe, v_pe, mo))
+                | Load (act, p_pe, mo) ->
+                  let@ () = WCT.is_ct act.loc act.ct in
+                  let@ p_pe = check_pexpr (Loc ()) p_pe in
+                  return (Memory.bt_of_sct act.ct, Load (act, p_pe, mo))
+                | _ -> todo ()
+              in
+              return (bTy, Eaction (Paction (pol, Action (aloc, action_))))
+            | Eskip -> return (Unit, Eskip)
+            | Eproc (name, es) ->
+              (match (name, es) with
+               | Impl (BuiltinFunction ("ctz" | "generic_ffs")), [ pe ] ->
+                 let@ pe = infer_pexpr pe in
+                 let bt = bt_of_pexpr pe in
+                 let@ () = ensure_bits_type (loc_of_pexpr pe) bt in
+                 return (bt, Eproc (name, [ pe ]))
+               | Impl (BuiltinFunction ("ctz" | "generic_ffs")), _ ->
+                 let has = List.length es in
+                 fail { loc; msg = Number_arguments { type_ = `Other; has; expect = 1 } }
+               | _ ->
                  fail
-                   { loc; msg = Number_arguments { type_ = `Computational; has; expect } }
-               in
-               let wrong_number_ghost_args () =
-                 let has = 0 in
-                 let expect = AT.count_ghost lt in
-                 fail { loc; msg = Number_arguments { type_ = `Ghost; has; expect } }
-               in
-               let rec check_args acc_pes lt pes =
-                 Pp.debug 1 (lazy (Pp.item __FUNCTION__ (AT.pp (fun _ -> Pp.empty) lt)));
-                 match (lt, pes) with
-                 | AT.Computational ((_s, bt), _info, lt'), pe :: pes' ->
-                   let@ pe = check_pexpr bt pe in
-                   check_args (acc_pes @ [ pe ]) lt' pes'
-                 | AT.L _lat, [] -> return acc_pes
-                 | AT.Computational _, [] | AT.L _, _ :: _ ->
-                   wrong_number_computational_args ()
-                 | AT.Ghost _, _ -> wrong_number_ghost_args ()
-               in
-               (* TODO: fix duplication wrt Check.check_expr, cf.
+                   { loc; msg = Generic !^"Unsupported Core procedure" }
+                 [@alert "-deprecated"])
+            | Eccall (act, f_pe, pes, gargs_opt) ->
+              let@ () = WCT.is_ct act.loc act.ct in
+              let@ ret_ct, arg_cts =
+                match act.ct with
+                | Sctypes.(Pointer (Function (ret_v_ct, arg_r_cts, is_variadic))) ->
+                  if is_variadic then
+                    fail
+                      { loc;
+                        msg =
+                          Generic !^"variadic function pointers are not supported"
+                          [@alert "-deprecated"]
+                      }
+                  else
+                    return (snd ret_v_ct, List.map fst arg_r_cts)
+                | _ ->
+                  fail
+                    { loc;
+                      msg =
+                        Generic
+                          (Pp.item
+                             "not a function pointer at call-site"
+                             (Sctypes.pp act.ct))
+                        [@alert "-deprecated"]
+                    }
+              in
+              List.iter add_ct (ret_ct :: arg_cts);
+              let@ f_pe = check_pexpr (Loc ()) f_pe in
+              (* TODO: we'd have to check the arguments against the function type, but we
+             can't when f_pe is dynamic *)
+              let arg_bt_specs = List.map (fun ct -> Memory.bt_of_sct ct) arg_cts in
+              let@ pes = ListM.map2M check_pexpr arg_bt_specs pes in
+              let its = match gargs_opt with None -> [] | Some (_, its) -> its in
+              let@ its = ListM.mapM (check_cnprog (fun _ it -> WIT.infer it)) its in
+              let gargs_opt =
+                Option.map (fun (ghost_loc, _) -> (ghost_loc, its)) gargs_opt
+              in
+              return (Memory.bt_of_sct ret_ct, Eccall (act, f_pe, pes, gargs_opt))
+            | Eif (c_pe, e1, e2) ->
+              let@ c_pe = check_pexpr Bool c_pe in
+              let@ bt, e1, e2 =
+                if is_undef_or_error_expr e1 then
+                  let@ e2 = infer_expr label_context e2 in
+                  let bt = bt_of_expr e2 in
+                  let@ e1 = check_expr label_context bt e1 in
+                  return (bt, e1, e2)
+                else
+                  let@ e1 = infer_expr label_context e1 in
+                  let bt = bt_of_expr e1 in
+                  let@ e2 = check_expr label_context bt e2 in
+                  return (bt, e1, e2)
+              in
+              return (bt, Eif (c_pe, e1, e2))
+            | Ebound e ->
+              let@ e = infer_expr label_context e in
+              return (bt_of_expr e, Ebound e)
+            | Elet (pat, pe, e) ->
+              let@ pe = infer_pexpr pe in
+              pure
+                (let@ pat = check_and_bind_pattern (bt_of_pexpr pe) pat in
+                 let@ e = infer_expr label_context e in
+                 return (bt_of_expr e, Elet (pat, pe, e)))
+            | Esseq (pat, e1, e2) | Ewseq (pat, e1, e2) ->
+              let@ e1 = infer_expr label_context e1 in
+              pure
+                (let@ pat = check_and_bind_pattern (bt_of_expr e1) pat in
+                 let@ e2 = infer_expr label_context e2 in
+                 let e_ =
+                   match e_ with
+                   | Esseq _ -> Esseq (pat, e1, e2)
+                   | _ -> Ewseq (pat, e1, e2)
+                 in
+                 return (bt_of_expr e2, e_))
+            | Eunseq es ->
+              let@ es = ListM.mapM (infer_expr label_context) es in
+              let bts = List.map bt_of_expr es in
+              return (Tuple bts, Eunseq es)
+            | Erun (l, pes) ->
+              (match Sym.Map.find_opt l label_context with
+               | None ->
+                 if !Sym.experimental_unions then
+                   let@ pes = ListM.mapM infer_pexpr pes in
+                   return (Unit, Erun (l, pes))
+                 else (* copying from check.ml *)
+                   fail
+                     { loc;
+                       msg =
+                         Generic (!^"undefined code label" ^/^ Sym.pp l)
+                         [@alert "-deprecated"]
+                     }
+               | Some (lt, _lkind, _) ->
+                 let@ pes =
+                   let wrong_number_computational_args () =
+                     let has = List.length pes in
+                     let expect = AT.count_computational lt in
+                     fail
+                       { loc;
+                         msg = Number_arguments { type_ = `Computational; has; expect }
+                       }
+                   in
+                   let wrong_number_ghost_args () =
+                     let has = 0 in
+                     let expect = AT.count_ghost lt in
+                     fail { loc; msg = Number_arguments { type_ = `Ghost; has; expect } }
+                   in
+                   let rec check_args acc_pes lt pes =
+                     Pp.debug
+                       1
+                       (lazy (Pp.item __FUNCTION__ (AT.pp (fun _ -> Pp.empty) lt)));
+                     match (lt, pes) with
+                     | AT.Computational ((_s, bt), _info, lt'), pe :: pes' ->
+                       let@ pe = check_pexpr bt pe in
+                       check_args (acc_pes @ [ pe ]) lt' pes'
+                     | AT.L _lat, [] -> return acc_pes
+                     | AT.Computational _, [] | AT.L _, _ :: _ ->
+                       wrong_number_computational_args ()
+                     | AT.Ghost _, _ -> wrong_number_ghost_args ()
+                   in
+                   (* TODO: fix duplication wrt Check.check_expr, cf.
                      https://github.com/rems-project/cn/issues/210 *)
-               check_args [] lt pes
-             in
-             return (Unit, Erun (l, pes)))
-        | CN_progs (surfaceprog, cnprogs) ->
-          let@ cnprogs = ListM.mapM (check_cnprog check_cn_statement) cnprogs in
-          return (Unit, CN_progs (surfaceprog, cnprogs))
-        | End _ -> todo ()
+                   check_args [] lt pes
+                 in
+                 return (Unit, Erun (l, pes)))
+            | CN_progs (surfaceprog, cnprogs) ->
+              let@ cnprogs = ListM.mapM (check_cnprog check_cn_statement) cnprogs in
+              return (Unit, CN_progs (surfaceprog, cnprogs))
+            | End _ -> todo ()
+          in
+          return (Expr (loc, annots, bty, e_))
       in
-      return (Expr (loc, annots, bty, e_))
+      (* Cache the result and return *)
+      Hashtbl.add infer_expr_cache expr_id result;
+      return result
 
 
   and check_expr label_context (expect : BT.t) expr =
