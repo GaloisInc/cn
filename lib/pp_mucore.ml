@@ -487,7 +487,11 @@ module Make (Config : CONFIG) = struct
     | Abmc annot -> (match annot with Abmc_id id -> [ !^(string_of_int id) ])
     | Atypedef sym -> [ pp_symbol sym ]
     | Aattrs _ -> [ !^"TODO(Aattrs)" ]
-    | Alabel label -> [ !^(pp_str_label label) ]
+    | Alabel _label ->
+      (* Suppress label annotations (while, continue, break, return, switch, etc.)
+         in pretty-printed output as they create excessive noise in debug logs,
+         especially with large compound statements containing loops. *)
+      []
     | Acerb _ -> []
     | Avalue (Ainteger ity) -> [ !^"type" ^^^ Pp_core_ctype.pp_integer_ctype ity ]
     | Ainlined_label (_, s, _) -> [ !^"inlined" ^^^ pp_symbol s ]

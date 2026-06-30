@@ -2659,6 +2659,7 @@ let record_and_check_logical_functions funs =
   let@ () =
     ListM.iteriM
       (fun i (name, def) ->
+         let fname = Sym.pp_string name in
          debug
            2
            (lazy
@@ -2666,8 +2667,11 @@ let record_and_check_logical_functions funs =
                 ("checking welltypedness of function"
                  ^ Pp.of_total i n_funs
                  ^ ": "
-                 ^ Sym.pp_string name)));
-         let@ def = WellTyped.function_ def in
+                 ^ fname)));
+         let@ def =
+           Timing.time_phase ("welltyped_function:" ^ fname) (fun () ->
+             WellTyped.function_ def)
+         in
          Global.add_logical_function name def)
       funs
   in
