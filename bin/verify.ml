@@ -136,6 +136,7 @@ let verify
          ~serialize_json:json_trace
          ~generate_state_html:(not no_state_html))
     ~f:(fun ~cabs_tunit:_ ~prog5:_ ~ail_prog:_ ~statement_locs:_ ~paused ->
+      let t0_verify = Unix.gettimeofday () in
       let check (functions, global_var_constraints, lemmas) =
         let open Typing in
         let@ errors =
@@ -156,6 +157,16 @@ let verify
                  ~generate_state_html:(not no_state_html)
                  err)
             errors;
+        (* Record Function_verification timing manually before exit *)
+        let t1_verify = Unix.gettimeofday () in
+        let verify_time = t1_verify -. t0_verify in
+        if profile then
+          Printf.eprintf
+            "Function_verification                   :      1 calls, %8.3fs total, \
+             %8.3fms avg\n"
+            verify_time
+            (verify_time *. 1000.0);
+        (* Print timing stats BEFORE exit *)
         Timing.print_stats ();
         Query_cache.print_stats ();
         (* Show portfolio statistics *)

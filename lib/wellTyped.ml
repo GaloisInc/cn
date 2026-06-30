@@ -2538,36 +2538,56 @@ module WProc = struct
 
   let welltyped : Loc.t -> _ Mu.args_and_body -> _ Mu.args_and_body m =
     fun (loc : Loc.t) (at : 'TY1 Mu.args_and_body) ->
-    WArgs.welltyped
-      (fun (body, labels, rt) ->
-         let@ rt = pure (WRT.welltyped rt) in
-         let label_context = label_context rt labels in
-         let@ labels =
-           PmapM.mapM
-             (fun _sym def ->
-                match def with
-                | Non_inlined (loc, name, annot, args) ->
-                  return (Non_inlined (loc, name, annot, args))
-                | Return loc -> return (Return loc)
-                | Loop (loc, label_args_and_body, annots, parsed_spec, loop_info) ->
-                  let@ label_args_and_body =
-                    pure
-                      (WArgs.welltyped
-                         (fun label_body ->
-                            BaseTyping.check_expr label_context Unit label_body)
-                         "label"
-                         loc
-                         label_args_and_body)
-                  in
-                  return (Loop (loc, label_args_and_body, annots, parsed_spec, loop_info)))
-             labels
-             Sym.compare
-         in
-         let@ body = pure (BaseTyping.check_expr label_context Unit body) in
-         return (body, labels, rt))
-      "function"
-      loc
-      at
+    let t0_total = Unix.gettimeofday () in
+    let result =
+      WArgs.welltyped
+        (fun (body, labels, rt) ->
+           let t_rt_0 = Unix.gettimeofday () in
+           let@ rt = pure (WRT.welltyped rt) in
+           let t_rt_1 = Unix.gettimeofday () in
+           Printf.eprintf "[SPEC] WRT.welltyped: %.3fs\n%!" (t_rt_1 -. t_rt_0);
+           let label_context = label_context rt labels in
+           let t_labels_0 = Unix.gettimeofday () in
+           let@ labels =
+             PmapM.mapM
+               (fun _sym def ->
+                  match def with
+                  | Non_inlined (loc, name, annot, args) ->
+                    return (Non_inlined (loc, name, annot, args))
+                  | Return loc -> return (Return loc)
+                  | Loop (loc, label_args_and_body, annots, parsed_spec, loop_info) ->
+                    let@ label_args_and_body =
+                      pure
+                        (WArgs.welltyped
+                           (fun label_body ->
+                              BaseTyping.check_expr label_context Unit label_body)
+                           "label"
+                           loc
+                           label_args_and_body)
+                    in
+                    return
+                      (Loop (loc, label_args_and_body, annots, parsed_spec, loop_info)))
+               labels
+               Sym.compare
+           in
+           let t_labels_1 = Unix.gettimeofday () in
+           Printf.eprintf
+             "[SPEC] PmapM.mapM labels (%d labels): %.3fs\n%!"
+             (Pmap.cardinal labels)
+             (t_labels_1 -. t_labels_0);
+           let t_body_0 = Unix.gettimeofday () in
+           let@ body = pure (BaseTyping.check_expr label_context Unit body) in
+           let t_body_1 = Unix.gettimeofday () in
+           Printf.eprintf
+             "[SPEC] BaseTyping.check_expr body: %.3fs\n%!"
+             (t_body_1 -. t_body_0);
+           return (body, labels, rt))
+        "function"
+        loc
+    in
+    let t1_total = Unix.gettimeofday () in
+    Printf.eprintf "[SPEC] WProc.welltyped total: %.3fs\n%!" (t1_total -. t0_total);
+    result at
 end
 
 module WRPD = struct
