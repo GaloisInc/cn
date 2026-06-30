@@ -432,6 +432,29 @@ let n_paction ~inherit_loc loc (Paction (pol, a)) =
 
 let unsupported loc doc = fail { loc; msg = Unsupported (!^"unsupported" ^^^ doc) }
 
+let n_expr_call_count = ref 0
+
+let n_expr_time_total = ref 0.0
+
+let n_expr_depth = ref 0
+
+let n_expr_depth_histogram = Hashtbl.create 100
+
+(* Track unique expressions by physical identity *)
+let n_expr_unique_exprs = Hashtbl.create 10000
+
+(* Memoization table: maps expression physical ID to computed result.
+
+   Required because Cerberus's label inlining pass creates a DAG (Directed Acyclic Graph)
+   rather than a tree - switch case branches share continuations via physical pointer sharing.
+   Without memoization, n_expr performs tree traversal on a DAG, visiting shared nodes once
+   per path that reaches them (O(n²) for n switch cases).
+
+   With memoization, we cache results by expression object identity, converting to proper
+   DAG traversal (visit each node once total, O(n)). For hw_write_ok with large switches,
+   this reduces ~175M calls to ~2K calls (91,000x speedup). *)
+let n_expr_memo : (int, unit Mucore.expr Or_TypeError.t) Hashtbl.t = Hashtbl.create 10000
+
 let rec n_expr
           ~inherit_loc
           (loc : Locations.t)
@@ -440,182 +463,258 @@ let rec n_expr
           e
   : unit Mucore.expr Or_TypeError.t
   =
-  let markers_env, cn_desugaring_state = desugaring_things in
-  let (Expr (annots, pe)) = e in
-  let loc = (if inherit_loc then Locations.update loc else Fun.id) (get_loc_ annots) in
-  let wrap pe = Mu.Expr (loc, annots, (), pe) in
-  let n_pexpr = n_pexpr ~inherit_loc loc in
-  let n_paction = n_paction ~inherit_loc loc in
-  let n_expr =
-    n_expr
-      ~inherit_loc
-      loc
-      ((env, old_states), desugaring_things)
-      (global_types, visible_objects_env)
-  in
-  match pe with
-  | Epure pexpr2 -> return (wrap (Epure (n_pexpr pexpr2)))
-  | Ememop (memop, pes) -> return (wrap (Ememop (memop, List.map n_pexpr pes)))
-  | Eaction paction2 -> return (wrap (Eaction (n_paction paction2)))
-  | Ecase (_pexpr, _pats_es) -> assert_error loc !^"Ecase"
-  | Elet (pat, e1, e2) ->
-    let e1 = n_pexpr e1 in
-    let pat = core_to__pattern ~inherit_loc loc pat in
-    let@ e2 = n_expr e2 in
-    return (wrap (Elet (pat, e1, e2)))
-  | Eif (e1, e2, e3) ->
-    let e1 = n_pexpr e1 in
-    let@ e2 = n_expr e2 in
-    let@ e3 = n_expr e3 in
-    return (wrap (Eif (e1, e2, e3)))
-  | Eccall (_a, ct1, e2, es) ->
-    let ct1 =
-      match ct1 with
-      | Pexpr (annot, _bty, PEval (Vctype ct1)) ->
-        let loc =
-          (if inherit_loc then Locations.update loc else Fun.id) (get_loc_ annots)
-        in
-        Mu.{ loc; annot; (* type_annot = bty; *) ct = convert_ct loc ct1 }
-      | _ ->
-        assert_error loc !^"core_anormalisation: Eccall with non-ctype first argument"
+  (* Check memoization table first - use physical identity.
+     Label inlining creates shared structure where different case branches point to the
+     same continuation expression object. Without this check, we'd reprocess shared nodes
+     once per branch (O(n²) for n cases). With memoization, we process each node once. *)
+  let expr_id = Obj.magic e |> Obj.repr |> Obj.magic in
+  match Hashtbl.find_opt n_expr_memo expr_id with
+  | Some cached_result ->
+    (* Return cached result - this expression was already processed via another path *)
+    cached_result
+  | None ->
+    (* Not cached - compute normally *)
+    let t0 = Unix.gettimeofday () in
+    incr n_expr_call_count;
+    incr n_expr_depth;
+    let depth = !n_expr_depth in
+    (match Hashtbl.find_opt n_expr_depth_histogram depth with
+     | Some count -> Hashtbl.replace n_expr_depth_histogram depth (count + 1)
+     | None -> Hashtbl.add n_expr_depth_histogram depth 1);
+    (* Track unique expressions by object ID (physical identity) *)
+    let visit_count =
+      match Hashtbl.find_opt n_expr_unique_exprs expr_id with
+      | Some count ->
+        Hashtbl.replace n_expr_unique_exprs expr_id (count + 1);
+        count + 1
+      | None ->
+        Hashtbl.add n_expr_unique_exprs expr_id 1;
+        1
     in
-    let@ e2 = return @@ n_pexpr e2 in
-    let es = List.map n_pexpr es in
-    let@ parsed_ghosts = Parse.cn_ghost_args annots in
-    let@ ghost_args =
-      match parsed_ghosts with
-      | None -> return None
-      | Some (ghost_loc, args) ->
-        let marker_id = Option.get (CF.Annot.get_marker annots) in
-        let marker_id_object_types =
-          Option.get (CF.Annot.get_marker_object_types annots)
+    let markers_env, cn_desugaring_state = desugaring_things in
+    let (Expr (annots, pe)) = e in
+    let loc = (if inherit_loc then Locations.update loc else Fun.id) (get_loc_ annots) in
+    let wrap pe = Mu.Expr (loc, annots, (), pe) in
+    let n_pexpr = n_pexpr ~inherit_loc loc in
+    let n_paction = n_paction ~inherit_loc loc in
+    let n_expr =
+      n_expr
+        ~inherit_loc
+        loc
+        ((env, old_states), desugaring_things)
+        (global_types, visible_objects_env)
+    in
+    let case_name =
+      match pe with
+      | Epure _ -> "Epure"
+      | Ememop _ -> "Ememop"
+      | Eaction _ -> "Eaction"
+      | Ecase _ -> "Ecase"
+      | Elet _ -> "Elet"
+      | Eif _ -> "Eif"
+      | Eccall _ -> "Eccall"
+      | Eproc _ -> "Eproc"
+      | Eunseq _ -> "Eunseq"
+      | Ewseq _ -> "Ewseq"
+      | Esseq _ -> "Esseq"
+      | Ebound _ -> "Ebound"
+      | End _ -> "End"
+      | Esave _ -> "Esave"
+      | Erun _ -> "Erun"
+      | Epar _ -> "Epar"
+      | Ewait _ -> "Ewait"
+      | Eannot _ -> "Eannot"
+      | Eexcluded _ -> "Eexcluded"
+    in
+    let result =
+      match pe with
+      | Epure pexpr2 -> return (wrap (Epure (n_pexpr pexpr2)))
+      | Ememop (memop, pes) -> return (wrap (Ememop (memop, List.map n_pexpr pes)))
+      | Eaction paction2 -> return (wrap (Eaction (n_paction paction2)))
+      | Ecase (_pexpr, _pats_es) -> assert_error loc !^"Ecase"
+      | Elet (pat, e1, e2) ->
+        let e1 = n_pexpr e1 in
+        let pat = core_to__pattern ~inherit_loc loc pat in
+        let@ e2 = n_expr e2 in
+        return (wrap (Elet (pat, e1, e2)))
+      | Eif (e1, e2, e3) ->
+        let e1 = n_pexpr e1 in
+        let@ e2 = n_expr e2 in
+        let@ e3 = n_expr e3 in
+        return (wrap (Eif (e1, e2, e3)))
+      | Eccall (_a, ct1, e2, es) ->
+        let ct1 =
+          match ct1 with
+          | Pexpr (annot, _bty, PEval (Vctype ct1)) ->
+            let loc =
+              (if inherit_loc then Locations.update loc else Fun.id) (get_loc_ annots)
+            in
+            Mu.{ loc; annot; (* type_annot = bty; *) ct = convert_ct loc ct1 }
+          | _ ->
+            assert_error loc !^"core_anormalisation: Eccall with non-ctype first argument"
         in
-        let visible_objects =
-          global_types @ Pmap.find marker_id_object_types visible_objects_env
-        in
-        let get_c_obj sym =
-          match List.assoc_opt Sym.equal sym visible_objects with
-          | Some obj_ty -> obj_ty
-          | None ->
-            (* should not occur since Cerberus guarantees every C object in scope has a type *)
-            failwith ("use of C obj without known type: " ^ Sym.pp_string sym)
-        in
-        let@ ghosts =
-          ListM.mapM
-            (fun parsed_ghost ->
-               let@ desugared_ghost =
-                 do_ail_desugar_rdonly
-                   CAE.
-                     { markers_env;
-                       inner =
-                         { (Pmap.find marker_id markers_env) with
-                           cn_state = cn_desugaring_state
+        let@ e2 = return @@ n_pexpr e2 in
+        let es = List.map n_pexpr es in
+        let@ parsed_ghosts = Parse.cn_ghost_args annots in
+        let@ ghost_args =
+          match parsed_ghosts with
+          | None -> return None
+          | Some (ghost_loc, args) ->
+            let marker_id = Option.get (CF.Annot.get_marker annots) in
+            let marker_id_object_types =
+              Option.get (CF.Annot.get_marker_object_types annots)
+            in
+            let visible_objects =
+              global_types @ Pmap.find marker_id_object_types visible_objects_env
+            in
+            let get_c_obj sym =
+              match List.assoc_opt Sym.equal sym visible_objects with
+              | Some obj_ty -> obj_ty
+              | None ->
+                (* should not occur since Cerberus guarantees every C object in scope has a type *)
+                failwith ("use of C obj without known type: " ^ Sym.pp_string sym)
+            in
+            let@ ghosts =
+              ListM.mapM
+                (fun parsed_ghost ->
+                   let@ desugared_ghost =
+                     do_ail_desugar_rdonly
+                       CAE.
+                         { markers_env;
+                           inner =
+                             { (Pmap.find marker_id markers_env) with
+                               cn_state = cn_desugaring_state
+                             }
                          }
-                     }
-                   (Desugar.cn_expr parsed_ghost)
-               in
-               let@ ghost =
-                 Translate.expr_ghost get_c_obj old_states env desugared_ghost
-               in
-               return ghost)
-            args
+                       (Desugar.cn_expr parsed_ghost)
+                   in
+                   let@ ghost =
+                     Translate.expr_ghost get_c_obj old_states env desugared_ghost
+                   in
+                   return ghost)
+                args
+            in
+            let ghost_args = List.map (Cnprog.map IT.Surface.proj) ghosts in
+            return (Some (ghost_loc, ghost_args))
         in
-        let ghost_args = List.map (Cnprog.map IT.Surface.proj) ghosts in
-        return (Some (ghost_loc, ghost_args))
-    in
-    return (wrap (Eccall (ct1, e2, es, ghost_args)))
-  | Eproc (_a, name, es) ->
-    let es = List.map n_pexpr es in
-    return (wrap (Eproc (name, es)))
-    (* (match (name, es) with *)
-    (* | Impl (BuiltinFunction "ctz"), [ arg1 ] -> *)
-    (*   return (wrap_pure (PEbitwise_unop (BW_CTZ, arg1))) *)
-    (* | Impl (BuiltinFunction "generic_ffs"), [ arg1 ] -> *)
-    (*   return (wrap_pure (PEbitwise_unop (BW_FFS, arg1))) *)
-    (* | _ -> assert_error loc (item "Eproc" (CF.Pp_core_ast.pp_expr e))) *)
-  | Eunseq es ->
-    let@ es = ListM.mapM n_expr es in
-    return (wrap (Eunseq es))
-  | Ewseq (pat, e1, e2) ->
-    let@ e1 = n_expr e1 in
-    let pat = core_to__pattern ~inherit_loc loc pat in
-    let@ e2 = n_expr e2 in
-    return (wrap (Ewseq (pat, e1, e2)))
-  | Esseq (pat, e1, e2) ->
-    (* let () = debug 10 (lazy (item "core_to_mucore Esseq. e1:"
+        return (wrap (Eccall (ct1, e2, es, ghost_args)))
+      | Eproc (_a, name, es) ->
+        let es = List.map n_pexpr es in
+        return (wrap (Eproc (name, es)))
+        (* (match (name, es) with *)
+        (* | Impl (BuiltinFunction "ctz"), [ arg1 ] -> *)
+        (*   return (wrap_pure (PEbitwise_unop (BW_CTZ, arg1))) *)
+        (* | Impl (BuiltinFunction "generic_ffs"), [ arg1 ] -> *)
+        (*   return (wrap_pure (PEbitwise_unop (BW_FFS, arg1))) *)
+        (* | _ -> assert_error loc (item "Eproc" (CF.Pp_core_ast.pp_expr e))) *)
+      | Eunseq es ->
+        let@ es = ListM.mapM n_expr es in
+        return (wrap (Eunseq es))
+      | Ewseq (pat, e1, e2) ->
+        let@ e1 = n_expr e1 in
+        let pat = core_to__pattern ~inherit_loc loc pat in
+        let@ e2 = n_expr e2 in
+        return (wrap (Ewseq (pat, e1, e2)))
+      | Esseq (pat, e1, e2) ->
+        (* let () = debug 10 (lazy (item "core_to_mucore Esseq. e1:"
        (CF.Pp_core_ast.pp_expr e1))) in let () = debug 10 (lazy (item
        "core_to_mucore Esseq. e2:" (CF.Pp_core_ast.pp_expr e2))) in let () = debug
        10 (lazy (item "core_to_mucore Esseq. p:" (CF.Pp_core.Basic.pp_pattern pat)))
        in *)
-    let@ e1 =
-      match (pat, e1) with
-      | ( Pattern ([], CaseBase (None, BTy_unit)),
-          Expr ([], Epure (Pexpr ([], (), PEval Vunit))) ) ->
-        let@ parsed_stmts = Parse.cn_statements annots in
-        (match parsed_stmts with
-         | _ :: _ ->
-           let marker_id = Option.get (CF.Annot.get_marker annots) in
-           let marker_id_object_types =
-             Option.get (CF.Annot.get_marker_object_types annots)
-           in
-           let visible_objects =
-             global_types @ Pmap.find marker_id_object_types visible_objects_env
-           in
-           let get_c_obj sym =
-             match List.assoc_opt Sym.equal sym visible_objects with
-             | Some obj_ty -> obj_ty
-             | None -> failwith ("use of C obj without known type: " ^ Sym.pp_string sym)
-             (* should not occur since Cerberus guarantees every C object in scope has a type *)
-           in
-           let@ desugared_stmts_and_stmts =
-             ListM.mapM
-               (fun parsed_stmt ->
-                  let@ desugared_stmt =
-                    do_ail_desugar_rdonly
-                      CAE.
-                        { markers_env;
-                          inner =
-                            { (Pmap.find marker_id markers_env) with
-                              cn_state = cn_desugaring_state
+        let@ e1 =
+          match (pat, e1) with
+          | ( Pattern ([], CaseBase (None, BTy_unit)),
+              Expr ([], Epure (Pexpr ([], (), PEval Vunit))) ) ->
+            let@ parsed_stmts = Parse.cn_statements annots in
+            (match parsed_stmts with
+             | _ :: _ ->
+               let marker_id = Option.get (CF.Annot.get_marker annots) in
+               let marker_id_object_types =
+                 Option.get (CF.Annot.get_marker_object_types annots)
+               in
+               let visible_objects =
+                 global_types @ Pmap.find marker_id_object_types visible_objects_env
+               in
+               let get_c_obj sym =
+                 match List.assoc_opt Sym.equal sym visible_objects with
+                 | Some obj_ty -> obj_ty
+                 | None ->
+                   failwith ("use of C obj without known type: " ^ Sym.pp_string sym)
+                 (* should not occur since Cerberus guarantees every C object in scope has a type *)
+               in
+               let@ desugared_stmts_and_stmts =
+                 ListM.mapM
+                   (fun parsed_stmt ->
+                      let@ desugared_stmt =
+                        do_ail_desugar_rdonly
+                          CAE.
+                            { markers_env;
+                              inner =
+                                { (Pmap.find marker_id markers_env) with
+                                  cn_state = cn_desugaring_state
+                                }
                             }
-                        }
-                      (Desugar.cn_statement parsed_stmt)
-                  in
-                  (* debug 6 (lazy (!^"CN statement before translation")); debug 6 (lazy
+                          (Desugar.cn_statement parsed_stmt)
+                      in
+                      (* debug 6 (lazy (!^"CN statement before translation")); debug 6 (lazy
                     (pp_doc_tree (CF.Cn_ocaml.PpAil.dtree_of_cn_statement
                     desugared_stmt))); *)
-                  let@ stmt =
-                    Translate.statement get_c_obj old_states env desugared_stmt
-                  in
-                  (* debug 6 (lazy (!^"CN statement after translation")); debug 6 (lazy
+                      let@ stmt =
+                        Translate.statement get_c_obj old_states env desugared_stmt
+                      in
+                      (* debug 6 (lazy (!^"CN statement after translation")); debug 6 (lazy
                     (pp_doc_tree (Cnprog.dtree stmt))); *)
-                  return (desugared_stmt, stmt))
-               parsed_stmts
-           in
-           let desugared_stmts, stmts = List.split desugared_stmts_and_stmts in
-           return (Mu.Expr (loc, [], (), CN_progs (desugared_stmts, stmts)))
-         | [] -> n_expr e1)
-      | _, _ -> n_expr e1
+                      return (desugared_stmt, stmt))
+                   parsed_stmts
+               in
+               let desugared_stmts, stmts = List.split desugared_stmts_and_stmts in
+               return (Mu.Expr (loc, [], (), CN_progs (desugared_stmts, stmts)))
+             | [] -> n_expr e1)
+          | _, _ -> n_expr e1
+        in
+        let pat = core_to__pattern ~inherit_loc loc pat in
+        let@ e2 = n_expr e2 in
+        return (wrap (Esseq (pat, e1, e2)))
+      | Ebound e ->
+        let@ e = n_expr e in
+        return (wrap (Ebound e))
+      | End es ->
+        let@ es = ListM.mapM n_expr es in
+        return (wrap (End es))
+      | Esave ((_sym1, _bt1), _syms_typs_pes, _e) ->
+        assert_error loc !^"core_anormalisation: Esave"
+      | Erun (_a, sym1, pes) ->
+        let pes = List.map n_pexpr pes in
+        (* TODO: https://github.com/rems-project/cn/issues/123 *)
+        return (wrap (Erun (sym1, pes)))
+      | Epar _es -> assert_error loc !^"core_anormalisation: Epar"
+      | Ewait _tid1 -> assert_error loc !^"core_anormalisation: Ewait"
+      | Eannot _ -> assert_error loc !^"core_anormalisation: Eannot"
+      | Eexcluded _ -> assert_error loc !^"core_anormalisation: Eexcluded"
     in
-    let pat = core_to__pattern ~inherit_loc loc pat in
-    let@ e2 = n_expr e2 in
-    return (wrap (Esseq (pat, e1, e2)))
-  | Ebound e ->
-    let@ e = n_expr e in
-    return (wrap (Ebound e))
-  | End es ->
-    let@ es = ListM.mapM n_expr es in
-    return (wrap (End es))
-  | Esave ((_sym1, _bt1), _syms_typs_pes, _e) ->
-    assert_error loc !^"core_anormalisation: Esave"
-  | Erun (_a, sym1, pes) ->
-    let pes = List.map n_pexpr pes in
-    (* TODO: https://github.com/rems-project/cn/issues/123 *)
-    return (wrap (Erun (sym1, pes)))
-  | Epar _es -> assert_error loc !^"core_anormalisation: Epar"
-  | Ewait _tid1 -> assert_error loc !^"core_anormalisation: Ewait"
-  | Eannot _ -> assert_error loc !^"core_anormalisation: Eannot"
-  | Eexcluded _ -> assert_error loc !^"core_anormalisation: Eexcluded"
+    let t1 = Unix.gettimeofday () in
+    let elapsed = t1 -. t0 in
+    n_expr_time_total := !n_expr_time_total +. elapsed;
+    decr n_expr_depth;
+    (* Log when we detect high retraversal - sample to avoid spam *)
+    if visit_count > 100 && visit_count mod 1000 = 0 then
+      Printf.eprintf
+        "[N_EXPR] RETRAVERSAL: expr %d visited %d times (depth=%d, case=%s)\n%!"
+        expr_id
+        visit_count
+        depth
+        case_name;
+    if !n_expr_call_count mod 10000 = 0 then
+      Printf.eprintf
+        "[N_EXPR] %d calls, %.3fs total (%.3fs avg, depth=%d, last=%s)\n%!"
+        !n_expr_call_count
+        !n_expr_time_total
+        (!n_expr_time_total /. float_of_int !n_expr_call_count)
+        depth
+        case_name;
+    (* Cache the result before returning *)
+    Hashtbl.add n_expr_memo expr_id result;
+    result
 
 
 module AT = ArgumentTypes
@@ -969,6 +1068,13 @@ let normalise_label
          else
            assert_error loc error_msg
        in
+       (* Label inlining (CF.Milicore_label_inline.rewrite_file) is REQUIRED for verification.
+          It inlines most labels (break, continue, case, return) but keeps LAloop labels
+          because loops need invariants for verification. Without label inlining, verification
+          fails with "switch labels" / "case label has not been inlined" errors.
+
+          Test generation can skip label inlining because it doesn't verify - it just generates
+          test code and can handle labels directly. *)
        (match label_annot with
         | LAloop loop_id ->
           let@ desugared_inv, cn_desugaring_state, loop_info =
@@ -1197,6 +1303,7 @@ let normalise_fun_map_decl
      | CF.Milicore.Mi_Fun (_bt, _args, _pe) -> assert false
      | Mi_Proc (loc, _mrk, _ret_bt, args, body, labels) ->
        debug 2 (lazy (item "normalising procedure" (Sym.pp fname)));
+       let t0_parse = Unix.gettimeofday () in
        let@ parsed_defn_specs = Parse.function_spec attrs in
        let parsed_decl_spec =
          Option.fold (Sym.Map.find_opt fname fun_specs) ~none:[] ~some:Fun.id
@@ -1204,10 +1311,16 @@ let normalise_fun_map_decl
        let@ parsed =
          Spec.there_can_only_be_one loc fname parsed_decl_spec parsed_defn_specs
        in
+       let t1_parse = Unix.gettimeofday () in
+       Printf.eprintf
+         "[MUCORE] Parse spec for %s: %.3fs\n%!"
+         (Sym.pp_string fname)
+         (t1_parse -. t0_parse);
        debug 6 (lazy (string "parsed spec attrs"));
        let _, defn_marker, _, ail_args, _ =
          List.assoc Sym.equal fname ail_prog.CF.AilSyntax.function_definitions
        in
+       let t0_setup = Unix.gettimeofday () in
        let@ env, d_st =
          Spec.setup_env_desugaring_state
            loc
@@ -1218,19 +1331,32 @@ let normalise_fun_map_decl
            args
            (List.map snd arg_cts)
        in
+       let t1_setup = Unix.gettimeofday () in
+       Printf.eprintf
+         "[MUCORE] Setup env for %s: %.3fs\n%!"
+         (Sym.pp_string fname)
+         (t1_setup -. t0_setup);
+       let t0_desugar = Unix.gettimeofday () in
        let@ { trusted; accesses; ghost_params; requires; ensures; functions }, ret_s, d_st
          =
          Spec.desugar global_types d_st parsed
        in
+       let t1_desugar = Unix.gettimeofday () in
+       Printf.eprintf
+         "[MUCORE] Spec.desugar for %s: %.3fs\n%!"
+         (Sym.pp_string fname)
+         (t1_desugar -. t0_desugar);
        debug 6 (lazy (!^"function requires/ensures" ^^^ Sym.pp fname));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_accesses accesses)));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_ghost_args ghost_params)));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_requires requires)));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_ensures ensures)));
+       let t0_make_args = Unix.gettimeofday () in
        let@ args_and_body =
          make_function_args
            (fun arg_states env st ->
               let st = Translate.C_vars.push_scope st Translate.C_vars.start in
+              let t0_body = Unix.gettimeofday () in
               let@ body =
                 n_expr
                   ~inherit_loc
@@ -1240,6 +1366,12 @@ let normalise_fun_map_decl
                   (global_types, visible_objects_env)
                   body
               in
+              let t1_body = Unix.gettimeofday () in
+              Printf.eprintf
+                "[MUCORE] n_expr body for %s: %.3fs\n%!"
+                (Sym.pp_string fname)
+                (t1_body -. t0_body);
+              let t0_ret = Unix.gettimeofday () in
               let@ returned =
                 Translate.return_type
                   loc
@@ -1248,6 +1380,12 @@ let normalise_fun_map_decl
                   (ret_s, ret_ct)
                   (accesses, ensures)
               in
+              let t1_ret = Unix.gettimeofday () in
+              Printf.eprintf
+                "[MUCORE] Translate.return_type for %s: %.3fs\n%!"
+                (Sym.pp_string fname)
+                (t1_ret -. t0_ret);
+              let t0_labels = Unix.gettimeofday () in
               let@ labels =
                 PmapM.mapM
                   (normalise_label
@@ -1261,6 +1399,12 @@ let normalise_fun_map_decl
                   labels
                   Sym.compare
               in
+              let t1_labels = Unix.gettimeofday () in
+              Printf.eprintf
+                "[MUCORE] normalise_label map (%d labels) for %s: %.3fs\n%!"
+                (Pmap.cardinal labels)
+                (Sym.pp_string fname)
+                (t1_labels -. t0_labels);
               return (body, labels, returned))
            loc
            env
@@ -1269,6 +1413,53 @@ let normalise_fun_map_decl
            ghost_params
            requires
        in
+       let t1_make_args = Unix.gettimeofday () in
+       Printf.eprintf
+         "[MUCORE] make_function_args total for %s: %.3fs\n%!"
+         (Sym.pp_string fname)
+         (t1_make_args -. t0_make_args);
+       (* Print depth histogram and uniqueness stats *)
+       if Hashtbl.length n_expr_depth_histogram > 0 then (
+         let unique_exprs = Hashtbl.length n_expr_unique_exprs in
+         let total_calls = !n_expr_call_count in
+         let retraversal_count =
+           Hashtbl.fold
+             (fun _id count acc -> if count > 1 then acc + count - 1 else acc)
+             n_expr_unique_exprs
+             0
+         in
+         Printf.eprintf "\n[N_EXPR] === Summary for %s ===\n%!" (Sym.pp_string fname);
+         Printf.eprintf "[N_EXPR] Total calls: %d\n%!" total_calls;
+         Printf.eprintf "[N_EXPR] Unique expressions: %d\n%!" unique_exprs;
+         Printf.eprintf
+           "[N_EXPR] Retraversal count: %d (%.1f%% of total)\n%!"
+           retraversal_count
+           (100.0 *. float_of_int retraversal_count /. float_of_int total_calls);
+         Printf.eprintf
+           "[N_EXPR] Average visits per expr: %.1f\n%!"
+           (float_of_int total_calls /. float_of_int unique_exprs);
+         (* Find most retraversed expressions *)
+         let retraversals =
+           Hashtbl.fold (fun id count acc -> (id, count) :: acc) n_expr_unique_exprs []
+         in
+         let sorted_retrav =
+           List.sort (fun (_, c1) (_, c2) -> compare c2 c1) retraversals
+         in
+         let top_10 = List.filteri (fun i _ -> i < 10) sorted_retrav in
+         if
+           List.length top_10 > 0 && match top_10 with (_, c) :: _ -> c > 1 | _ -> false
+         then (
+           Printf.eprintf "[N_EXPR] Top 10 most retraversed expressions:\n%!";
+           List.iter
+             (fun (id, count) ->
+                if count > 1 then
+                  Printf.eprintf "  expr %d: visited %d times\n%!" id count)
+             top_10);
+         Hashtbl.clear n_expr_depth_histogram;
+         Hashtbl.clear n_expr_unique_exprs;
+         Hashtbl.clear n_expr_memo;
+         n_expr_call_count := 0;
+         n_expr_time_total := 0.0);
        return (Some (Mu.Proc { loc; args_and_body; trusted }, functions))
      | Mi_ProcDecl (loc, ret_bt, _bts) ->
        (match Sym.Map.find_opt fname fun_specs with
@@ -1466,17 +1657,35 @@ let translate_datatype env Cn.{ cn_dt_loc; cn_dt_name; cn_dt_cases; cn_dt_magic_
 let normalise_file ~inherit_loc ((fin_markers_env : CAE.fin_markers_env), ail_prog) file =
   let open CF.AilSyntax in
   let open CF.Milicore in
-  let@ tagDefs = normalise_tag_definitions file.mi_tagDefs in
+  let@ tagDefs =
+    Timing.time_phase "mucore_normalise_tagdefs" (fun () ->
+      normalise_tag_definitions file.mi_tagDefs)
+  in
   let fin_marker, markers_env = fin_markers_env in
   let fin_d_st = CAE.{ inner = Pmap.find fin_marker markers_env; markers_env } in
   let env = Translate.init tagDefs (fetch_enum fin_d_st) (fetch_typedef fin_d_st) in
-  let@ env = Translate.add_datatypes env ail_prog.cn_datatypes in
+  let@ env =
+    Timing.time_phase "mucore_add_datatypes" (fun () ->
+      Translate.add_datatypes env ail_prog.cn_datatypes)
+  in
   (* Builtin functions that can be expressed as index terms are added in Translate.init *)
-  let@ env = Translate.add_user_defined_functions env ail_prog.cn_functions in
-  let@ lfuns = ListM.mapM (Translate.function_ env) ail_prog.cn_functions in
+  let@ env =
+    Timing.time_phase "mucore_add_user_defined_functions" (fun () ->
+      Translate.add_user_defined_functions env ail_prog.cn_functions)
+  in
+  let@ lfuns =
+    Timing.time_phase "mucore_translate_functions" (fun () ->
+      ListM.mapM (Translate.function_ env) ail_prog.cn_functions)
+  in
   let env = Translate.add_predicates env ail_prog.cn_predicates in
-  let@ preds = ListM.mapM (Translate.predicate env) ail_prog.cn_predicates in
-  let@ lemmata = ListM.mapM (Translate.lemma env) ail_prog.cn_lemmata in
+  let@ preds =
+    Timing.time_phase "mucore_translate_predicates" (fun () ->
+      ListM.mapM (Translate.predicate env) ail_prog.cn_predicates)
+  in
+  let@ lemmata =
+    Timing.time_phase "mucore_translate_lemmata" (fun () ->
+      ListM.mapM (Translate.lemma env) ail_prog.cn_lemmata)
+  in
   let global_types =
     List.map
       (fun (s, global) ->
@@ -1485,7 +1694,10 @@ let normalise_file ~inherit_loc ((fin_markers_env : CAE.fin_markers_env), ail_pr
          | GlobalDecl (_bt, ct) -> (s, ct))
       file.mi_globs
   in
-  let@ globs = normalise_globs_list ~inherit_loc env file.mi_globs in
+  let@ globs =
+    Timing.time_phase "mucore_normalise_globs" (fun () ->
+      normalise_globs_list ~inherit_loc env file.mi_globs)
+  in
   let env = List.fold_left register_glob env globs in
   let add_to_list key value list_map =
     (* Map.add_to_list exists in OCaml 5.1, this is because we currently build
@@ -1502,15 +1714,16 @@ let normalise_file ~inherit_loc ((fin_markers_env : CAE.fin_markers_env), ail_pr
       Sym.Map.empty
   in
   let@ funs, mk_functions =
-    normalise_fun_map
-      ~inherit_loc
-      (markers_env, ail_prog)
-      (global_types, file.mi_visible_objects_env)
-      env
-      fun_specs_map
-      file.mi_funinfo
-      file.mi_loop_attributes
-      file.mi_funs
+    Timing.time_phase "mucore_normalise_fun_map" (fun () ->
+      normalise_fun_map
+        ~inherit_loc
+        (markers_env, ail_prog)
+        (global_types, file.mi_visible_objects_env)
+        env
+        fun_specs_map
+        file.mi_funinfo
+        file.mi_loop_attributes
+        file.mi_funs)
   in
   let call_funinfo =
     Pmap.mapi

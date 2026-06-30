@@ -88,7 +88,8 @@ let frontend
     }
   in
   let@ cabs_tunit_opt, ail_prog_opt, prog0 =
-    c_frontend_and_elaboration ~cn_init_scope (conf, io) (stdlib, impl) ~filename
+    Timing.time_phase "C_frontend" (fun () ->
+      c_frontend_and_elaboration ~cn_init_scope (conf, io) (stdlib, impl) ~filename)
   in
   let@ () =
     if conf.typecheck_core then
@@ -100,13 +101,19 @@ let frontend
   let cabs_tunit = Option.get cabs_tunit_opt in
   let markers_env, ail_prog = Option.get ail_prog_opt in
   CF.Tags.set_tagDefs prog0.CF.Core.tagDefs;
-  let prog1 = CF.Remove_unspecs.rewrite_file prog0 in
-  let prog2 = CF.Milicore.core_to_micore__file Locations.update prog1 in
+  let prog1 =
+    Timing.time_phase "Core_rewrite" (fun () -> CF.Remove_unspecs.rewrite_file prog0)
+  in
+  let prog2 =
+    Timing.time_phase "Milicore_convert" (fun () ->
+      CF.Milicore.core_to_micore__file Locations.update prog1)
+  in
   let prog3 =
     if skip_label_inlining then
       prog2
     else
-      CF.Milicore_label_inline.rewrite_file prog2
+      Timing.time_phase "Label_inline" (fun () ->
+        CF.Milicore_label_inline.rewrite_file prog2)
   in
   let statement_locs = CStatements.search (snd ail_prog) in
   print_log_file ("original", `CORE prog0);
@@ -209,14 +216,16 @@ let with_well_formedness_check
     let result =
       let open Or_TypeError in
       let@ prog5 =
-        Core_to_mucore.normalise_file
-          ~inherit_loc:(not no_inherit_loc)
-          (markers_env, snd ail_prog)
-          prog
+        Timing.time_phase "Mucore_normalize" (fun () ->
+          Core_to_mucore.normalise_file
+            ~inherit_loc:(not no_inherit_loc)
+            (markers_env, snd ail_prog)
+            prog)
       in
       print_log_file ("mucore", `MUCORE prog5);
       let paused =
-        Typing.run_to_pause Context.empty (Check.check_decls_lemmata_fun_specs prog5)
+        Timing.time_phase "Spec_validation" (fun () ->
+          Typing.run_to_pause Context.empty (Check.check_decls_lemmata_fun_specs prog5))
       in
       Result.iter_error handle_error (Typing.pause_to_result paused);
       let@ _ = f ~cabs_tunit ~prog5 ~ail_prog ~statement_locs ~paused in
