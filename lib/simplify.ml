@@ -19,10 +19,17 @@ module ITSet = Set.Make (IT)
 type simp_ctxt =
   { global : Global.t;
     values : IT.t Sym.Map.t;
-    simp_hook : IT.t -> IT.t option
+    simp_hook : IT.t -> IT.t option;
+    assumptions : LogicalConstraints.Set.t
   }
 
-let default global = { global; values = Sym.Map.empty; simp_hook = (fun _ -> None) }
+let default global =
+  { global;
+    values = Sym.Map.empty;
+    simp_hook = (fun _ -> None);
+    assumptions = LogicalConstraints.Set.empty
+  }
+
 
 let do_ctz_z z =
   let rec loop z found =
@@ -247,8 +254,45 @@ module IndexTerms = struct
     | _ -> IT.num_lit_ z bt
 
 
+  (* Try to find a substitution for a term from the assumptions.
+     Returns Some value if assumptions contain term == value or value == term *)
+  let find_in_assumptions simp_ctxt term =
+    let result =
+      LogicalConstraints.Set.fold
+        (fun lc acc ->
+           match acc with
+           | Some _ -> acc (* Already found *)
+           | None -> LogicalConstraints.equates_to term lc)
+        simp_ctxt.assumptions
+        None
+    in
+    (match result with
+     | Some v ->
+       Pp.debug
+         3
+         (lazy Pp.(!^"Found in assumptions: " ^^ IT.pp term ^^ !^" == " ^^ IT.pp v))
+     | None ->
+       if not (LogicalConstraints.Set.is_empty simp_ctxt.assumptions) then
+         Pp.debug 1 (lazy Pp.(!^"No match in assumptions for: " ^^ IT.pp term)));
+    result
+
+
   let rec simp ?(inline_functions = false) simp_ctxt =
     let aux it = simp ~inline_functions simp_ctxt it in
+    (* Debug: log when we have non-empty assumptions *)
+    let () =
+      if
+        (not (LogicalConstraints.Set.is_empty simp_ctxt.assumptions))
+        && not inline_functions
+      then
+        Pp.debug
+          1
+          (lazy
+            Pp.(
+              !^"[SIMPLIFY DEBUG] Simplifying with "
+              ^^ !^(string_of_int (LogicalConstraints.Set.cardinal simp_ctxt.assumptions))
+              ^^ !^" assumptions"))
+    in
     fun it ->
       let the_term = match simp_ctxt.simp_hook it with None -> it | Some it' -> it' in
       let (IT (the_term_, the_bt, the_loc)) = the_term in
@@ -732,14 +776,113 @@ module IndexTerms = struct
           | Some inlined -> aux inlined
           | None -> t)
       | Match (scrutinee, branches) ->
+        let num_branches = List.length branches in
+        Pp.debug
+          1
+          (lazy
+            Pp.(
+              !^"[SIMPLIFY DEBUG] Match with "
+              ^^ !^(string_of_int num_branches)
+              ^^ !^" branches"));
+        Pp.debug 1 (lazy Pp.(!^"  Scrutinee: " ^^ IT.pp scrutinee));
         let scrutinee' = aux scrutinee in
+        Pp.debug 1 (lazy Pp.(!^"  After simplification: " ^^ IT.pp scrutinee'));
+        (* Log what kind of term the scrutinee is *)
+        (match IT.get_term scrutinee' with
+         | Sym s -> Pp.debug 1 (lazy Pp.(!^"  Scrutinee is Sym: " ^^ Sym.pp s))
+         | Const _ -> Pp.debug 1 (lazy Pp.(!^"  Scrutinee is Const"))
+         | Apply (name, args) ->
+           Pp.debug 1 (lazy Pp.(!^"  Scrutinee is Apply: " ^^ Sym.pp name));
+           Pp.debug
+             3
+             (lazy
+               Pp.(!^"    With " ^^ !^(string_of_int (List.length args)) ^^ !^" args"))
+         | Constructor (ctor, _) ->
+           Pp.debug 1 (lazy Pp.(!^"  Scrutinee is Constructor: " ^^ Sym.pp ctor))
+         | _ -> Pp.debug 1 (lazy Pp.(!^"  Scrutinee is other term type")));
         (* Try to match scrutinee against patterns and simplify to the branch body *)
         (match try_match_pattern scrutinee' branches with
-         | Some body -> aux body
+         | Some body ->
+           Pp.debug 1 (lazy Pp.(!^"Match simplified via pattern matching"));
+           aux body
          | None ->
-           (* Can't simplify, reconstruct with simplified scrutinee and branches *)
-           let branches' = List.map (fun (pat, body) -> (pat, aux body)) branches in
-           IT (Match (scrutinee', branches'), the_bt, the_loc))
+           Pp.debug 1 (lazy Pp.(!^"Pattern matching failed"));
+           (* Pattern matching failed. If scrutinee is an Apply and we have assumptions,
+              try to inline and evaluate it using constraint information *)
+           let scrutinee_final =
+             match IT.get_term scrutinee' with
+             | Apply (name, args) when not inline_functions ->
+               Pp.debug 1 (lazy Pp.(!^"Checking if we can optimize Apply node"));
+               if LogicalConstraints.Set.is_empty simp_ctxt.assumptions then
+                 Pp.debug 1 (lazy Pp.(!^"  No assumptions available"))
+               else
+                 Pp.debug
+                   3
+                   (lazy
+                     Pp.(
+                       !^"  Have "
+                       ^^ !^(string_of_int
+                               (LogicalConstraints.Set.cardinal simp_ctxt.assumptions))
+                       ^^ !^" assumptions"));
+               (* Try to substitute known values from assumptions into the args *)
+               let args_with_subst =
+                 List.map
+                   (fun arg ->
+                      Pp.debug 1 (lazy Pp.(!^"  Checking arg: " ^^ IT.pp arg));
+                      match find_in_assumptions simp_ctxt arg with
+                      | Some value ->
+                        Pp.debug
+                          3
+                          (lazy Pp.(!^"    -> Found substitution: " ^^ IT.pp value));
+                        value
+                      | None ->
+                        Pp.debug 1 (lazy Pp.(!^"    -> No substitution found"));
+                        arg)
+                   args
+               in
+               (* If any args changed, try inlining with the substituted values *)
+               if List.exists2 (fun a b -> not (IT.equal a b)) args args_with_subst then (
+                 Pp.debug
+                   1
+                   (lazy Pp.(!^"Args changed, attempting constraint-aware inlining"));
+                 match Sym.Map.find_opt name simp_ctxt.global.logical_functions with
+                 | Some def ->
+                   (match Definition.Function.try_open def args_with_subst with
+                    | Some inlined_body ->
+                      Pp.debug 1 (lazy Pp.(!^"Successfully inlined with constraints"));
+                      (* Recursively simplify the inlined body with inlining enabled *)
+                      simp ~inline_functions:true simp_ctxt inlined_body
+                    | None ->
+                      Pp.debug 1 (lazy Pp.(!^"Cannot inline (recursive function)"));
+                      scrutinee')
+                 | None ->
+                   Pp.debug 1 (lazy Pp.(!^"Function not found in global"));
+                   scrutinee')
+               else (
+                 Pp.debug 1 (lazy Pp.(!^"No args changed after substitution check"));
+                 scrutinee')
+             | Apply _ when inline_functions ->
+               Pp.debug
+                 3
+                 (lazy
+                   Pp.(
+                     !^"Scrutinee is Apply but inline_functions=true (will be handled \
+                        elsewhere)"));
+               scrutinee'
+             | _ ->
+               Pp.debug 1 (lazy Pp.(!^"Scrutinee is not Apply or doesn't match pattern"));
+               scrutinee'
+           in
+           (* Try pattern matching again with the potentially improved scrutinee *)
+           (match try_match_pattern scrutinee_final branches with
+            | Some body ->
+              Pp.debug 1 (lazy Pp.(!^"Match simplified after constraint substitution!"));
+              aux body
+            | None ->
+              Pp.debug 1 (lazy Pp.(!^"Still cannot simplify, reconstructing Match"));
+              (* Still can't simplify, reconstruct *)
+              let branches' = List.map (fun (pat, body) -> (pat, aux body)) branches in
+              IT (Match (scrutinee_final, branches'), the_bt, the_loc)))
       | _ ->
         (* FIXME: it's problematic that some term shapes aren't even explored *)
         it

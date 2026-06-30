@@ -1731,10 +1731,18 @@ let check_with_adaptive_portfolio solver _cfg cmds =
 
 let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
   clear_model ();
+  (* Debug: log all calls *)
+  debug 1 (lazy Pp.(!^"[SOLVER] provable_or_unknown called"));
+  (* Debug: log assumptions count *)
+  let num_assumptions = LogicalConstraints.Set.cardinal assumptions in
+  debug
+    1
+    (lazy Pp.(!^"[SOLVER] assumptions count: " ^^ !^(string_of_int num_assumptions)));
   (* shortcut, as similarly suggested by Robbert *)
+  let simp_ctxt_with_assumptions : Simplify.simp_ctxt = { simp_ctxt with assumptions } in
   let lc =
     Timing.time_phase "simplify_constraint" (fun () ->
-      Simplify.LogicalConstraints.simp simp_ctxt lc)
+      Simplify.LogicalConstraints.simp simp_ctxt_with_assumptions lc)
   in
   match lc with
   | LC.T (IT (Const (Bool true), _, _)) ->
