@@ -25,6 +25,24 @@ let time_phase name f =
     f ()
 
 
+(* Monadic version - for timing monadic computations *)
+let time_phase_m name (action : 'st -> 'a) : 'st -> 'a =
+  if !enabled then (
+    fun state ->
+  let t0 = Unix.gettimeofday () in
+  let result = action state in
+  let t1 = Unix.gettimeofday () in
+  let elapsed = t1 -. t0 in
+  (match Hashtbl.find_opt phases name with
+   | Some stats ->
+     stats.count <- stats.count + 1;
+     stats.total_time <- stats.total_time +. elapsed
+   | None -> Hashtbl.add phases name { count = 1; total_time = elapsed });
+  result)
+  else
+    action
+
+
 let print_stats () =
   if !enabled then (
     Printf.eprintf "\n=== CN Performance Profile ===\n";
@@ -48,3 +66,10 @@ let print_stats () =
 
 
 let reset () = Hashtbl.clear phases
+
+(* Print stats on exit if enabled *)
+let () =
+  at_exit (fun () ->
+    if !enabled && Hashtbl.length phases > 0 then (
+      Printf.eprintf "\n[CN interrupted - printing partial timing stats]\n";
+      print_stats ()))
