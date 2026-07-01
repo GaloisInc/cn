@@ -2,19 +2,22 @@
 
 (* Statistics *)
 let hits = ref 0
+
 let misses = ref 0
+
 let total_lookup_time = ref 0.0
+
 let hash_time = ref 0.0
+
 let db_time = ref 0.0
+
 let enabled = ref true
 
 (* Debug flag - set via CN_QUERY_CACHE_DEBUG environment variable *)
 let debug_enabled () =
-  try
-    match Sys.getenv "CN_QUERY_CACHE_DEBUG" with
-    | "1" -> true
-    | _ -> false
-  with Not_found -> false
+  try match Sys.getenv "CN_QUERY_CACHE_DEBUG" with "1" -> true | _ -> false with
+  | Not_found -> false
+
 
 (* SQLite database handle *)
 let db : Sqlite3.db option ref = ref None
@@ -31,6 +34,7 @@ let cache_db_path () =
   mkdir_p cache_dir;
   Filename.concat cache_dir "query-cache.db"
 
+
 (* Initialize SQLite database *)
 let init_db () =
   match !db with
@@ -42,22 +46,19 @@ let init_db () =
         let db_handle = Sqlite3.db_open path in
         (* Create table if it doesn't exist *)
         let _ =
-          Sqlite3.exec db_handle
-            "CREATE TABLE IF NOT EXISTS query_cache (\
-             hash TEXT PRIMARY KEY,\
-             result INTEGER NOT NULL\
-             ) WITHOUT ROWID"
+          Sqlite3.exec
+            db_handle
+            "CREATE TABLE IF NOT EXISTS query_cache (hash TEXT PRIMARY KEY,result \
+             INTEGER NOT NULL) WITHOUT ROWID"
         in
         (* Create index on hash for faster lookups (though PRIMARY KEY already indexes) *)
         db := Some db_handle
       with
       | _ -> ())
 
+
 (* Convert result to integer for storage *)
-let result_to_int = function
-  | `True -> 0
-  | `False -> 1
-  | `Unknown -> 2
+let result_to_int = function `True -> 0 | `False -> 1 | `Unknown -> 2
 
 (* Convert integer to result *)
 let result_from_int = function
@@ -65,6 +66,7 @@ let result_from_int = function
   | 1 -> Some `False
   | 2 -> Some `Unknown
   | _ -> None
+
 
 (* Hash SMT commands - must use string serialization for determinism *)
 let hash_smt_commands (commands : Sexplib.Sexp.t list) : string =
@@ -83,10 +85,16 @@ let hash_smt_commands (commands : Sexplib.Sexp.t list) : string =
   let hash = Digest.string str |> Digest.to_hex in
   let t1 = Unix.gettimeofday () in
   hash_time := !hash_time +. (t1 -. t0);
-  if debug_enabled () && num_commands > 0 && (num_commands mod 1000 = 0 || str_len > 100000) then
-    Printf.eprintf "[HASH] %d commands, %d bytes, %.3fms\n%!"
-      num_commands str_len ((t1 -. t0) *. 1000.0);
+  if
+    debug_enabled () && num_commands > 0 && (num_commands mod 1000 = 0 || str_len > 100000)
+  then
+    Printf.eprintf
+      "[HASH] %d commands, %d bytes, %.3fms\n%!"
+      num_commands
+      str_len
+      ((t1 -. t0) *. 1000.0);
   hash
+
 
 (* Look up query in cache by pre-computed hash *)
 let lookup_by_hash (hash : string) : [> `True | `False | `Unknown ] option =
@@ -99,31 +107,32 @@ let lookup_by_hash (hash : string) : [> `True | `False | `Unknown ] option =
       match !db with
       | None -> None
       | Some db_handle ->
-        try
-          let stmt = Sqlite3.prepare db_handle "SELECT result FROM query_cache WHERE hash = ?" in
-          let _ = Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT hash) in
-          match Sqlite3.step stmt with
-          | Sqlite3.Rc.ROW ->
-            (match Sqlite3.Data.to_int (Sqlite3.column stmt 0) with
-             | Some result_int ->
-               let _ = Sqlite3.finalize stmt in
-               result_from_int result_int
-             | None ->
-               let _ = Sqlite3.finalize stmt in
-               None)
-          | _ ->
-            let _ = Sqlite3.finalize stmt in
-            None
-        with
-        | _ -> None
+        (try
+           let stmt =
+             Sqlite3.prepare db_handle "SELECT result FROM query_cache WHERE hash = ?"
+           in
+           let _ = Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT hash) in
+           match Sqlite3.step stmt with
+           | Sqlite3.Rc.ROW ->
+             (match Sqlite3.Data.to_int (Sqlite3.column stmt 0) with
+              | Some result_int ->
+                let _ = Sqlite3.finalize stmt in
+                result_from_int result_int
+              | None ->
+                let _ = Sqlite3.finalize stmt in
+                None)
+           | _ ->
+             let _ = Sqlite3.finalize stmt in
+             None
+         with
+         | _ -> None)
     in
     let t1 = Unix.gettimeofday () in
     db_time := !db_time +. (t1 -. t0);
     total_lookup_time := !total_lookup_time +. (t1 -. t0);
-    (match result with
-     | Some _ -> incr hits
-     | None -> incr misses);
+    (match result with Some _ -> incr hits | None -> incr misses);
     result)
+
 
 (* Legacy API for backward compatibility - computes hash from commands *)
 let lookup_smt_commands (commands : Sexplib.Sexp.t list)
@@ -131,9 +140,10 @@ let lookup_smt_commands (commands : Sexplib.Sexp.t list)
   =
   if not !enabled then
     None
-  else
+  else (
     let hash = hash_smt_commands commands in
-    lookup_by_hash hash
+    lookup_by_hash hash)
+
 
 (* Store query result in cache by pre-computed hash *)
 let store_by_hash (hash : string) (result : [< `True | `False | `Unknown ]) : unit =
@@ -142,18 +152,22 @@ let store_by_hash (hash : string) (result : [< `True | `False | `Unknown ]) : un
     match !db with
     | None -> ()
     | Some db_handle ->
-      try
-        let stmt =
-          Sqlite3.prepare db_handle
-            "INSERT OR REPLACE INTO query_cache (hash, result) VALUES (?, ?)"
-        in
-        let _ = Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT hash) in
-        let _ = Sqlite3.bind stmt 2 (Sqlite3.Data.INT (Int64.of_int (result_to_int result))) in
-        let _ = Sqlite3.step stmt in
-        let _ = Sqlite3.finalize stmt in
-        ()
-      with
-      | _ -> ())
+      (try
+         let stmt =
+           Sqlite3.prepare
+             db_handle
+             "INSERT OR REPLACE INTO query_cache (hash, result) VALUES (?, ?)"
+         in
+         let _ = Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT hash) in
+         let _ =
+           Sqlite3.bind stmt 2 (Sqlite3.Data.INT (Int64.of_int (result_to_int result)))
+         in
+         let _ = Sqlite3.step stmt in
+         let _ = Sqlite3.finalize stmt in
+         ()
+       with
+       | _ -> ()))
+
 
 (* Legacy API for backward compatibility - computes hash from commands *)
 let store_smt_commands
@@ -161,9 +175,10 @@ let store_smt_commands
       (result : [< `True | `False | `Unknown ])
   : unit
   =
-  if !enabled then
+  if !enabled then (
     let hash = hash_smt_commands commands in
-    store_by_hash hash result
+    store_by_hash hash result)
+
 
 (* Print cache statistics *)
 let print_stats () =
@@ -200,9 +215,16 @@ let print_stats () =
     Printf.eprintf "Cache db:     %s\n" (cache_db_path ());
     if debug_enabled () then (
       Printf.eprintf "Lookup time:  %.3fs\n" !total_lookup_time;
-      Printf.eprintf "  Hash time:  %.3fs (%.1f%%)\n" !hash_time (100.0 *. !hash_time /. !total_lookup_time);
-      Printf.eprintf "  DB time:    %.3fs (%.1f%%)\n" !db_time (100.0 *. !db_time /. !total_lookup_time));
+      Printf.eprintf
+        "  Hash time:  %.3fs (%.1f%%)\n"
+        !hash_time
+        (100.0 *. !hash_time /. !total_lookup_time);
+      Printf.eprintf
+        "  DB time:    %.3fs (%.1f%%)\n"
+        !db_time
+        (100.0 *. !db_time /. !total_lookup_time));
     Printf.eprintf "=============================\n")
+
 
 (* Clear cache *)
 let clear () =

@@ -761,6 +761,19 @@ module C_vars = struct
                e
            in
            return expr
+         | Record _ ->
+           let@ expr =
+             ListM.fold_rightM
+               (fun (id, v) expr ->
+                  let@ v = self v in
+                  let start_pos = Option.get @@ Locations.start_pos @@ Id.get_loc id in
+                  let cursor = Cerb_location.PointCursor start_pos in
+                  let loc = Locations.region (start_pos, end_pos) cursor in
+                  return (IT (RecordUpdate ((expr, id), v), bt, loc)))
+               updates
+               e
+           in
+           return expr
          | _ ->
            fail
              { loc = IT.get_loc e;
@@ -769,7 +782,7 @@ module C_vars = struct
                    (Illtyped_it
                       { it = Terms.pp e;
                         has = SBT.pp bt;
-                        expected = "struct";
+                        expected = "struct or record";
                         reason =
                           (let head, pos = Locations.head_pos_of_location loc in
                            head ^ "\n" ^ pos)

@@ -9,14 +9,17 @@ cn/alloc_id/pointer_cast_provenance.c:71:19: warning: 'each' prefers a 'u64', bu
 [2/4]: test_write_through_cast -- fail
 [3/4]: test_multiple_roundtrips -- fail
 [4/4]: test_arithmetic_on_uintptr -- fail
-Atomic: has_alloc_id(intToPtr)
-  -> FALSE
 cn/alloc_id/pointer_cast_provenance.c:17:9: error: Unprovable constraint
     /*@ assert(has_alloc_id(q)); @*/  // Does q have provenance?
         ^~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/pointer_cast_provenance.c:17:9:
     /*@ assert(has_alloc_id(q)); @*/  // Does q have provenance?
         ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/pointer_cast_provenance.c:17:16::
+    /*@ assert(has_alloc_id(q)); @*/  // Does q have provenance?
+               ~~~~~~~~~~~~^~~ 
+
 Failing constraint:
   has_alloc_id(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_provenance.c__test_cast_preserves_provenance.html
@@ -25,14 +28,17 @@ cn/alloc_id/pointer_cast_provenance.c:36:5: error: Missing resource for writing
     ~~~^~~~ 
 Resource needed: W<signed int>(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_provenance.c__test_write_through_cast.html
-Atomic: (alloc_id)p == (alloc_id)intToPtr
-  -> FALSE
 cn/alloc_id/pointer_cast_provenance.c:59:9: error: Unprovable constraint
     /*@ assert((alloc_id)p == (alloc_id)q1); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/pointer_cast_provenance.c:59:9:
     /*@ assert((alloc_id)p == (alloc_id)q1); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/pointer_cast_provenance.c:59:16::
+    /*@ assert((alloc_id)p == (alloc_id)q1); @*/
+               ~~~~~~~~~~~~^~~~~~~~~~~~~~~ 
+
 Failing constraint:
   (alloc_id)p == (alloc_id)intToPtr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_provenance.c__test_multiple_roundtrips.html

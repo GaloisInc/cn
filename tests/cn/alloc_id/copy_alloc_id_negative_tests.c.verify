@@ -9,25 +9,31 @@ return code: 1
 [8/10]: test_tag_insufficient_space -- fail
 [9/10]: test_integer_no_provenance -- fail
 [10/10]: test_mix_allocations -- fail
-Atomic: A.base <= (u64)p - 1000'u64 /* 0x3e8 */
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:37:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(bad_addr, p);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   A.base <= (u64)p - 1000'u64 /* 0x3e8 */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_address_below_base.html
-Atomic: A.base <= (u64)p + 10000'u64 /* 0x2710 */
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:55:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(bad_addr, p);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   A.base <= (u64)p + 10000'u64 /* 0x2710 */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_address_above_end.html
@@ -37,25 +43,31 @@ cn/alloc_id/copy_alloc_id_negative_tests.c:71:12: error: Missing resource for ca
 Resource needed: Alloc(p)
       cn/alloc_id/copy_alloc_id_negative_tests.c:13:19: (arg A)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_missing_alloc_resource.html
-Atomic: Ap.base <= (u64)q
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:92:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(q_addr, p);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   Ap.base <= (u64)q
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_wrong_allocation.html
-Atomic: A.base <= (u64)arr + 1000'u64 /* 0x3e8 */
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:113:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(way_past, arr);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   A.base <= (u64)arr + 1000'u64 /* 0x3e8 */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_way_past_end.html
@@ -63,45 +75,59 @@ cn/alloc_id/copy_alloc_id_negative_tests.c:130:37: error: Mismatched types.
     uintptr_t way_back = mid_addr - (100 * sizeof(int));
                                     ^~~~~~~~~~~~~~~~~~~ 
 Expected value of type 'u64' but found value of type 'u32'
-Atomic: A.base <= 3735928559'u64 /* 0xdeadbeef */
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:150:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(arbitrary, p);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   A.base <= 3735928559'u64 /* 0xdeadbeef */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_arbitrary_address.html
-Literal false
 cn/alloc_id/copy_alloc_id_negative_tests.c:171:5: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(addr, p);
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:163:14:
     ensures  false;  // Should not be provable
              ^~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:163:14::
+    ensures  false;  // Should not be provable
+             ^
+
 Failing constraint:
   false
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_tag_insufficient_space.html
-Literal false
 cn/alloc_id/copy_alloc_id_negative_tests.c:191:5: error: Unprovable constraint
     return (int*)addr;  // This will fail - no provenance
     ^~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:180:14:
     ensures  false;  // Should not be provable
              ^~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:180:14::
+    ensures  false;  // Should not be provable
+             ^
+
 Failing constraint:
   false
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_integer_no_provenance.html
-Atomic: Ap.base <= (u64)q
-  -> FALSE
 cn/alloc_id/copy_alloc_id_negative_tests.c:211:12: error: Unprovable constraint
     return __cerbvar_copy_alloc_id(q_addr, p);
            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/copy_alloc_id_negative_tests.c:14:14:
              A.base <= addr_val;
              ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/copy_alloc_id_negative_tests.c:14:14::
+             A.base <= addr_val;
+             ~~~~~~~^~~~~~~~~~~ 
+
 Failing constraint:
   Ap.base <= (u64)q
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__copy_alloc_id_negative_tests.c__test_mix_allocations.html

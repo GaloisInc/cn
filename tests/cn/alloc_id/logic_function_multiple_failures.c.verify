@@ -2,53 +2,37 @@ return code: 1
 [1/3]: check_triangle -- pass
 [2/3]: test_zero_side -- fail
 [3/3]: test_bad_triangle -- fail
-Expanding: valid_triangle
-  And: trying LHS
-    And: trying LHS
-      And: trying LHS
-        And: trying LHS
-          And: trying LHS
-            Atomic: 0'u64 < 0'u64
-              -> FALSE
-          And: LHS failed
-        And: LHS failed
-      And: LHS failed
-    And: LHS failed
-  And: LHS failed
 cn/alloc_id/logic_function_multiple_failures.c:35:5: error: Unprovable constraint
     check_triangle(p, 0, 0, 0);  // All sides zero
     ^~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/logic_function_multiple_failures.c:21:14:
              valid_triangle(a, b, c);
              ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function valid_triangle at cn/alloc_id/logic_function_multiple_failures.c:21:14::
+             valid_triangle(a, b, c);
+             ~~~~~~~~~~~~~~^~~~~~~~~ 
+  → Failing constraint at cn/alloc_id/logic_function_multiple_failures.c:10:7::
+      a > 0u64 &&           // Side a must be positive
+      ~~^~~~~~ 
+
 Failing constraint:
   0'u64 < 0'u64
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__logic_function_multiple_failures.c__test_zero_side.html
-Expanding: valid_triangle
-  And: trying LHS
-    And: trying LHS
-      And: trying LHS
-        And: trying LHS
-          And: trying LHS
-            Atomic: 0'u64 < 1'u64
-              -> TRUE
-          And: LHS OK, trying RHS
-            Atomic: 0'u64 < 2'u64
-              -> TRUE
-        And: LHS OK, trying RHS
-          Atomic: 0'u64 < 10'u64
-            -> TRUE
-      And: LHS OK, trying RHS
-        Atomic: 10'u64 < 3'u64
-          -> FALSE
-    And: LHS failed
-  And: LHS failed
 cn/alloc_id/logic_function_multiple_failures.c:45:5: error: Unprovable constraint
     check_triangle(p, 1, 2, 10);  // 1 + 2 not > 10
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/logic_function_multiple_failures.c:21:14:
              valid_triangle(a, b, c);
              ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function valid_triangle at cn/alloc_id/logic_function_multiple_failures.c:21:14::
+             valid_triangle(a, b, c);
+             ~~~~~~~~~~~~~~^~~~~~~~~ 
+  → Failing constraint at cn/alloc_id/logic_function_multiple_failures.c:13:7::
+      a + b > c &&          // Triangle inequality 1
+      ~~~~~~^~~ 
+
 Failing constraint:
   10'u64 < 1'u64 + 2'u64
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__logic_function_multiple_failures.c__test_bad_triangle.html

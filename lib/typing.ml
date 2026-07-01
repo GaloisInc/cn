@@ -111,7 +111,11 @@ let iterM = Eff.ListM.iterM
 
 let make_simp_ctxt s =
   Simplify.
-    { global = s.typing_context.global; values = s.sym_eqs; simp_hook = (fun _ -> None) }
+    { global = s.typing_context.global;
+      values = s.sym_eqs;
+      simp_hook = (fun _ -> None);
+      assumptions = LC.Set.empty
+    }
 
 
 let simp_ctxt () =

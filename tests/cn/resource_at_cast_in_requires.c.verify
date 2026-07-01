@@ -29,26 +29,33 @@ cn/resource_at_cast_in_requires.c:48:5: error: Missing resource for writing
     ~~~^~~~ 
 Resource needed: W<signed int>(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test4_different_locals.html
-Atomic: (alloc_id)intToPtr == (alloc_id)(pointer)addr
-  -> FALSE
 cn/resource_at_cast_in_requires.c:73:9: error: Unprovable constraint
     /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/resource_at_cast_in_requires.c:73:9:
     /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/resource_at_cast_in_requires.c:73:16::
+    /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
+               ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
 Failing constraint:
   (alloc_id)intToPtr == (alloc_id)(pointer)addr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test6_alloc_id_equality.html
-Expanding: ptr_eq
-  Atomic: intToPtr == (pointer)addr
-    -> FALSE
 cn/resource_at_cast_in_requires.c:84:9: error: Unprovable constraint
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/resource_at_cast_in_requires.c:84:9:
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function ptr_eq at cn/resource_at_cast_in_requires.c:84:16::
+    /*@ assert(ptr_eq(p, (pointer)addr)); @*/
+               ~~~~~~^~~~~~~~~~~~~~~~~~ 
+  → Failing constraint at other location (<builtin>) :
+
+
 Failing constraint:
   intToPtr == (pointer)addr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test7_ptr_eq.html

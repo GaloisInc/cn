@@ -2,39 +2,51 @@ return code: 1
 [1/3]: test_explicit_equality -- fail
 [2/3]: test_named_spec_cast -- fail
 [3/3]: test_relationship -- fail
-Expanding: ptr_eq
-  Atomic: intToPtr == (pointer)addr
-    -> FALSE
 cn/cast_spec_vs_code.c:18:9: error: Unprovable constraint
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/cast_spec_vs_code.c:18:9:
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function ptr_eq at cn/cast_spec_vs_code.c:18:16::
+    /*@ assert(ptr_eq(p, (pointer)addr)); @*/
+               ~~~~~~^~~~~~~~~~~~~~~~~~ 
+  → Failing constraint at other location (<builtin>) :
+
+
 Failing constraint:
   intToPtr == (pointer)addr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_spec_vs_code.c__test_explicit_equality.html
-Expanding: ptr_eq
-  Atomic: intToPtr == spec_ptr
-    -> FALSE
 cn/cast_spec_vs_code.c:32:9: error: Unprovable constraint
     /*@ assert(ptr_eq(p, spec_ptr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/cast_spec_vs_code.c:32:9:
     /*@ assert(ptr_eq(p, spec_ptr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function ptr_eq at cn/cast_spec_vs_code.c:32:16::
+    /*@ assert(ptr_eq(p, spec_ptr)); @*/
+               ~~~~~~^~~~~~~~~~~~~ 
+  → Failing constraint at other location (<builtin>) :
+
+
 Failing constraint:
   intToPtr == spec_ptr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_spec_vs_code.c__test_named_spec_cast.html
-Expanding: ptr_eq
-  Atomic: intToPtr == (pointer)addr
-    -> FALSE
 cn/cast_spec_vs_code.c:48:9: error: Unprovable constraint
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/cast_spec_vs_code.c:48:9:
     /*@ assert(ptr_eq(p, (pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function ptr_eq at cn/cast_spec_vs_code.c:48:16::
+    /*@ assert(ptr_eq(p, (pointer)addr)); @*/
+               ~~~~~~^~~~~~~~~~~~~~~~~~ 
+  → Failing constraint at other location (<builtin>) :
+
+
 Failing constraint:
   intToPtr == (pointer)addr
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_spec_vs_code.c__test_relationship.html

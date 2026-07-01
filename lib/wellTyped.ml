@@ -7,11 +7,9 @@ open Pp.Infix
 
 (* Debug flag - set via CN_SPEC_DEBUG environment variable *)
 let debug_enabled () =
-  try
-    match Sys.getenv "CN_SPEC_DEBUG" with
-    | "1" -> true
-    | _ -> false
-  with Not_found -> false
+  try match Sys.getenv "CN_SPEC_DEBUG" with "1" -> true | _ -> false with
+  | Not_found -> false
+
 
 (* Global state: the set of all C-types that might appear as values in Core
    expressions (and so might make it into the SMT problem). We use this to
