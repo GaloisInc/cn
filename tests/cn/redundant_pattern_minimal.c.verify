@@ -1,0 +1,19 @@
+return code: 125
+cn: internal error, uncaught exception:
+    UnexpectedSolverResponse((error
+     "line 103 column 42: invalid datatype declaration, datatype does not have any constructors"))
+    Raised at Cn__Solver.debug_ack_command in file "lib/solver.ml", <POS>
+    Called from Cn__Solver.ack_command in file "lib/solver.ml", <POS>
+    Called from Stdlib__List.iter in file "list.ml", <POS>
+    Called from Cn__Solver.declare_solver_basics in file "lib/solver.ml", <POS>
+    Called from Cn__Solver.make in file "lib/solver.ml", <POS>
+    Called from Cn__Typing.init_solver.(fun) in file "lib/typing.ml", <POS>
+    Called from Cn__Typing.modify in file "lib/typing.ml", <POS>
+    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
+    Called from Cn__Typing.bind.(fun) in file "lib/typing.ml", <POS>
+    Called from Cn__Typing.run_from_pause in file "lib/typing.ml", <POS>
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
+    Called from Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
+    Re-raised at Dune__exe__Common.with_well_formedness_check in file "bin/common.ml", <POS>
+    Called from Cmdliner_term.app.(fun) in file "cmdliner_term.ml", <POS>
+    Called from Cmdliner_eval.run_parser in file "cmdliner_eval.ml", <POS>

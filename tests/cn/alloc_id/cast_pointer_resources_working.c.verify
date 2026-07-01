@@ -1,0 +1,32 @@
+return code: 1
+[1/6]: pattern1_with_witness -- fail
+[2/6]: pattern2_witness_without_resource -- fail
+[3/6]: pattern3_dual_resources -- pass
+[4/6]: pattern4_array_element -- fail
+[5/6]: pattern5_just_cast_resource -- fail
+[6/6]: pattern6_with_alloc -- fail
+cn/alloc_id/cast_pointer_resources_working.c:13:5: error: Missing resource for writing
+    *p = 42;  // Works!
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_pointer_resources_working.c__pattern1_with_witness.html
+cn/alloc_id/cast_pointer_resources_working.c:25:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_pointer_resources_working.c__pattern2_witness_without_resource.html
+cn/alloc_id/cast_pointer_resources_working.c:59:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_pointer_resources_working.c__pattern4_array_element.html
+cn/alloc_id/cast_pointer_resources_working.c:69:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_pointer_resources_working.c__pattern5_just_cast_resource.html
+cn/alloc_id/cast_pointer_resources_working.c:86:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cast_pointer_resources_working.c__pattern6_with_alloc.html

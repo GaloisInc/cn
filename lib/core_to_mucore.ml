@@ -10,6 +10,14 @@ module IT = IndexTerms
 module SBT = BaseTypes.Surface
 module Mu = Mucore
 
+(* Debug flag - set via CN_MUCORE_DEBUG environment variable *)
+let debug_enabled () =
+  try
+    match Sys.getenv "CN_MUCORE_DEBUG" with
+    | "1" -> true
+    | _ -> false
+  with Not_found -> false
+
 (* Short forms *)
 module Desugar = struct
   let cn_statement = CF.Cabs_to_ail.desugar_cn_statement
@@ -559,7 +567,8 @@ let rec n_expr
         let@ ghost_args =
           match parsed_ghosts with
           | None -> return None
-          | Some (ghost_loc, args) ->
+          | Some (ghost_loc, (args, _outputs)) ->
+            (* args is (cn_expr list * Id.t list) - take just the input args *)
             let marker_id = Option.get (CF.Annot.get_marker annots) in
             let marker_id_object_types =
               Option.get (CF.Annot.get_marker_object_types annots)
@@ -1312,10 +1321,11 @@ let normalise_fun_map_decl
          Spec.there_can_only_be_one loc fname parsed_decl_spec parsed_defn_specs
        in
        let t1_parse = Unix.gettimeofday () in
-       Printf.eprintf
-         "[MUCORE] Parse spec for %s: %.3fs\n%!"
-         (Sym.pp_string fname)
-         (t1_parse -. t0_parse);
+       if debug_enabled () then
+         Printf.eprintf
+           "[MUCORE] Parse spec for %s: %.3fs\n%!"
+           (Sym.pp_string fname)
+           (t1_parse -. t0_parse);
        debug 6 (lazy (string "parsed spec attrs"));
        let _, defn_marker, _, ail_args, _ =
          List.assoc Sym.equal fname ail_prog.CF.AilSyntax.function_definitions
@@ -1332,20 +1342,22 @@ let normalise_fun_map_decl
            (List.map snd arg_cts)
        in
        let t1_setup = Unix.gettimeofday () in
-       Printf.eprintf
-         "[MUCORE] Setup env for %s: %.3fs\n%!"
-         (Sym.pp_string fname)
-         (t1_setup -. t0_setup);
+       if debug_enabled () then
+         Printf.eprintf
+           "[MUCORE] Setup env for %s: %.3fs\n%!"
+           (Sym.pp_string fname)
+           (t1_setup -. t0_setup);
        let t0_desugar = Unix.gettimeofday () in
        let@ { trusted; accesses; ghost_params; requires; ensures; functions }, ret_s, d_st
          =
          Spec.desugar global_types d_st parsed
        in
        let t1_desugar = Unix.gettimeofday () in
-       Printf.eprintf
-         "[MUCORE] Spec.desugar for %s: %.3fs\n%!"
-         (Sym.pp_string fname)
-         (t1_desugar -. t0_desugar);
+       if debug_enabled () then
+         Printf.eprintf
+           "[MUCORE] Spec.desugar for %s: %.3fs\n%!"
+           (Sym.pp_string fname)
+           (t1_desugar -. t0_desugar);
        debug 6 (lazy (!^"function requires/ensures" ^^^ Sym.pp fname));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_accesses accesses)));
        debug 6 (lazy (CF.Pp_ast.pp_doc_tree (dtree_of_ghost_args ghost_params)));
@@ -1367,10 +1379,11 @@ let normalise_fun_map_decl
                   body
               in
               let t1_body = Unix.gettimeofday () in
-              Printf.eprintf
-                "[MUCORE] n_expr body for %s: %.3fs\n%!"
-                (Sym.pp_string fname)
-                (t1_body -. t0_body);
+              if debug_enabled () then
+                Printf.eprintf
+                  "[MUCORE] n_expr body for %s: %.3fs\n%!"
+                  (Sym.pp_string fname)
+                  (t1_body -. t0_body);
               let t0_ret = Unix.gettimeofday () in
               let@ returned =
                 Translate.return_type
@@ -1381,10 +1394,11 @@ let normalise_fun_map_decl
                   (accesses, ensures)
               in
               let t1_ret = Unix.gettimeofday () in
-              Printf.eprintf
-                "[MUCORE] Translate.return_type for %s: %.3fs\n%!"
-                (Sym.pp_string fname)
-                (t1_ret -. t0_ret);
+              if debug_enabled () then
+                Printf.eprintf
+                  "[MUCORE] Translate.return_type for %s: %.3fs\n%!"
+                  (Sym.pp_string fname)
+                  (t1_ret -. t0_ret);
               let t0_labels = Unix.gettimeofday () in
               let@ labels =
                 PmapM.mapM
@@ -1400,11 +1414,12 @@ let normalise_fun_map_decl
                   Sym.compare
               in
               let t1_labels = Unix.gettimeofday () in
-              Printf.eprintf
-                "[MUCORE] normalise_label map (%d labels) for %s: %.3fs\n%!"
-                (Pmap.cardinal labels)
-                (Sym.pp_string fname)
-                (t1_labels -. t0_labels);
+              if debug_enabled () then
+                Printf.eprintf
+                  "[MUCORE] normalise_label map (%d labels) for %s: %.3fs\n%!"
+                  (Pmap.cardinal labels)
+                  (Sym.pp_string fname)
+                  (t1_labels -. t0_labels);
               return (body, labels, returned))
            loc
            env
@@ -1414,12 +1429,13 @@ let normalise_fun_map_decl
            requires
        in
        let t1_make_args = Unix.gettimeofday () in
-       Printf.eprintf
-         "[MUCORE] make_function_args total for %s: %.3fs\n%!"
-         (Sym.pp_string fname)
-         (t1_make_args -. t0_make_args);
+       if debug_enabled () then
+         Printf.eprintf
+           "[MUCORE] make_function_args total for %s: %.3fs\n%!"
+           (Sym.pp_string fname)
+           (t1_make_args -. t0_make_args);
        (* Print depth histogram and uniqueness stats *)
-       if Hashtbl.length n_expr_depth_histogram > 0 then (
+       if debug_enabled () && Hashtbl.length n_expr_depth_histogram > 0 then (
          let unique_exprs = Hashtbl.length n_expr_unique_exprs in
          let total_calls = !n_expr_call_count in
          let retraversal_count =

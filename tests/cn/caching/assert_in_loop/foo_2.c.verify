@@ -1,0 +1,13 @@
+return code: 1
+[1/1]: sum -- fail
+Atomic: (O_i0 & O_s0) == ~O_s0
+  -> FALSE
+cn/caching/assert_in_loop/foo_2.c:11:9: error: Unprovable constraint
+    /*@ assert(i & s == ~s); @*/
+        ^~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/caching/assert_in_loop/foo_2.c:11:9:
+    /*@ assert(i & s == ~s); @*/
+        ^~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  (O_i0 & O_s0) == ~O_s0
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__foo_2.c__sum.html

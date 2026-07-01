@@ -1,0 +1,7 @@
+return code: 0
+cn/alloc_id/pointer_cast_provenance.c:68:19: warning: 'each' prefers a 'u64', but 'i' has type 'i64'.
+/*@ requires take A = each(i64 i; 0i64 <= i && i < 10i64) {
+                  ^
+cn/alloc_id/pointer_cast_provenance.c:71:19: warning: 'each' prefers a 'u64', but 'i' has type 'i64'.
+    ensures  take A2 = each(i64 i; 0i64 <= i && i < 10i64) {
+                  ^

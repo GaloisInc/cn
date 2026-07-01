@@ -1,0 +1,19 @@
+return code: 1
+And: trying LHS
+  Atomic: 0'i32 < y
+    -> FALSE
+And: LHS failed
+[1/1]: f2 -- fail
+And: trying LHS
+  Atomic: 0'i32 < y
+    -> FALSE
+And: LHS failed
+cn/consistency_check_multiple2.error.c:15:3: error: Unprovable constraint
+  return y;
+  ^~~~~~~~~ 
+Constraint from cn/consistency_check_multiple2.error.c:13:13:
+/*@ ensures return > 0i32 && return < 0i32; @*/
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  0'i32 < y
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__consistency_check_multiple2.error.c__f2.html

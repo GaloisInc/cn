@@ -1,0 +1,82 @@
+// Example: Ring buffer with deferred tail update
+// This file shows what the Without operator would enable
+// (Rename to .c once Without is implemented)
+
+#include <stddef.h>
+#include <stdint.h>
+
+#define SIZE 8
+
+struct ring_buffer {
+    int data[SIZE];
+    int head;
+    int tail;
+};
+
+// Full ring buffer invariant
+predicate Valid_Ring(struct ring_buffer *rb)
+/*@ accesses rb; @*/
+{
+    take v = Owned<struct ring_buffer>(rb);
+    return ((v.tail - v.head) < SIZE) &&
+           ((v.tail - v.head) >= 0) &&
+           // All slots in [head, tail) are non-zero
+           (forall i32 i; (v.head <= i && i < v.tail) implies (v.data[i % SIZE] != 0));
+}
+
+// Just the tail-related constraint
+predicate TailConstraint(struct ring_buffer *rb)
+/*@ accesses rb; @*/
+{
+    take v = Owned<struct ring_buffer>(rb);
+    return (forall i32 i; (v.head <= i && i < v.tail) implies (v.data[i % SIZE] != 0));
+}
+
+// Prepare a slot but don't update tail - caller will do that
+void prepare_slot(struct ring_buffer *rb, int val)
+/*@ requires Valid_Ring(rb);
+             val != 0;
+    ensures take v = Without(Valid_Ring(rb), TailConstraint(rb));
+@*/
+{
+    rb->data[rb->tail % SIZE] = val;
+    // DON'T increment tail - that's the caller's job
+}
+
+// Full push operation
+void push(struct ring_buffer *rb, int val)
+/*@ requires Valid_Ring(rb);
+             val != 0;
+    ensures Valid_Ring(rb);
+@*/
+{
+    prepare_slot(rb, val);
+    rb->tail++;
+    // After this update, Valid_Ring holds again!
+}
+
+// Alternative without Without: must return raw ownership
+void prepare_slot_verbose(struct ring_buffer *rb, int val)
+/*@ requires Valid_Ring(rb);
+             val != 0;
+    ensures take v = Owned<struct ring_buffer>(rb);
+            (v.tail - v.head) < SIZE;
+            (v.tail - v.head) >= 0;
+            // Can't say anything about the tail slot anymore!
+@*/
+{
+    rb->data[rb->tail % SIZE] = val;
+}
+
+// Caller must re-establish full invariant from scratch
+void push_verbose(struct ring_buffer *rb, int val)
+/*@ requires Valid_Ring(rb);
+             val != 0;
+    ensures Valid_Ring(rb);
+@*/
+{
+    prepare_slot_verbose(rb, val);
+    rb->tail++;
+    // Have to prove Valid_Ring from raw ownership - much harder!
+    // Would need to reason about all slots again...
+}

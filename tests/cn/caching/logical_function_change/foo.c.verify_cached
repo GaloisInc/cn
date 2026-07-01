@@ -1,0 +1,5 @@
+return code: 2
+cn/caching/logical_function_change/foo.c:2:16: error: unexpected token after ')' and before 'double'
+Please add error message for state 1859 to parsers/c/c_parser_error.messages
+function (i32) double(i32 x) {
+               ^~~~~~ 

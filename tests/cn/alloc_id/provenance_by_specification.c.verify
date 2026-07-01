@@ -1,0 +1,37 @@
+return code: 1
+[1/6]: use_pointer_at_address -- fail
+[2/6]: use_pointer_with_addr_eq -- fail
+[3/6]: two_pointers_same_address -- fail
+[4/6]: use_array_element_by_address -- fail
+[5/6]: use_pointer_existential -- fail
+[6/6]: reconstruct_pointer -- fail
+cn/alloc_id/provenance_by_specification.c:21:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__use_pointer_at_address.html
+cn/alloc_id/provenance_by_specification.c:34:5: error: Missing resource for writing
+    *q = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(q)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__use_pointer_with_addr_eq.html
+cn/alloc_id/provenance_by_specification.c:52:5: error: Missing resource for writing
+    *r = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__two_pointers_same_address.html
+cn/alloc_id/provenance_by_specification.c:71:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__use_array_element_by_address.html
+cn/alloc_id/provenance_by_specification.c:81:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__use_pointer_existential.html
+cn/alloc_id/provenance_by_specification.c:100:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__provenance_by_specification.c__reconstruct_pointer.html

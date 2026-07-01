@@ -25,7 +25,7 @@ void test_comma_fam_increment_bug(struct simple_fam *s)
 /*@
   requires take sf = RW(s);
   ensures take sf2 = RW(s);
-          let ptr = s->data;
+          let ptr = member_shift<struct simple_fam>(s, data);
           sf2.count == sf.count + 1u64;
 @*/
 {
@@ -51,7 +51,7 @@ void test_comma_fam_assign(struct simple_fam *s)
 /*@
   requires take sf = RW(s);
   ensures take sf2 = RW(s);
-          let ptr = s->data;
+          let ptr = member_shift<struct simple_fam>(s, data);
           sf2.count == 10u64;
 @*/
 {

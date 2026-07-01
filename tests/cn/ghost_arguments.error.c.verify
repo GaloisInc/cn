@@ -4,11 +4,13 @@ cn/ghost_arguments.error.c:4:3: warning: experimental keyword 'cn_ghost' (use of
   ^~~~~~~~ 
 [1/2]: foo -- pass
 [2/2]: main -- fail
+Literal false
 cn/ghost_arguments.error.c:18:10: error: Unprovable constraint
   return foo(6 /*@ 2i32, x + *p, *p @*/);
          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/ghost_arguments.error.c:5:3:
   n + m + k == p;
   ^~~~~~~~~~~~~~~ 
-Specifically: 2'i32 + 3'i32 + 1'i32 + 1'i32 == 6'i32
+Failing constraint:
+  false
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__ghost_arguments.error.c__main.html

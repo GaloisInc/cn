@@ -1,0 +1,38 @@
+return code: 1
+[1/4]: requires_both_positive -- pass
+[2/4]: requires_all_positive -- pass
+[3/4]: test_nested_two_levels -- fail
+[4/4]: test_nested_three_levels -- fail
+Expanding: both_positive
+  And: trying LHS
+    Expanding: positive
+      Atomic: 0'u64 < 0'u64
+        -> FALSE
+  And: LHS failed
+cn/alloc_id/nested_logical_functions.c:49:5: error: Unprovable constraint
+    requires_both_positive(p, 0, 5);  // x=0 fails positive(x)
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/alloc_id/nested_logical_functions.c:26:14:
+             both_positive(x, y);
+             ^~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  0'u64 < 0'u64
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__nested_logical_functions.c__test_nested_two_levels.html
+Expanding: all_positive
+  And: trying LHS
+    Expanding: both_positive
+      And: trying LHS
+        Expanding: positive
+          Atomic: 0'u64 < 0'u64
+            -> FALSE
+      And: LHS failed
+  And: LHS failed
+cn/alloc_id/nested_logical_functions.c:59:5: error: Unprovable constraint
+    requires_all_positive(p, 0, 5, 0);  // x=0 and z=0 both fail
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/alloc_id/nested_logical_functions.c:35:14:
+             all_positive(x, y, z);
+             ^~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  0'u64 < 0'u64
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__nested_logical_functions.c__test_nested_three_levels.html

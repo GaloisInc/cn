@@ -1,0 +1,8 @@
+return code: 1
+cn/depth_test.c:8:23: error: Type error
+  /*@ assert(a == x + 1); @*/
+                      ^
+Expression '1' has type 'integer'.
+I expected it to have type 'i32' because of cn/depth_test.c:8:19:
+  /*@ assert(a == x + 1); @*/
+                  ^

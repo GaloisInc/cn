@@ -1,0 +1,4 @@
+return code: 0
+cn/alloc_id/function_error_detailed.c:29:14: warning: CN pointer equality is not the same as C's (will not warn again). Please use `ptr_eq` or `is_null` (maybe `addr_eq`).
+             return == array_shift<int>(arr, index);
+             ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 

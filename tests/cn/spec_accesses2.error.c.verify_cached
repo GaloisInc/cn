@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: foo -- fail
+cn/spec_accesses2.error.c:18:16: error: Missing resource for reading
+    return x + z;
+               ^ 
+Resource needed: RW<signed int>(&z)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__spec_accesses2.error.c__foo.html

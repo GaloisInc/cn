@@ -1,0 +1,4 @@
+return code: 1
+cn/requiresof_simple.c:9:23: error: the predicate `RequiresOf' is not declared
+/*@ requires take r = RequiresOf(foo, y);
+                      ^

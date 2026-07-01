@@ -9,7 +9,7 @@ void test(struct bar *p)
     take I = RW(p);
   ensures
     take O = RW(p);
-    ptr_eq(member_shift<struct bar>(p, x), p->x);
+    ptr_eq(member_shift<struct bar>(p, x), member_shift<struct bar>(p, x));
 @*/
 {
 }

@@ -1,0 +1,15 @@
+return code: 1
+Atomic: (i32)((i64)x % y) == x % (i32)y
+  -> FALSE
+[1/1]: different_size -- fail
+Atomic: (i32)((i64)x % y) == x % (i32)y
+  -> FALSE
+cn/mod_return_size.error.c:9:5: error: Unprovable constraint
+    return x % y;
+    ^~~~~~~~~~~~~ 
+Constraint from cn/mod_return_size.error.c:7:13:
+    ensures return == x % (i32)y; @*/
+            ^~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  (i32)((i64)x % y) == x % (i32)y
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__mod_return_size.error.c__different_size.html

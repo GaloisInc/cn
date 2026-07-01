@@ -1,0 +1,65 @@
+return code: 1
+[1/10]: test1_direct_cast_resource -- fail
+[2/10]: test2_read_write_cast -- fail
+[3/10]: test3_multiple_accesses -- fail
+[4/10]: test4_different_locals -- fail
+[5/10]: test5_alloc_id_check -- pass
+[6/10]: test6_alloc_id_equality -- fail
+[7/10]: test7_ptr_eq -- fail
+[8/10]: helper -- pass
+[9/10]: test8_call_helper -- fail
+[10/10]: test9_cast_to_char -- fail
+cn/resource_at_cast_in_requires.c:12:5: error: Missing resource for writing
+    *p = 42;  // Can we use the resource?
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test1_direct_cast_resource.html
+cn/resource_at_cast_in_requires.c:23:13: error: Missing resource for reading
+    int x = *p;
+            ^~ 
+Resource needed: RW<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test2_read_write_cast.html
+cn/resource_at_cast_in_requires.c:34:5: error: Missing resource for writing
+    *p = 1;
+    ~~~^~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test3_multiple_accesses.html
+cn/resource_at_cast_in_requires.c:48:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test4_different_locals.html
+Atomic: (alloc_id)intToPtr == (alloc_id)(pointer)addr
+  -> FALSE
+cn/resource_at_cast_in_requires.c:73:9: error: Unprovable constraint
+    /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/resource_at_cast_in_requires.c:73:9:
+    /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  (alloc_id)intToPtr == (alloc_id)(pointer)addr
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test6_alloc_id_equality.html
+Expanding: ptr_eq
+  Atomic: intToPtr == (pointer)addr
+    -> FALSE
+cn/resource_at_cast_in_requires.c:84:9: error: Unprovable constraint
+    /*@ assert(ptr_eq(p, (pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/resource_at_cast_in_requires.c:84:9:
+    /*@ assert(ptr_eq(p, (pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  intToPtr == (pointer)addr
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test7_ptr_eq.html
+cn/resource_at_cast_in_requires.c:102:5: error: Missing resource for calling function helper
+    helper(p);  // Can we pass the resource along?
+    ^~~~~~~~~ 
+Resource needed: RW<signed int>(intToPtr)
+      cn/resource_at_cast_in_requires.c:89:19: (arg H)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test8_call_helper.html
+cn/resource_at_cast_in_requires.c:112:5: error: Missing resource for writing
+    *p = 'x';  // This needs RW<char>, not RW<int>
+    ~~~^~~~~ 
+Resource needed: W<char>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_in_requires.c__test9_cast_to_char.html

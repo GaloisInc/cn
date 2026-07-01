@@ -1,0 +1,10 @@
+return code: 0
+[1/9]: roundtrip -- pass
+[2/9]: pointer_with_offset -- pass
+[3/9]: set_tag_bit -- pass
+[4/9]: clear_tag_bit -- pass
+[5/9]: align_down -- pass
+[6/9]: mask_pointer_bits -- pass
+[7/9]: analyze_pointer -- pass
+[8/9]: compare_pointers -- pass
+[9/9]: test_tagged_cycle -- pass
