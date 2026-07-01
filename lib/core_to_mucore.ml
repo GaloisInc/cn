@@ -12,11 +12,9 @@ module Mu = Mucore
 
 (* Debug flag - set via CN_MUCORE_DEBUG environment variable *)
 let debug_enabled () =
-  try
-    match Sys.getenv "CN_MUCORE_DEBUG" with
-    | "1" -> true
-    | _ -> false
-  with Not_found -> false
+  try match Sys.getenv "CN_MUCORE_DEBUG" with "1" -> true | _ -> false with
+  | Not_found -> false
+
 
 (* Short forms *)
 module Desugar = struct

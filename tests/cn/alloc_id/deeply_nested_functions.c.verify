@@ -1,26 +1,29 @@
 return code: 1
 [1/2]: requires_two_even_bytes -- pass
 [2/2]: test_deep_nesting -- fail
-Expanding: two_even_bytes
-  And: trying LHS
-    Expanding: even_byte
-      And: trying LHS
-        Expanding: valid_byte
-          Expanding: in_range
-            And: trying LHS
-              Atomic: true
-                -> TRUE
-            And: LHS OK, trying RHS
-              Atomic: false
-                -> FALSE
-      And: LHS failed
-  And: LHS failed
 cn/alloc_id/deeply_nested_functions.c:52:5: error: Unprovable constraint
     requires_two_even_bytes(p, 300, 7);
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/deeply_nested_functions.c:36:14:
              two_even_bytes(a, b);
              ^~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Expanded function two_even_bytes at cn/alloc_id/deeply_nested_functions.c:36:14::
+             two_even_bytes(a, b);
+             ~~~~~~~~~~~~~~^~~~~~ 
+  → Expanded function even_byte at cn/alloc_id/deeply_nested_functions.c:30:7::
+      even_byte(a) && even_byte(b)
+      ~~~~~~~~~^~~ 
+  → Expanded function valid_byte at cn/alloc_id/deeply_nested_functions.c:24:7::
+      valid_byte(x) && is_even(x)
+      ~~~~~~~~~~^~~ 
+  → Expanded function in_range at cn/alloc_id/deeply_nested_functions.c:19:7::
+      in_range(x, 0u64, 255u64)
+      ~~~~~~~~^~~~~~~~~~~~~~~~~ 
+  → Failing constraint at cn/alloc_id/deeply_nested_functions.c:8:19::
+      x >= min && x <= max
+                  ~~^~~~~~ 
+
 Failing constraint:
   300'u64 /* 0x12c */ <= 255'u64 /* 0xff */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__deeply_nested_functions.c__test_deep_nesting.html

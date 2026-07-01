@@ -1,13 +1,16 @@
 return code: 1
 [1/1]: f -- fail
-Atomic: ptr_eq(&p[1'u64], NULL) || ptr_eq(&p[2'u64], NULL) || (u64)&p[1'u64] == 1'u64 || (u64)&p[2'u64] == 2'u64
-  -> FALSE
 cn/spec_null_shift.error.c:5:1: error: Unprovable constraint
 void f(int *p, int *q)
 ~~~~~^~~~~~~~~~~~~~~~~ 
 Constraint from cn/spec_null_shift.error.c:13:5:
     ptr_eq(x, NULL) || ptr_eq(y, NULL) || (u64) x == 1u64 || (u64) y == 2u64;
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/spec_null_shift.error.c:13:5::
+    ptr_eq(x, NULL) || ptr_eq(y, NULL) || (u64) x == 1u64 || (u64) y == 2u64;
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~ 
+
 Failing constraint:
   ptr_eq(&p[1'u64], NULL) || ptr_eq(&p[2'u64], NULL) || (u64)&p[1'u64] == 1'u64
 || (u64)&p[2'u64] == 2'u64

@@ -35,25 +35,31 @@ cn/fam_thorough.c:407:9: warning: focus: index added, no effect on existing reso
 [25/27]: test_fam_switch -- pass
 [26/27]: test_fam_comma -- pass
 [27/27]: test_fam_many_shifts -- pass
-Atomic: (i64)((u64)&(&s->data)[i] - (u64)&s->data) / 4'i64 == (i64)i
-  -> FALSE
 cn/fam_thorough.c:310:5: error: Unprovable constraint
     return pi - p0;
     ^~~~~~~~~~~~~~~ 
 Constraint from cn/fam_thorough.c:302:11:
           return == (i64)i;
           ^~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/fam_thorough.c:302:11::
+          return == (i64)i;
+          ~~~~~~~^~~~~~~~~ 
+
 Failing constraint:
   (i64)((u64)&(&s->data)[i] - (u64)&s->data) / 4'i64 == (i64)i
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__fam_thorough.c__test_fam_address_of.html
-Atomic: (i64)((u64)&(&s->data)[n] - (u64)&s->data) / 4'i64 == (i64)n
-  -> FALSE
 cn/fam_thorough.c:366:5: error: Unprovable constraint
     return offset - base;
     ^~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/fam_thorough.c:358:11:
           return == (i64)n;
           ^~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/fam_thorough.c:358:11::
+          return == (i64)n;
+          ~~~~~~~^~~~~~~~~ 
+
 Failing constraint:
   (i64)((u64)&(&s->data)[n] - (u64)&s->data) / 4'i64 == (i64)n
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__fam_thorough.c__test_fam_ptr_arithmetic.html

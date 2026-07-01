@@ -25,25 +25,31 @@ cn/pointer_cast_resource_matching.error.c:64:5: error: Missing resource for writ
     ~~~^~~~ 
 Resource needed: W<signed int>(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test4_alloc_id_equality.html
-Atomic: !has_alloc_id((pointer)4096'u64 /* 0x1000 */)
-  -> FALSE
 cn/pointer_cast_resource_matching.error.c:71:9: error: Unprovable constraint
     /*@ assert(!has_alloc_id((pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/pointer_cast_resource_matching.error.c:71:9:
     /*@ assert(!has_alloc_id((pointer)addr)); @*/
         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/pointer_cast_resource_matching.error.c:71:16::
+    /*@ assert(!has_alloc_id((pointer)addr)); @*/
+               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
 Failing constraint:
   !has_alloc_id((pointer)4096'u64 /* 0x1000 */)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test5_inspect_cast.html
-Atomic: has_alloc_id(intToPtr)
-  -> FALSE
 cn/pointer_cast_resource_matching.error.c:85:9: error: Unprovable constraint
     /*@ assert(has_alloc_id(q)); @*/  // Or not?
         ^~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/pointer_cast_resource_matching.error.c:85:9:
     /*@ assert(has_alloc_id(q)); @*/  // Or not?
         ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/pointer_cast_resource_matching.error.c:85:16::
+    /*@ assert(has_alloc_id(q)); @*/  // Or not?
+               ~~~~~~~~~~~~^~~ 
+
 Failing constraint:
   has_alloc_id(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test6_cast_round_trip.html

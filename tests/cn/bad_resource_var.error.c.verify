@@ -1,13 +1,16 @@
 return code: 1
 [1/1]: inc -- fail
-Atomic: X + 1'i32 < 2147483647'i32 /* 0x7fffffff */
-  -> FALSE
 cn/bad_resource_var.error.c:1:1: error: Unprovable constraint
 void inc(int* p)
 ~~~~~^~~~~~~~~~~ 
 Constraint from cn/bad_resource_var.error.c:5:13:
             X2 < 2147483647i32; @*/
             ^~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/bad_resource_var.error.c:5:13::
+            X2 < 2147483647i32; @*/
+            ~~~^~~~~~~~~~~~~~~ 
+
 Failing constraint:
   X + 1'i32 < 2147483647'i32 /* 0x7fffffff */
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__bad_resource_var.error.c__inc.html

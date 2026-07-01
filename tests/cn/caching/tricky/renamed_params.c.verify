@@ -1,13 +1,16 @@
 return code: 1
 [1/1]: either -- fail
-Atomic: 0'i32 == y || 0'i32 == z
-  -> FALSE
 cn/caching/tricky/renamed_params.c:8:3: error: Unprovable constraint
   return x_1;
   ^~~~~~~~~~~ 
 Constraint from cn/caching/tricky/renamed_params.c:3:13:
     ensures return == y || return == z;
             ^~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/caching/tricky/renamed_params.c:3:13::
+    ensures return == y || return == z;
+            ~~~~~~~~~~~~^~~~~~~~~~~~~~ 
+
 Failing constraint:
   0'i32 == y || 0'i32 == z
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__renamed_params.c__either.html

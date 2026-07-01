@@ -279,7 +279,12 @@ let organize_lines (lines : LAT.packing_ft) : IT.t * def_line Sym.Map.t * LC.t l
 let ask_solver g lcs =
   let here = Locations.other __LOC__ in
   let simp_ctxt =
-    Simplify.{ global = g; values = Sym.Map.empty; simp_hook = (fun _ -> None) }
+    Simplify.
+      { global = g;
+        values = Sym.Map.empty;
+        simp_hook = (fun _ -> None);
+        assumptions = LC.Set.empty
+      }
   in
   let s = Solver.make g [] in
   List.fold_right (fun lc _ -> Solver.assume s lc) lcs ();

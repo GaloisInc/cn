@@ -9,14 +9,17 @@ cn/alloc_id/uintptr_to_pointer_resource.c:37:5: error: Missing resource for writ
     ~~~^~~~ 
 Resource needed: W<signed int>(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__uintptr_to_pointer_resource.c__test_cast_no_provenance.html
-Atomic: !has_alloc_id(intToPtr)
-  -> FALSE
 cn/alloc_id/uintptr_to_pointer_resource.c:51:9: error: Unprovable constraint
     /*@ assert(!has_alloc_id(q)); @*/  // q does NOT have provenance
         ^~~~~~~~~~~~~~~~~~~~~~~~~ 
 Constraint from cn/alloc_id/uintptr_to_pointer_resource.c:51:9:
     /*@ assert(!has_alloc_id(q)); @*/  // q does NOT have provenance
         ^~~~~~~~~~~~~~~~~~~~~~~~~ 
+Path to failure:
+  → Failing constraint at cn/alloc_id/uintptr_to_pointer_resource.c:51:16::
+    /*@ assert(!has_alloc_id(q)); @*/  // q does NOT have provenance
+               ^~~~~~~~~~~~~~~~ 
+
 Failing constraint:
   !has_alloc_id(intToPtr)
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__uintptr_to_pointer_resource.c__test_has_alloc_id_after_cast.html

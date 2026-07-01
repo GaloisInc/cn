@@ -74,11 +74,18 @@ type solver_frame =
   { mutable commands : SMT.sexp list; (** Ack-style SMT commands, most recent first. *)
     mutable declared_symbols : Sym.t list;
       (** Symbols declared in this frame, for cleanup on pop *)
-    saved_counters : (BT.t, int) Hashtbl.t (** Counter state at push time *)
+    saved_counters : (BT.t, int) Hashtbl.t; (** Counter state at push time *)
+    mutable context_hash : string
+      (** Rolling hash of all commands in this frame and previous frames.
+          Updated incrementally as commands are added. *)
   }
 
 let empty_solver_frame () =
-  { commands = []; declared_symbols = []; saved_counters = Hashtbl.create 10 }
+  { commands = [];
+    declared_symbols = [];
+    saved_counters = Hashtbl.create 10;
+    context_hash = ""
+  }
 
 
 type solver =
@@ -192,7 +199,10 @@ let push s =
     (fun bt count -> Hashtbl.replace frame.saved_counters bt count)
     s.var_counters;
   s.prev_frames := frame :: !(s.prev_frames);
-  s.cur_frame := empty_solver_frame ()
+  (* New frame inherits the hash from the parent frame *)
+  let new_frame = empty_solver_frame () in
+  new_frame.context_hash <- frame.context_hash;
+  s.cur_frame := new_frame
 
 
 (** Return to the previous scope.  Assumes that there is a previous scope. *)
@@ -235,7 +245,11 @@ let num_scopes s = List.length !(s.prev_frames)
 let ack_command s cmd =
   debug_ack_command s cmd;
   let f = !(s.cur_frame) in
-  f.commands <- cmd :: f.commands
+  f.commands <- cmd :: f.commands;
+  (* Update rolling hash: hash(new_cmd + previous_hash) *)
+  let cmd_str = Sexplib.Sexp.to_string cmd in
+  let combined = cmd_str ^ f.context_hash in
+  f.context_hash <- Digest.string combined |> Digest.to_hex
 
 
 (** Generate a fresh name *)
@@ -1467,14 +1481,22 @@ let clear_model () = model_state := None
 
 module TryHard = struct
   let translate_forall solver qs body =
-    let alpha_rename qs body =
-      let comb (s1, bt) (qs1, body1) =
-        let s2, body2 = IT.alpha_rename s1 body1 in
-        ((s2, bt) :: qs1, body2)
+    (* Alpha-rename all quantifiers in a single pass instead of one traversal per variable.
+       Build a substitution list for all variables at once, then apply it in one tree walk. *)
+    let alpha_rename_all qs body =
+      let fresh_qs, rename_list =
+        List.fold_right
+          (fun (s, bt) (acc_qs, acc_renames) ->
+             let s' = Sym.fresh_same s in
+             ((s', bt) :: acc_qs, (s, `Rename s') :: acc_renames))
+          qs
+          ([], [])
       in
-      List.fold_right comb qs ([], body)
+      (* Build substitution from all renames at once *)
+      let su = Subst.make IT.free_vars_with_rename rename_list in
+      (fresh_qs, IT.subst su body)
     in
-    let qs, body = alpha_rename qs body in
+    let qs, body = alpha_rename_all qs body in
     let body_ = translate_term solver body in
     let qs_ =
       List.map
@@ -1761,10 +1783,12 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
         List.iter (fun t -> assume solver (T t)) (negated_expr :: extra);
         qs)
     in
-    (* Get all commands including incremental state from previous frames *)
+    (* Get the rolling hash that represents the full incremental context *)
+    let context_hash = !(solver.cur_frame).context_hash in
+    (* Still need commands for portfolio mode and model recording *)
     let cmds = List.rev (get_commands solver) in
-    (* Check cache with full incremental context, not just current frame *)
-    let cached_result = QCache.lookup_smt_commands cmds in
+    (* Check cache using the pre-computed rolling hash *)
+    let cached_result = QCache.lookup_by_hash context_hash in
     (match cached_result with
      | Some result ->
        (* Cache hit - skip solver *)
@@ -1799,8 +1823,8 @@ let provable_or_unknown ~loc ~solver ~assumptions ~simp_ctxt lc =
              Timing.time_phase "record_model" (fun () -> record_model solver cmds qs);
            `Unknown
        in
-       (* Store in cache with full incremental context *)
-       QCache.store_smt_commands cmds result;
+       (* Store in cache using the rolling hash *)
+       QCache.store_by_hash context_hash result;
        result)
 
 
