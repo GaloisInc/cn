@@ -1,0 +1,5 @@
+return code: 2
+cn/datatype_update_shorthand.c:15:14: error: unexpected token after 'Node' and before 'r'
+Please add error message for state 1237 to parsers/c/c_parser_error.messages
+        Node r => { Node {value: new_val, ..r} }
+             ^ 

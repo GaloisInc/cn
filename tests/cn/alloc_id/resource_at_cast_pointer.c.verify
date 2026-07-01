@@ -1,0 +1,14 @@
+return code: 1
+[1/3]: use_cast_pointer_with_resource -- fail
+[2/3]: use_with_address_constraint -- fail
+[3/3]: use_with_witness_and_cast_resource -- pass
+cn/alloc_id/resource_at_cast_pointer.c:12:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_pointer.c__use_cast_pointer_with_resource.html
+cn/alloc_id/resource_at_cast_pointer.c:23:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__resource_at_cast_pointer.c__use_with_address_constraint.html

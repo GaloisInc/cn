@@ -1,0 +1,90 @@
+return code: 1
+./comma_fam_bug.crash.exec.c:94:15: error: incompatible integer to pointer conversion initializing 'int *' with an expression of type 'typeof (({
+    typeof (s) *__tmp = &(s);
+    update_error_message_info_(__func__, "./comma_fam_bug.crash.exec.c", 94, 0);
+    c_ownership_check("Load", __tmp, sizeof(typeof (s)), get_cn_stack_depth());
+    cn_load(__tmp, sizeof(typeof (s)));
+    *__tmp;
+})->count)' (aka 'unsigned long') [-Wint-conversion]
+   94 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |               ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./comma_fam_bug.crash.exec.c:94:54: error: expected identifier or '('
+   94 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |                                                      ^
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:94:54: error: expected ')'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:94:54: note: to match this '('
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:3: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |   ^
+./comma_fam_bug.crash.exec.c:94:64: error: expected ';' at end of declaration
+   94 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |                                                                ^
+      |                                                                ;
+./comma_fam_bug.crash.exec.c:109:14: warning: incompatible pointer types assigning to 'cn_pointer *' (aka 'struct cn_pointer *') from 'int[]' [-Wincompatible-pointer-types]
+  109 |       ptr_cn = sf2_cn->data;
+      |              ^ ~~~~~~~~~~~~
+./comma_fam_bug.crash.exec.c:132:15: error: incompatible integer to pointer conversion initializing 'int *' with an expression of type 'typeof (({
+    typeof (s) *__tmp = &(s);
+    update_error_message_info_(__func__, "./comma_fam_bug.crash.exec.c", 132, 0);
+    c_ownership_check("Load", __tmp, sizeof(typeof (s)), get_cn_stack_depth());
+    cn_load(__tmp, sizeof(typeof (s)));
+    *__tmp;
+})->count)' (aka 'unsigned long') [-Wint-conversion]
+  132 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |               ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./comma_fam_bug.crash.exec.c:132:54: error: expected identifier or '('
+  132 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |                                                      ^
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:132:54: error: expected ')'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:132:54: note: to match this '('
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:3: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |   ^
+./comma_fam_bug.crash.exec.c:132:64: error: expected ';' at end of declaration
+  132 |   signed int* p = CN_POSTFIX(CN_LOAD(s)->count, ++), CN_LOAD(s)->data;
+      |                                                                ^
+      |                                                                ;
+./comma_fam_bug.crash.exec.c:168:15: error: incompatible integer to pointer conversion initializing 'int *' with an expression of type 'typeof (({
+    typeof (s) *__tmp = &(s);
+    update_error_message_info_(__func__, "./comma_fam_bug.crash.exec.c", 168, 0);
+    c_ownership_check("Load", __tmp, sizeof(typeof (s)), get_cn_stack_depth());
+    cn_load(__tmp, sizeof(typeof (s)));
+    *__tmp;
+})->count)' (aka 'unsigned long') [-Wint-conversion]
+  168 |   signed int* p = CN_STORE(CN_LOAD(s)->count, 10), CN_LOAD(s)->data;
+      |               ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./comma_fam_bug.crash.exec.c:168:52: error: expected identifier or '('
+  168 |   signed int* p = CN_STORE(CN_LOAD(s)->count, 10), CN_LOAD(s)->data;
+      |                                                    ^
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:168:52: error: expected ')'
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:4: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |    ^
+./comma_fam_bug.crash.exec.c:168:52: note: to match this '('
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-executable/utils.h:623:3: note: expanded from macro 'CN_LOAD'
+  623 |   ({                                                                                     \
+      |   ^
+./comma_fam_bug.crash.exec.c:168:62: error: expected ';' at end of declaration
+  168 |   signed int* p = CN_STORE(CN_LOAD(s)->count, 10), CN_LOAD(s)->data;
+      |                                                              ^
+      |                                                              ;
+./comma_fam_bug.crash.exec.c:183:14: warning: incompatible pointer types assigning to 'cn_pointer *' (aka 'struct cn_pointer *') from 'int[]' [-Wincompatible-pointer-types]
+  183 |       ptr_cn = sf2_cn->data;
+      |              ^ ~~~~~~~~~~~~
+2 warnings and 12 errors generated.
+Failed to compile 'comma_fam_bug.crash.exec.c'.

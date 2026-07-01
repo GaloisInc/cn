@@ -1,0 +1,49 @@
+return code: 1
+[1/6]: test1_take_at_cast -- fail
+[2/6]: test2_access_via_cast -- fail
+[3/6]: test3_explicit_equivalence -- fail
+[4/6]: test4_alloc_id_equality -- fail
+[5/6]: test5_inspect_cast -- fail
+[6/6]: test6_cast_round_trip -- fail
+cn/pointer_cast_resource_matching.error.c:29:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test1_take_at_cast.html
+cn/pointer_cast_resource_matching.error.c:40:5: error: Missing resource for writing
+    *p = 42;  // Does this consume RW<int>(witness)?
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test2_access_via_cast.html
+cn/pointer_cast_resource_matching.error.c:52:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test3_explicit_equivalence.html
+cn/pointer_cast_resource_matching.error.c:64:5: error: Missing resource for writing
+    *p = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test4_alloc_id_equality.html
+Atomic: !has_alloc_id((pointer)4096'u64 /* 0x1000 */)
+  -> FALSE
+cn/pointer_cast_resource_matching.error.c:71:9: error: Unprovable constraint
+    /*@ assert(!has_alloc_id((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_resource_matching.error.c:71:9:
+    /*@ assert(!has_alloc_id((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  !has_alloc_id((pointer)4096'u64 /* 0x1000 */)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test5_inspect_cast.html
+Atomic: has_alloc_id(intToPtr)
+  -> FALSE
+cn/pointer_cast_resource_matching.error.c:85:9: error: Unprovable constraint
+    /*@ assert(has_alloc_id(q)); @*/  // Or not?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_resource_matching.error.c:85:9:
+    /*@ assert(has_alloc_id(q)); @*/  // Or not?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  has_alloc_id(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_resource_matching.error.c__test6_cast_round_trip.html

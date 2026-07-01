@@ -1,0 +1,8 @@
+return code: 0
+cn/fam_struct_ownership.c:27:29: warning: 'focus' prefers a 'u64', but 'deref_read_&p00.l' has type 'u16'.
+    /*@ focus RW<uint16_t>, p->l; @*/
+                            ~^~~ 
+cn/fam_struct_ownership.c:27:9: warning: focus: index added, no effect on existing resources (yet).
+    /*@ focus RW<uint16_t>, p->l; @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~ 
+[1/1]: foo -- pass

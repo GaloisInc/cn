@@ -1,0 +1,4 @@
+return code: 0
+cn/caching/transitive_predicate/foo_2.c:2:12: warning: deprecated keyword 'Owned', use 'RW' instead
+  take x = Owned<int>(p);
+           ^~~~~ 

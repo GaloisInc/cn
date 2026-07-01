@@ -1,0 +1,10 @@
+return code: 1
+cn/alloc_id/function_error_detailed.c:29:14: warning: CN pointer equality is not the same as C's (will not warn again). Please use `ptr_eq` or `is_null` (maybe `addr_eq`).
+             return == array_shift<int>(arr, index);
+             ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+[1/1]: get_element -- fail
+cn/alloc_id/function_error_detailed.c:32:12: error: `&arr[index]` out of bounds
+    return &arr[index];
+           ^~~~~~~~~~~ 
+(UB missing short message): UB_CERB004_unspecified__pointer_add
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__function_error_detailed.c__get_element.html

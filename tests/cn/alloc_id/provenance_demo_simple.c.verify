@@ -1,0 +1,17 @@
+return code: 0
+[1/16]: example_extract_address -- pass
+[2/16]: addresses_equal -- pass
+[3/16]: must_have_provenance -- pass
+[4/16]: check_address_value -- pass
+[5/16]: same_allocation -- pass
+[6/16]: different_allocations -- pass
+[7/16]: pointer_in_bounds_check -- pass
+[8/16]: init_descriptor -- pass
+[9/16]: use_descriptor_safe -- pass
+[10/16]: array_next -- pass
+[11/16]: get_data_ptr -- pass
+[12/16]: get_array_element -- pass
+[13/16]: broken_roundtrip_demo -- pass
+[14/16]: pointer_analysis -- pass
+[15/16]: address_arithmetic -- pass
+[16/16]: handle_null_pointer -- pass

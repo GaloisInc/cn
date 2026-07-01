@@ -1,0 +1,15 @@
+return code: 1
+./fam_struct_update.test.c:334:1: error: called object type 'int' is not a function or function pointer
+  334 | CN_EXTERN_RANDOM_TEST_CASE(fam_struct_update, d, 100, res->e);
+      | ^                                             ~
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-testing/test.h:283:3: note: expanded from macro 'CN_EXTERN_RANDOM_TEST_CASE'
+  283 |   CN_RANDOM_TEST_CASE(Suite, Name, Name, Samples, __VA_ARGS__)
+      |   ^                                ~~~~
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-testing/test.h:298:3: note: expanded from macro 'CN_RANDOM_TEST_CASE'
+  298 |   CN_RANDOM_TEST_CASE_WITH_CUSTOM_INIT(Suite, Name, FuncName, Samples, , __VA_ARGS__)
+      |   ^                                                 ~~~~~~~~
+<OPAM_PREFIX>/lib/cn/runtime/include/cn-testing/test.h:233:21: note: expanded from macro 'CN_RANDOM_TEST_CASE_WITH_CUSTOM_INIT'
+  233 |       (void)FuncName(__VA_ARGS__);                                                       \
+      |             ~~~~~~~~^
+1 error generated.
+Failed to compile 'fam_struct_update.test.c'.

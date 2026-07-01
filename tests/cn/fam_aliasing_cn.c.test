@@ -1,0 +1,3 @@
+return code: 2
+[1m'Alloc' not currently supported at runtime[0m:
+Used at <cn/fam_buffer.h:10:9>

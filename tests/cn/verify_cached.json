@@ -1,0 +1,6 @@
+{
+    "name": "verify_cached",
+    "args": ["verify", "--use-db", "--db-path=/tmp/cn_tests.db"],
+    "filter": "^(.*\\.c)$",
+    "timeout": 60
+}

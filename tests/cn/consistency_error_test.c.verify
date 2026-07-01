@@ -1,0 +1,23 @@
+return code: 1
+[1/2]: foo -- fail
+[2/2]: bar -- fail
+Literal false
+cn/consistency_error_test.c:8:5: error: Unprovable constraint
+    return 0;
+    ^~~~~~~~~ 
+Constraint from cn/consistency_error_test.c:5:13:
+    ensures false;  // Inconsistent: requires true but ensures false
+            ^~~~~~ 
+Failing constraint:
+  false
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__consistency_error_test.c__foo.html
+Literal false
+cn/consistency_error_test.c:16:5: error: Unprovable constraint
+    return 0;
+    ^~~~~~~~~ 
+Constraint from cn/consistency_error_test.c:13:13:
+    ensures false;  // Inconsistent: requires true but ensures false
+            ^~~~~~ 
+Failing constraint:
+  false
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__consistency_error_test.c__bar.html

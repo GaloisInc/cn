@@ -1,0 +1,21 @@
+return code: 1
+[1/2]: requires_properties -- pass
+[2/2]: caller -- fail
+Expanding: all_properties
+  And: trying LHS
+    And: trying LHS
+      And: trying LHS
+        Atomic: 10'u64 < 5'u64
+          -> FALSE
+      And: LHS failed
+    And: LHS failed
+  And: LHS failed
+cn/alloc_id/logic_function_error.c:37:5: error: Unprovable constraint
+    requires_properties(p, 5, 50, 55);
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/alloc_id/logic_function_error.c:20:14:
+             all_properties(x, y, z);
+             ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  10'u64 < 5'u64
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__logic_function_error.c__caller.html

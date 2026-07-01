@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: use_middle -- fail
+cn/caching/transitive_dependency/foo_2.c:16:10: error: Undefined behaviour
+  return a + 2;
+         ~~^~~ 
+an exceptional condition occurs during the evaluation of an expression (§6.5#5)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__foo_2.c__use_middle.html

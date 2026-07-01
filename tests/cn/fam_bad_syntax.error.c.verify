@@ -1,0 +1,6 @@
+return code: 1
+cn/fam_bad_syntax.error.c:12:32: error: Cannot access flexible array member 'data' via struct value
+      RW<int>(array_shift<int>(p->data, j))
+                               ~^~~~~~ 
+Flexible array members of 'buffer' must be accessed using 'member_shift<buffer>(data)',
+not via struct member access syntax 'struct_value.data'

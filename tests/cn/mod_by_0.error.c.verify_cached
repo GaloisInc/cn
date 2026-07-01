@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: mod -- fail
+cn/mod_by_0.error.c:6:12: error: Undefined behaviour
+    return x % y;
+           ~~^~~ 
+the value of the second operand of a '%' operator is zero (§6.5.5#5, sentence 2)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__mod_by_0.error.c__mod.html

@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: main -- fail
+cn/int_to_ptr.error.c:16:12: error: Missing resource for reading
+    return *p == 0;
+           ^~ 
+Resource needed: RW<signed int>(call_cast0_return)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__int_to_ptr.error.c__main.html

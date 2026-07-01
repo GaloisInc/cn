@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: test -- fail
+cn/cerberus_comment_between_type_and_name.error.c:11:5: error: Missing resource for writing
+    x = 1;
+    ~~^~~ 
+Resource needed: W<signed int>(&x)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__cerberus_comment_between_type_and_name.error.c__test.html

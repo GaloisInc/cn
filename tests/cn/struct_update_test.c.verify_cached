@@ -1,0 +1,8 @@
+return code: 1
+cn/struct_update_test.c:26:18: error: Type error
+    {a: new_a, ..r}
+                 ^
+Expression 'r' has type '{i32 a,i32 b}'.
+I expected it to have type 'struct' because of cn/struct_update_test.c:26:5:
+    {a: new_a, ..r}
+    ^~~~~~~~~~~~~~~ 

@@ -1,0 +1,13 @@
+return code: 1
+Literal false
+[1/1]: f -- fail
+Literal false
+cn/has_alloc_id_ptr_neq.error.c:11:5: error: Unprovable constraint
+    return p != q;
+    ^~~~~~~~~~~~~~ 
+Constraint from cn/has_alloc_id_ptr_neq.error.c:8:5:
+    return == 0i32;
+    ^~~~~~~~~~~~~~~ 
+Failing constraint:
+  false
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__has_alloc_id_ptr_neq.error.c__f.html

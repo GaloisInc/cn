@@ -5,6 +5,14 @@ module Loc = Locations
 module IdSet = Set.Make (Id)
 open Pp.Infix
 
+(* Debug flag - set via CN_SPEC_DEBUG environment variable *)
+let debug_enabled () =
+  try
+    match Sys.getenv "CN_SPEC_DEBUG" with
+    | "1" -> true
+    | _ -> false
+  with Not_found -> false
+
 (* Global state: the set of all C-types that might appear as values in Core
    expressions (and so might make it into the SMT problem). We use this to
    construct the C-type-to-integer mapping for the SMT solver. This should
@@ -780,7 +788,7 @@ module WIT = struct
           match IT.get_bt t with
           | Record members -> return members
           | has ->
-            let expected = "struct" in
+            let expected = "record" in
             let reason = Either.Left loc in
             fail (illtyped_index_term loc t has ~expected ~reason)
         in
@@ -788,7 +796,7 @@ module WIT = struct
           match List.assoc_opt Id.equal member members with
           | Some bt -> return bt
           | None ->
-            let expected = "struct with member " ^ Id.get_string member in
+            let expected = "record with member " ^ Id.get_string member in
             let reason = Either.Left loc in
             fail (illtyped_index_term loc t (IT.get_bt t) ~expected ~reason)
         in
@@ -2585,7 +2593,8 @@ module WProc = struct
            let t_rt_0 = Unix.gettimeofday () in
            let@ rt = pure (WRT.welltyped rt) in
            let t_rt_1 = Unix.gettimeofday () in
-           Printf.eprintf "[SPEC] WRT.welltyped: %.3fs\n%!" (t_rt_1 -. t_rt_0);
+           if debug_enabled () then
+             Printf.eprintf "[SPEC] WRT.welltyped: %.3fs\n%!" (t_rt_1 -. t_rt_0);
            let label_context = label_context rt labels in
            let t_labels_0 = Unix.gettimeofday () in
            let@ labels =
@@ -2611,22 +2620,25 @@ module WProc = struct
                Sym.compare
            in
            let t_labels_1 = Unix.gettimeofday () in
-           Printf.eprintf
-             "[SPEC] PmapM.mapM labels (%d labels): %.3fs\n%!"
-             (Pmap.cardinal labels)
-             (t_labels_1 -. t_labels_0);
+           if debug_enabled () then
+             Printf.eprintf
+               "[SPEC] PmapM.mapM labels (%d labels): %.3fs\n%!"
+               (Pmap.cardinal labels)
+               (t_labels_1 -. t_labels_0);
            let t_body_0 = Unix.gettimeofday () in
            let@ body = pure (BaseTyping.check_expr label_context Unit body) in
            let t_body_1 = Unix.gettimeofday () in
-           Printf.eprintf
-             "[SPEC] BaseTyping.check_expr body: %.3fs\n%!"
-             (t_body_1 -. t_body_0);
+           if debug_enabled () then
+             Printf.eprintf
+               "[SPEC] BaseTyping.check_expr body: %.3fs\n%!"
+               (t_body_1 -. t_body_0);
            return (body, labels, rt))
         "function"
         loc
     in
     let t1_total = Unix.gettimeofday () in
-    Printf.eprintf "[SPEC] WProc.welltyped total: %.3fs\n%!" (t1_total -. t0_total);
+    if debug_enabled () then
+      Printf.eprintf "[SPEC] WProc.welltyped total: %.3fs\n%!" (t1_total -. t0_total);
     result at
 end
 

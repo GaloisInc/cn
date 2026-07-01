@@ -1,0 +1,32 @@
+return code: 1
+cn/fam_struct_ownership.c:27:29: warning: 'focus' prefers a 'u64', but 'deref_read_p00.l' has type 'u16'.
+    /*@ focus RW<uint16_t>, p->l; @*/
+                            ~^~~ 
+cn: internal error, uncaught exception:
+    Not_found
+    Raised at Stdlib__List.find in file "list.ml", <POS>
+    Called from Cn__List.assoc in file "lib/list.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.replace_memberof_it in file "lib/testGeneration/bennet/memberIndirection.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.replace_memberof_it in file "lib/testGeneration/bennet/memberIndirection.ml" (inlined), <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.replace_memberof_it in file "lib/testGeneration/bennet/memberIndirection.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.replace_memberof_gt in file "lib/testGeneration/bennet/memberIndirection.ml" (inlined), <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.replace_memberof_gt.aux in file "lib/testGeneration/bennet/memberIndirection.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_pre in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_pre in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_pre in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_pre in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_pre in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__MemberIndirection.Make.transform_gt.aux in file "lib/testGeneration/bennet/memberIndirection.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__GenTerms.Make.map_gen_post in file "lib/testGeneration/bennet/genTerms.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__Stage2__SimplifyGen.Make.transform_gt.aux in file "lib/testGeneration/bennet/stage2/simplifyGen/simplifyGen.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__Stage2__SimplifyGen.Make.transform_gd in file "lib/testGeneration/bennet/stage2/simplifyGen/simplifyGen.ml", <POS>
+    Called from Cn__List.map_snd.(fun) in file "lib/list.ml", <POS>
+    Called from Stdlib__List.map in file "list.ml", <POS>
+    Called from Cn__TestGeneration__Bennet__Stage2.Make.transform in file "lib/testGeneration/bennet/stage2/stage2.ml", <POS>
+    Called from Cn__TestGeneration__Bennet.synthesize in file "lib/testGeneration/bennet/bennet.ml", <POS>
+    Called from Cn__TestGeneration.save_generators in file "lib/testGeneration/testGeneration.ml", <POS>
+    Called from Cn__TestGeneration.run in file "lib/testGeneration/testGeneration.ml", <POS>
+    Called from Dune__exe__Test.run_tests.(fun) in file "bin/test.ml", <POS>
+    
+Issues can be made at https://github.com/rems-project/cerberus/issues.
+Prefix your issue with "[CN-Test-Gen]". Check that there isn't already one for this error.

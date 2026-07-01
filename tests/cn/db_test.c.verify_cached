@@ -1,0 +1,8 @@
+return code: 1
+[1/2]: add -- fail
+[2/2]: main -- pass
+cn/db_test.c:8:12: error: Undefined behaviour
+    return x + y;
+           ~~^~~ 
+an exceptional condition occurs during the evaluation of an expression (§6.5#5)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__db_test.c__add.html

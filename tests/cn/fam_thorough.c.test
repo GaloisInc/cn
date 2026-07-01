@@ -1,0 +1,3 @@
+return code: 2
+[1m'Alloc' not currently supported at runtime[0m:
+Used at <cn/fam_thorough.c:17:9>

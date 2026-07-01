@@ -1,10 +1,12 @@
 return code: 1
 [1/1]: g1 -- fail
+Literal false
 cn/and_or_precedence.error.c:15:13: error: Unprovable constraint
         /*@ assert (false); @*/
             ^~~~~~~~~~~~~~~ 
 Constraint from cn/and_or_precedence.error.c:15:13:
         /*@ assert (false); @*/
             ^~~~~~~~~~~~~~~ 
-Specifically: false
+Failing constraint:
+  false
 State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__and_or_precedence.error.c__g1.html

@@ -1,0 +1,8 @@
+return code: 1
+cn/fam_struct_update_fam_field.error.c:15:18: error: Type error
+    let I2 = {b: newptr, ..I};  // ERROR: Cannot update FAM field
+                 ^
+Expression 'newptr' has type 'pointer'.
+I expected it to have type 'map<u64, i32>' because of cn/fam_struct_update_fam_field.error.c:15:28:
+    let I2 = {b: newptr, ..I};  // ERROR: Cannot update FAM field
+                           ^

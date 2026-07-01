@@ -1,0 +1,14 @@
+return code: 0
+cn/to_from_bytes_block.c:6:48: warning: annotation on array_shift suggests p has type byte* but it has type signed int*.
+    take X = each (u64 i; i < sizeof<int>) { W(array_shift<byte>(p, i)) };
+                                               ^~~~~~~~~~~~~~~~~~~~~~~ 
+cn/to_from_bytes_block.c:11:9: warning: experimental keyword 'from_bytes' (use of experimental features is discouraged)
+    /*@ from_bytes W(p); @*/
+        ^~~~~~~~~~ 
+cn/to_from_bytes_block.c:22:9: warning: experimental keyword 'to_bytes' (use of experimental features is discouraged)
+    /*@ to_bytes W(p); @*/
+        ^~~~~~~~ 
+cn/to_from_bytes_block.c:19:48: warning: annotation on array_shift suggests p has type byte* but it has type signed int*.
+    take X = each (u64 i; i < sizeof<int>) { W(array_shift<byte>(p, i)) };
+                                               ^~~~~~~~~~~~~~~~~~~~~~~ 
+[1/1]: main -- pass

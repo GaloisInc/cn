@@ -1,0 +1,13 @@
+return code: 1
+[1/1]: get_value -- fail
+Atomic: 0'i32 == x
+  -> FALSE
+cn/caching/broken_implementation/foo_2.c:9:3: error: Unprovable constraint
+  return 0;
+  ^~~~~~~~~ 
+Constraint from cn/caching/broken_implementation/foo_2.c:3:13:
+    ensures return == x;
+            ^~~~~~~~~~~~ 
+Failing constraint:
+  0'i32 == x
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__foo_2.c__get_value.html

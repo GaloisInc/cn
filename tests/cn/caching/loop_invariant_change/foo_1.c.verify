@@ -1,0 +1,7 @@
+return code: 1
+[1/1]: sum -- fail
+cn/caching/loop_invariant_change/foo_1.c:12:5: error: Undefined behaviour
+    s += i;
+    ~~^~~~ 
+an exceptional condition occurs during the evaluation of an expression (§6.5#5)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__foo_1.c__sum.html

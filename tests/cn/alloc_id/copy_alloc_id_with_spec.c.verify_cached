@@ -1,0 +1,5 @@
+return code: 0
+[1/4]: roundtrip -- pass
+[2/4]: pointer_with_offset -- pass
+[3/4]: set_tag_bit -- pass
+[4/4]: align_down -- pass

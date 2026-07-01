@@ -1,0 +1,11 @@
+return code: 1
+./fam_struct_access_semantics.exec.c:102:55: warning: incompatible pointer types passing 'int[]' to parameter of type 'cn_pointer *' (aka 'struct cn_pointer *') [-Wincompatible-pointer-types]
+  102 |       cn_assert(ptr_eq(cn_member_shift(p_cn, bar, x), O_cn->x), POST);
+      |                                                       ^~~~~~~
+./fam_struct_access_semantics.exec.c:50:48: note: passing argument to parameter here
+   50 | static cn_bool* ptr_eq(cn_pointer*, cn_pointer*);
+      |                                                ^
+1 warning generated.
+
+Testing Summary:
+cases: 1, passed: 0, failed: 1, errored: 0, skipped: 0

@@ -1,0 +1,4 @@
+return code: 0
+cn/to_from_bytes_struct.error.c:30:7: warning: experimental keyword 'to_bytes' (use of experimental features is discouraged)
+  /*@ to_bytes RW<s>(p); @*/
+      ^~~~~~~~ 

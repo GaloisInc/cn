@@ -1,0 +1,74 @@
+return code: 1
+[1/7]: test1_alloc_id_equality -- fail
+[2/7]: test2_use_resource_after_roundtrip -- fail
+[3/7]: test3_explicit_cast_relationship -- fail
+[4/7]: test4_assert_provenance_preserved -- fail
+[5/7]: test5_ptr_eq_after_roundtrip -- fail
+[6/7]: test6_inspect_cast_result -- fail
+[7/7]: test7_constrain_cast_alloc_id -- fail
+Atomic: (alloc_id)p == (alloc_id)(pointer)(u64)p
+  -> FALSE
+cn/pointer_cast_roundtrip_tracking.c:16:9: error: Unprovable constraint
+    /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_roundtrip_tracking.c:16:9:
+    /*@ assert((alloc_id)p == (alloc_id)((pointer)addr)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  (alloc_id)p == (alloc_id)(pointer)(u64)p
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test1_alloc_id_equality.html
+cn/pointer_cast_roundtrip_tracking.c:29:5: error: Missing resource for writing
+    *q = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test2_use_resource_after_roundtrip.html
+cn/pointer_cast_roundtrip_tracking.c:45:5: error: Missing resource for writing
+    *q = 42;
+    ~~~^~~~ 
+Resource needed: W<signed int>(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test3_explicit_cast_relationship.html
+Atomic: (alloc_id)(pointer)(u64)p == (alloc_id)p
+  -> FALSE
+cn/pointer_cast_roundtrip_tracking.c:57:9: error: Unprovable constraint
+    /*@ assert((alloc_id)((pointer)addr) == (alloc_id)p); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_roundtrip_tracking.c:57:9:
+    /*@ assert((alloc_id)((pointer)addr) == (alloc_id)p); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  (alloc_id)(pointer)(u64)p == (alloc_id)p
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test4_assert_provenance_preserved.html
+Expanding: ptr_eq
+  Atomic: p == intToPtr
+    -> FALSE
+cn/pointer_cast_roundtrip_tracking.c:72:9: error: Unprovable constraint
+    /*@ assert(ptr_eq(p, q)); @*/  // Full pointer equality?
+        ^~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_roundtrip_tracking.c:72:9:
+    /*@ assert(ptr_eq(p, q)); @*/  // Full pointer equality?
+        ^~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  p == intToPtr
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test5_ptr_eq_after_roundtrip.html
+Atomic: has_alloc_id(intToPtr)
+  -> FALSE
+cn/pointer_cast_roundtrip_tracking.c:84:9: error: Unprovable constraint
+    /*@ assert(has_alloc_id(q)); @*/  // Does q have any alloc_id?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_roundtrip_tracking.c:84:9:
+    /*@ assert(has_alloc_id(q)); @*/  // Does q have any alloc_id?
+        ^~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  has_alloc_id(intToPtr)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test6_inspect_cast_result.html
+Atomic: has_alloc_id((pointer)(u64)p) == has_alloc_id(p)
+  -> FALSE
+cn/pointer_cast_roundtrip_tracking.c:97:9: error: Unprovable constraint
+    /*@ assert(has_alloc_id((pointer)addr) == has_alloc_id(p)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Constraint from cn/pointer_cast_roundtrip_tracking.c:97:9:
+    /*@ assert(has_alloc_id((pointer)addr) == has_alloc_id(p)); @*/
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Failing constraint:
+  has_alloc_id((pointer)(u64)p) == has_alloc_id(p)
+State file: file:///var/folders/kz/cv69rwcs6q50g9d669lh0vjw0000gp/T/state__pointer_cast_roundtrip_tracking.c__test7_constrain_cast_alloc_id.html

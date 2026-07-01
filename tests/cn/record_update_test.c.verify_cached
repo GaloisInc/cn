@@ -1,0 +1,8 @@
+return code: 1
+cn/record_update_test.c:5:15: error: Type error
+  {x: 5i32, ..r}
+              ^
+Expression 'r' has type '{i32 x,i32 y}'.
+I expected it to have type 'struct' because of cn/record_update_test.c:5:3:
+  {x: 5i32, ..r}
+  ^~~~~~~~~~~~~~ 
