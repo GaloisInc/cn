@@ -749,7 +749,13 @@ let clear_function_dependencies (db : db_handle) ~(function_sym : string) : unit
   if debug then Printf.eprintf "Clearing dependencies for %s\n%!" function_sym;
   List.iter
     (fun table ->
-       let sql = Printf.sprintf "DELETE FROM %s WHERE function_sym = ?" table in
+       let col =
+         if String.equal table "function_calls_function" then
+           "caller_sym"
+         else
+           "function_sym"
+       in
+       let sql = Printf.sprintf "DELETE FROM %s WHERE %s = ?" table col in
        try
          let stmt = prepare db sql in
          let changes_before = changes db in
@@ -850,6 +856,27 @@ let record_predicate_predicate_usage
     ignore (finalize stmt)
   with
   | _ -> ()
+
+
+(** Clear all dependencies for a predicate (called before re-recording to avoid stale entries) *)
+let clear_predicate_dependencies (db : db_handle) ~(predicate_sym : string) : unit =
+  let tables =
+    [ ("predicate_uses_predicate", "user_sym");
+      ("predicate_uses_logical_function", "predicate_sym");
+      ("predicate_uses_struct", "predicate_sym");
+      ("predicate_uses_datatype", "predicate_sym")
+    ]
+  in
+  List.iter
+    (fun (table, col) ->
+       let sql = Printf.sprintf "DELETE FROM %s WHERE %s = ?" table col in
+       try
+         let stmt = prepare db sql in
+         exec_stmt stmt [ Data.TEXT predicate_sym ];
+         ignore (finalize stmt)
+       with
+       | _ -> ())
+    tables
 
 
 (** Get predicate dependencies for a predicate *)
@@ -1377,22 +1404,52 @@ let rec is_predicate_up_to_date
            false (* Logical function changed *)
          else (* Check logical function's dependencies recursively *)
            is_logical_function_up_to_date db pred_sym current_lf_hashes ~visited)
-    | _, None -> false (* Not in current hashes, assume stale *)
+    | _, None ->
+      (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+       | Some "1" ->
+         Printf.eprintf
+           "DEBUG: predicate %s not in current_pred_hashes (key mismatch?)\n%!"
+           pred_sym
+       | _ -> ());
+      false (* Not in current hashes, assume stale *)
     | Some stored, Some current_hash ->
-      if String.compare stored.content_hash current_hash <> 0 then
-        false (* This predicate changed *)
+      if String.compare stored.content_hash current_hash <> 0 then (
+        (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+         | Some "1" ->
+           Printf.eprintf
+             "DEBUG: predicate %s hash changed: stored=%s current=%s\n%!"
+             pred_sym
+             stored.content_hash
+             current_hash
+         | _ -> ());
+        false (* This predicate changed *))
       else (
         (* Check this predicate's dependencies recursively *)
         let pred_deps = get_predicate_predicate_dependencies db pred_sym in
+        (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+         | Some "1" ->
+           Printf.eprintf
+             "DEBUG: predicate %s hash ok, checking %d pred deps: [%s]\n%!"
+             pred_sym
+             (List.length pred_deps)
+             (String.concat "; " pred_deps)
+         | _ -> ());
         let pred_deps_ok =
           List.for_all
             (fun dep_sym ->
-               is_predicate_up_to_date
-                 db
-                 dep_sym
-                 current_pred_hashes
-                 current_lf_hashes
-                 ~visited)
+               let result =
+                 is_predicate_up_to_date
+                   db
+                   dep_sym
+                   current_pred_hashes
+                   current_lf_hashes
+                   ~visited
+               in
+               (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+                | Some "1" when not result ->
+                  Printf.eprintf "DEBUG: predicate %s dep %s FAILED\n%!" pred_sym dep_sym
+                | _ -> ());
+               result)
             pred_deps
         in
         if not pred_deps_ok then
@@ -1400,6 +1457,14 @@ let rec is_predicate_up_to_date
         else (
           (* Check logical function dependencies *)
           let lf_deps = get_predicate_logical_function_dependencies db pred_sym in
+          (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+           | Some "1" ->
+             Printf.eprintf
+               "DEBUG: predicate %s pred deps ok, checking %d lf deps: [%s]\n%!"
+               pred_sym
+               (List.length lf_deps)
+               (String.concat "; " lf_deps)
+           | _ -> ());
           let lf_deps_ok =
             List.for_all
               (fun lf_sym ->
@@ -1429,14 +1494,38 @@ and is_logical_function_up_to_date
     match
       (get_logical_function_status db lf_sym, Hashtbl.find_opt current_lf_hashes lf_sym)
     with
-    | None, _ -> false (* Not in database, assume stale *)
-    | _, None -> false (* Not in current hashes, assume stale *)
+    | None, _ ->
+      (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+       | Some "1" -> Printf.eprintf "DEBUG: lf %s not in DB\n%!" lf_sym
+       | _ -> ());
+      false (* Not in database, assume stale *)
+    | _, None ->
+      (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+       | Some "1" -> Printf.eprintf "DEBUG: lf %s not in current_lf_hashes\n%!" lf_sym
+       | _ -> ());
+      false (* Not in current hashes, assume stale *)
     | Some stored, Some current_hash ->
-      if String.compare stored.content_hash current_hash <> 0 then
-        false (* This logical function changed *)
+      if String.compare stored.content_hash current_hash <> 0 then (
+        (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+         | Some "1" ->
+           Printf.eprintf
+             "DEBUG: lf %s hash changed: stored=%s current=%s\n%!"
+             lf_sym
+             stored.content_hash
+             current_hash
+         | _ -> ());
+        false (* This logical function changed *))
       else (
         (* Check this logical function's dependencies recursively *)
         let deps = get_logical_function_dependencies db lf_sym in
+        (match Sys.getenv_opt "CN_DEBUG_CACHE" with
+         | Some "1" ->
+           Printf.eprintf
+             "DEBUG: lf %s hash ok, checking %d deps: [%s]\n%!"
+             lf_sym
+             (List.length deps)
+             (String.concat "; " deps)
+         | _ -> ());
         List.for_all
           (fun dep_sym ->
              is_logical_function_up_to_date db dep_sym current_lf_hashes ~visited)

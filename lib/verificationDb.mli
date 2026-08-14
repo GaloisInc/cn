@@ -112,6 +112,9 @@ val get_datatype_definition : db_handle -> string -> function_record option
 (** Clear all dependencies for a function (called before re-recording to avoid stale entries) *)
 val clear_function_dependencies : db_handle -> function_sym:string -> unit
 
+(** Clear all dependencies for a predicate (called before re-recording to avoid stale entries) *)
+val clear_predicate_dependencies : db_handle -> predicate_sym:string -> unit
+
 (** Record function -> struct usage *)
 val record_struct_usage : db_handle -> function_sym:string -> struct_name:string -> unit
 
