@@ -711,7 +711,7 @@ let rec n_expr
         visit_count
         depth
         case_name;
-    if !n_expr_call_count mod 10000 = 0 then
+    if debug_enabled () && !n_expr_call_count mod 10000 = 0 then
       Printf.eprintf
         "[N_EXPR] %d calls, %.3fs total (%.3fs avg, depth=%d, last=%s)\n%!"
         !n_expr_call_count
