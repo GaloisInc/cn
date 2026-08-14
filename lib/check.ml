@@ -3923,6 +3923,10 @@ let time_check_c_functions
                | None -> return ()
                | Some pred_def ->
                  let pred_hash = ContentHash.hash_predicate pred_def in
+                 (* Clear stale deps before re-recording *)
+                 VerificationDb.clear_predicate_dependencies
+                   db_handle
+                   ~predicate_sym:(Sym.pp_string pred_sym);
                  VerificationDb.record_predicate_verified
                    db_handle
                    ~sym:(Sym.pp_string pred_sym)

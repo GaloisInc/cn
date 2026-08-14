@@ -360,6 +360,41 @@ let rec rename_ft_deterministic (ft : AT.ft) : AT.ft =
   aux ft
 
 
+and rename_lrt_deterministic counter (lrt : LRT.t) : LRT.t =
+  match lrt with
+  | LRT.Define ((name, it), info, t) ->
+    let new_name = Sym.fresh (Printf.sprintf "v_%d" !counter) in
+    counter := !counter + 1;
+    let subst = IT.make_rename ~from:name ~to_:new_name in
+    let it' = IT.subst subst it in
+    let t' = LRT.subst subst t in
+    let t'' = rename_lrt_deterministic counter t' in
+    LRT.Define ((new_name, it'), info, t'')
+  | LRT.Resource ((name, (re, bt)), info, t) ->
+    let new_name = Sym.fresh (Printf.sprintf "v_%d" !counter) in
+    counter := !counter + 1;
+    let subst = IT.make_rename ~from:name ~to_:new_name in
+    let re' = Req.subst subst re in
+    let t' = LRT.subst subst t in
+    let t'' = rename_lrt_deterministic counter t' in
+    LRT.Resource ((new_name, (re', bt)), info, t'')
+  | LRT.Constraint (lc, info, t) ->
+    let t' = rename_lrt_deterministic counter t in
+    LRT.Constraint (lc, info, t')
+  | LRT.I -> LRT.I
+
+
+and rename_rt_deterministic counter (rt : RT.t) : RT.t =
+  match rt with
+  | RT.Computational ((name, bt), info, lrt) ->
+    let new_name = Sym.fresh (Printf.sprintf "v_%d" !counter) in
+    counter := !counter + 1;
+    let subst = IT.make_rename ~from:name ~to_:new_name in
+    let lrt' = LRT.subst subst lrt in
+    let lrt'' = rename_lrt_deterministic counter lrt' in
+    RT.Computational ((new_name, bt), info, lrt'')
+
+
 and rename_lat_deterministic counter (lat : RT.t LAT.t) : RT.t LAT.t =
   match lat with
   | LAT.Define ((name, it), info, t) ->
@@ -381,7 +416,7 @@ and rename_lat_deterministic counter (lat : RT.t LAT.t) : RT.t LAT.t =
   | LAT.Constraint (lc, info, t) ->
     let t' = rename_lat_deterministic counter t in
     LAT.Constraint (lc, info, t')
-  | LAT.I i -> LAT.I i
+  | LAT.I i -> LAT.I (rename_rt_deterministic counter i)
 
 
 (** Alpha-rename a function type (specification) to canonical form *)
@@ -432,7 +467,7 @@ and rename_lat_lemma_deterministic counter (lat : LRT.t LAT.t) : LRT.t LAT.t =
   | LAT.Constraint (lc, info, t) ->
     let t' = rename_lat_lemma_deterministic counter t in
     LAT.Constraint (lc, info, t')
-  | LAT.I i -> LAT.I i
+  | LAT.I i -> LAT.I (rename_lrt_deterministic counter i)
 
 
 (** Substitution for Mucore expressions and related structures.
