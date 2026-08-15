@@ -71,23 +71,11 @@ let well_formed
             Printf.printf "===================\n\n";
             Printf.printf "Database: %s\n" db_path;
             Printf.printf "File: %s\n" filename;
-            (* Filter functions if --only is specified *)
-            let functions_to_analyze =
-              match only_function with
-              | None -> c_functions
-              | Some fn_name ->
-                List.filter
-                  (fun (sym, _) -> String.equal (Sym.pp_string sym) fn_name)
-                  c_functions
-            in
-            match only_function with
-            | Some fn_name when List.length functions_to_analyze = 0 ->
-              Printf.printf "Error: Function '%s' not found in file\n" fn_name;
-              return ()
-            | _ ->
-              Printf.printf
-                "Functions analyzed: %d\n\n"
-                (List.length functions_to_analyze);
+            if List.length only > 0 && List.length selected_funs = 0 then (
+              Printf.printf "Error: None of the specified functions found in file\n";
+              return ())
+            else (
+              Printf.printf "Functions analyzed: %d\n\n" (List.length selected_funs);
               (* Build lookup maps for dependency checking *)
               let sym_name_map = Hashtbl.create 100 in
               List.iter
@@ -440,9 +428,9 @@ let well_formed
                            (fun dep -> Printf.printf "    - datatype: %s\n" dep)
                            datatype_deps);
                        Printf.printf "  Action: Will skip verification\n\n"))
-                functions_to_analyze;
+                selected_funs;
               VerificationDb.close_db db |> ignore;
-              return ())
+              return ()))
         in
         Typing.run_from_pause check paused))
   else (* Normal well-formedness check *)
